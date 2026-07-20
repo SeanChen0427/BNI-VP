@@ -2,26 +2,25 @@
 
 ## 現況
 
-目前是無建置步驟的多頁式原型：
+目前是由 GitHub Pages 發布、Supabase 提供正式後端的多頁式應用：
 
-每月資料橋接由 `assets/js/monthly-data-update.js` 呼叫 `preview-server.mjs` 的 `/api/monthly-data`；伺服器驗證副主席／管理員身分、檔案大小及報表期間後，寫入相鄰 `BNI/data/` 對應目錄。
+每月資料橋接由 `assets/js/monthly-data-update.js` 呼叫 Supabase `app-api` Edge Function；Function 驗證 JWT、角色、姓名、檔案大小及報表期間後，寫入 Private Storage 與 `report_imports`。`preview-server.mjs` 只保留本機開發用途。
 
 ```text
 瀏覽器頁面
 ├─ localStorage：案件、表單草稿、公告、出席、設定
 ├─ Supabase Auth：三組共用帳號的密碼驗證、短期登入 token
+├─ Supabase PostgreSQL：會員、月會、報表索引、分析版本與 RLS
+├─ Supabase Private Storage：PALMS／會籍／會齡／審計原始報表
+├─ Supabase Edge Functions
+│  ├─ app-api：月會、每月資料、分析、AI、離會與公司查詢
+│  └─ manage-shared-credentials：Admin 更新三組共用密碼
 ├─ sessionStorage：登入工作階段、AI 對話（關閉分頁即移除）
 ├─ IndexedDB：案件 Word 附件
-└─ preview-server.mjs
-   ├─ 靜態檔案
-   ├─ BNI 分析橋接
-   ├─ 公司統編查詢代理
-   ├─ 會員委員會月會紀錄（本機私有應用資料）
-   ├─ 個人 AI Key 本機加密保存
-   └─ AI 制度查詢代理
+└─ localStorage：尚待跨裝置遷移的案件、表單、公告、現場出席與課程進度
 ```
 
-這是可測試原型，不是正式 SaaS 架構。
+正式網址只發布公開前端；真實會員、報表、密碼與 AI Key 均不進 GitHub。
 
 ## 頁面分區
 
@@ -88,16 +87,16 @@
 
 Supabase 專案 `fahrblkukuhgveiptufn` 已建立正式 schema、RLS、Private Storage 與三組共用 Auth 帳號。前端登入已於 2026-07-20 接上 Supabase Auth；多數案件與表單資料仍待由瀏覽器本機儲存遷移至 PostgreSQL／Private Storage。
 
-正式前台已確認由 GitHub Pages 託管，但尚未建立／連接 GitHub repository。2026-07-20 的 Sites 與 Supabase `web-app`／`site` 只屬暫時前台，GitHub Pages 驗證後必須移除；操作證據與清理清單見 `docs/DEPLOYMENT_LOG_2026-07-20.md`。
+正式前台已由 GitHub Pages 託管於 `SeanChen0427/BNI-VP`；2026-07-20 的 Sites 公開入口已關閉，Supabase `web-app`／`site` 暫時前台已移除。操作證據與清理紀錄見 `docs/DEPLOYMENT_LOG_2026-07-20.md`。
 
 ## 已知架構債
 
 1. 多數 CSS 與部分 JS 被壓成單行，閱讀與差異審查成本高。
 2. `localStorage` 資料沒有 schema migration。
-3. 登入與角色已由 Supabase Auth＋`app_accounts` RLS 驗證；多數業務資料仍在本機原型，尚未全面改由後端 RLS 強制。
+3. 登入、會員、報表、月會、分析、AI 與離會已由 Supabase Auth／RLS／Edge API 保護；案件、表單、現場點名與課程進度仍待跨裝置遷移。
 4. 表單的 Word 產生程式高度重複。
-5. 真實會員名單已從 `member-directory.js` 移除並改由登入後查詢 Supabase；仍須在首次 GitHub 提交前執行完整敏感資料掃描。
-6. `preview-server.mjs` 同時負責多種 API，後續應拆成路由與服務。
+5. 真實會員名單已從 `member-directory.js` 移除並改由登入後查詢 Supabase；每次 GitHub Pages 發佈前由 workflow 執行敏感資料掃描。
+6. `preview-server.mjs` 保留本機預覽相容；正式環境的 9 組舊 API 已由 `app-api` Edge Function 接管。
 7. 無 ESLint、Prettier、型別檢查與完整自動測試。
 
 ## 本機預覽安全界線

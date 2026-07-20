@@ -1,6 +1,6 @@
-# 本機資料與儲存 Schema
+# 資料與儲存 Schema
 
-本文件記錄原型期資料位置。正式上線後應遷移至後端。
+本文件記錄正式後端與仍待遷移的瀏覽器本機資料。
 
 ## localStorage
 
@@ -38,15 +38,16 @@
 - Value：訪談 Word `File`
 - 唯一讀寫服務：`services/case-files.js`
 
-## 專案外本機加密資料
+## Supabase 伺服器端加密資料
 
-`~/Library/Application Support/Fulian VP System/`
+- `ai_credentials`：個人 AI Key 的 AES-GCM 密文；解密 secret 只存在 Edge Function 環境。
+- `ai_profiles`：個人預設 AI 平台。
+- `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。
+- `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
+- `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
+- `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 
-- `local-master.key`
-- `ai-credentials.enc`
-- `committee-meetings.json`：月會草稿與正式紀錄
-
-不得複製進 GitHub、備份範例或截圖。
+上述資料不得複製進 GitHub、公開備份範例或截圖。
 
 ## 本機測試資料重置
 
@@ -56,7 +57,7 @@
 - `fulian-case-workflow-v2-*`
 - 五種案件訪談草稿 Key
 - IndexedDB `fulian-case-files`
-- `committee-meetings.json` 內的月會紀錄
+- Supabase `committee_meetings` 內的月會紀錄
 
 會員主檔、BNI／PALMS、登入與人員設定、個人 AI Key、出席、公告及課程進度不在清除範圍。
 

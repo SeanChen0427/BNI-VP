@@ -111,7 +111,7 @@ async function loadDepartureState(){
     const response=await fetch(`/api/member-departure?identity=${encodeURIComponent(departureIdentity())}`,{cache:"no-store"}),data=await response.json();
     if(!response.ok)throw new Error(data.message||"無法讀取名單");
     departureState=data;renderDepartureState();$("#departureStatus").textContent="";
-  }catch(error){$("#departureStatus").textContent=`名單載入失敗：${error.message}（需啟動本機伺服器）`}
+  }catch(error){$("#departureStatus").textContent=`名單載入失敗：${error.message}`}
 }
 function departureWarnings(name){
   const warnings=[];

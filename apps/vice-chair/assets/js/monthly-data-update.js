@@ -22,7 +22,7 @@
     window.dispatchEvent(new CustomEvent("fulian:monthly-data-status",{detail:data}));
   }
   async function load(){
-    setMessage("正在核對 BNI 資料夾…");try{
+    setMessage("正在核對 Supabase 私人報表…");try{
       const response=await fetch(`/api/monthly-data?identity=${encodeURIComponent(identity)}`,{cache:"no-store"}),data=await response.json();
       if(!response.ok)throw new Error(data.message||`HTTP ${response.status}`);render(data);setMessage(data.completed===data.total?"本月四類資料均已完成。":"尚有資料待上傳，完成後系統會自動驗證並入檔。",data.completed===data.total?"success":"");
     }catch(error){list.innerHTML=`<div class="monthly-data-loading">無法讀取資料狀態</div>`;setMessage(error.message,"error")}
