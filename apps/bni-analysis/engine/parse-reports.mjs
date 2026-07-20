@@ -9,10 +9,10 @@ export function normalizeName(name) {
 }
 
 // 檔案一：PALMS 報告。表頭以「首欄含『姓』的列」動態定位。
-export function parsePalms(filePath) {
-  const rows = parseXmlSpreadsheet(readFileSync(filePath, "utf8"));
+export function parsePalmsText(xml, sourceLabel = "PALMS 上傳檔") {
+  const rows = parseXmlSpreadsheet(xml);
   const headerIndex = rows.findIndex((r) => String(r[0] || "").includes("姓"));
-  if (headerIndex < 0) throw new Error(`找不到 PALMS 表頭列：${filePath}`);
+  if (headerIndex < 0) throw new Error(`找不到 PALMS 表頭列：${sourceLabel}`);
   const period = extractPeriod(rows, headerIndex);
   const members = [];
   for (let i = headerIndex + 1; i < rows.length; i += 1) {
@@ -38,8 +38,12 @@ export function parsePalms(filePath) {
       ceu: toNumber(c[19]),
     });
   }
-  if (members.length === 0) throw new Error(`PALMS 解析不到任何會員資料列：${filePath}`);
+  if (members.length === 0) throw new Error(`PALMS 解析不到任何會員資料列：${sourceLabel}`);
   return { period, members, headerIndex, rowCount: rows.length };
+}
+
+export function parsePalms(filePath) {
+  return parsePalmsText(readFileSync(filePath, "utf8"), filePath);
 }
 
 // 檔案二：會員到期日報告。
@@ -57,8 +61,8 @@ const EXPIRY_LABELS = {
   startDate: "開始日期",
 };
 
-export function parseExpiry(filePath) {
-  const rows = parseXmlSpreadsheet(readFileSync(filePath, "utf8"));
+export function parseExpiryText(xml, sourceLabel = "會員到期日上傳檔") {
+  const rows = parseXmlSpreadsheet(xml);
   const members = [];
   let colMap = null; // 目前區段的欄位對應 { field: colIndex }
   let section = "current";
@@ -95,13 +99,17 @@ export function parseExpiry(filePath) {
       startDate: dateOf(pick("startDate")),
     });
   }
-  if (members.length === 0) throw new Error(`到期日報告解析不到任何資料列：${filePath}`);
+  if (members.length === 0) throw new Error(`到期日報告解析不到任何資料列：${sourceLabel}`);
   return { members };
 }
 
+export function parseExpiry(filePath) {
+  return parseExpiryText(readFileSync(filePath, "utf8"), filePath);
+}
+
 // 檔案三：會齡報告。只使用累計開始日期（index 6）；復會判斷另需最近開始日期（index 10，僅供身份判斷）。
-export function parseTenure(filePath) {
-  const rows = parseXmlSpreadsheet(readFileSync(filePath, "utf8"));
+export function parseTenureText(xml, sourceLabel = "會齡上傳檔") {
+  const rows = parseXmlSpreadsheet(xml);
   const members = [];
   for (const c of rows) {
     const startRaw = String(c[6] || "").trim();
@@ -113,17 +121,24 @@ export function parseTenure(filePath) {
     const recent = recentRaw.match(/^(\d{4}-\d{2}-\d{2})/);
     members.push({ name, cumulativeStart: m[1], recentStart: recent ? recent[1] : null });
   }
-  if (members.length === 0) throw new Error(`會齡報告解析不到任何資料列：${filePath}`);
+  if (members.length === 0) throw new Error(`會齡報告解析不到任何資料列：${sourceLabel}`);
   return { members };
 }
 
+export function parseTenure(filePath) {
+  return parseTenureText(readFileSync(filePath, "utf8"), filePath);
+}
+
 // 離會名單：data/departed-members.md 的表格列。
-export function parseDeparted(filePath) {
-  const text = readFileSync(filePath, "utf8");
+export function parseDepartedText(text) {
   const names = [];
   for (const line of text.split("\n")) {
     const m = line.match(/^\|\s*([^|]+?)\s*\|\s*(\d{4}-\d{2}-\d{2})\s*\|/);
     if (m && m[1] !== "姓名") names.push({ name: normalizeName(m[1]), confirmedAt: m[2] });
   }
   return names;
+}
+
+export function parseDeparted(filePath) {
+  return parseDepartedText(readFileSync(filePath, "utf8"));
 }

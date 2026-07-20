@@ -120,6 +120,9 @@ file_size_limit = "50MiB"
 [functions.site]
 verify_jwt = false
 
+[functions.app-api]
+verify_jwt = true
+
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
 # public = false

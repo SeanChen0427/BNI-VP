@@ -33,11 +33,15 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `supabase/migrations/20260720070454_initial_schema.sql`
   - `supabase/migrations/20260720074814_grant_service_role_privileges.sql`
   - `supabase/migrations/20260720095300_public_web_assets_bucket.sql`
+  - `supabase/migrations/20260720153500_online_application_api.sql`
 - 第一版正式 schema 建立 26 個資料表、78 條 RLS policies 與 3 個 Private Storage buckets：
   - `raw-reports`
   - `case-files`
   - `case-confirmations`
 - 後續錯誤繞路另建立的 `web-app` 公開 bucket 已在 GitHub Pages 驗證後移除。
+- 新增正式 `app_settings`、`monthly_attendance_summaries`、`ai_profiles`；月會寫入 RLS 收斂為 Admin／副主席，委員只讀已結案紀錄。
+- 已部署 `app-api` Edge Function；Supabase gateway JWT 驗證與函式內 `app_accounts`／當期委員姓名驗證同時啟用。
+- `FULIAN_AI_ENCRYPTION_KEY` 已以隨機 Edge secret 設定，未輸出、未寫入專案；個人 AI Key 以 AES-GCM 密文保存在 `ai_credentials`。
 
 ### Auth 與角色
 
@@ -74,27 +78,35 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 
 - `assets/js/supabase-config.js`：Supabase 公開 URL 與 publishable key。
 - `assets/js/auth.js`：Supabase Auth、角色驗證、token 更新、登出及逾時。
-- `assets/js/supabase-data.js`：由 Supabase 讀取會員與已發布分析快照，攔截：
+- `assets/js/supabase-data.js`：由 Supabase 讀取會員、單月出席與已發布分析快照；所有同源 `/api/*` 會自動附上目前登入 JWT 及自我申報姓名後轉送 `app-api`。直接讀取：
   - `/api/bni-analysis`
   - `/api/bni-monthly-attendance`
+- Edge API 接管：
+  - `/api/monthly-data`
+  - `/api/committee-meetings`
+  - `/api/analysis-draft`
+  - `/api/analysis-snapshots`
+  - `/api/ai-settings`
+  - `/api/ai-chat`
+  - `/api/member-departure`
+  - `/api/company`
+  - `/api/test-data-reset`
 - `assets/js/member-directory.js`：會員姓名不再寫死於公開前端，由登入後的 Supabase 查詢取得。
 - `assets/js/auth.js`：副主席與會員委員姓名同樣改由登入後的 Supabase `committee_terms` 取得。
 - `member-care.js`、`attendance.js`、`settings.js`、`work-planner.js` 已等待線上會員名單載入。
 - PALMS 教材 PDF 因 Supabase Storage 不接受中文物件鍵，檔名由中文改為 `palms-entry-guide-v1.0-20220505.pdf`；PDF 內容與畫面文案未改。
 
-## 四、尚未完成的正式後端遷移
+## 四、本輪完成與仍待遷移的資料層
 
-目前不能宣稱「所有功能都已可跨裝置正式使用」。以下功能仍依賴本機 `preview-server.mjs`、`localStorage`、IndexedDB 或 macOS 應用資料：
+本輪已完成所有舊 `/api/*` 的正式後端接管；月會、每月報表、單月出席、分析草稿、離會、AI 與公司查詢不再依賴本機 `preview-server.mjs` 或 macOS 應用資料。
+
+以下既有前端模組仍明確使用瀏覽器 `localStorage`／IndexedDB，尚未跨裝置同步：
 
 - 案件、任務、表單草稿與部分工作流程。
 - 訪談 Word 附件。
-- 會員委員會月會儲存。
-- 每月資料上傳與分析草稿 API。
-- 個人 AI Key 與 AI 對話代理。
-- 離會登記、測試資料重置、公司統編代理。
-- 出席、公告、課程進度等瀏覽器本機狀態。
+- 出席現場點名、公告、課程進度等瀏覽器本機狀態。
 
-正式上線仍需把這些資料層與 API 逐項遷移至 Supabase PostgreSQL、Private Storage 與 Edge Functions。
+這些屬下一階段的跨裝置資料同步，不是本次 HTML 404／月會／每月上傳 API 故障。
 
 ## 五、錯誤繞路與目前暫時資源
 
@@ -130,6 +142,9 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 根目錄 `npm run check` 已通過。
 - BNI regression 46／46 通過。
 - 公開 repository 檢查 196 個檔案通過；Supabase CLI 暫存、真實會員名單、PALMS、密鑰與暫時前台均未提交。
+- 本輪修改後 `npm run check`、46／46 計分回歸及公開 repository 掃描再次通過；GitHub Pages 公開 artifact 共 112 個檔案。
+- `20260720153500_online_application_api.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` Function bundler 成功帶入既有分析核心，沒有另建計分副本。
+- 本輪自動三角色線上驗證無法沿用專案外的初始密碼檔：三組密碼已在先前操作中更新，而初始檔未同步更新。未擅自重設正式密碼；完成 GitHub Pages 新版發佈後需使用目前有效密碼做一次實際點擊驗收。
 - GitHub Pages workflow build 與 deploy 均成功。
 - 正式首頁、登入頁與 `auth.js` 均回應 HTTP 200。
 - `scripts/verify-online-supabase.mjs` 已對正式 GitHub Pages 執行：
@@ -150,5 +165,5 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 後續順序：
 
 1. 輪替本次工具輸出中曾顯示過的 legacy service role key。
-2. 繼續把案件、表單、附件、月會、任務與其他本機 `/api/*` 遷移至 Supabase，直到所有工作流程都能跨裝置保存。
+2. 將案件、表單、附件、任務、現場點名與課程進度從瀏覽器本機狀態遷移至既有 Supabase schema，完成跨裝置同步。
 3. 完成一般使用者的實際操作驗收與換屆交接規則。

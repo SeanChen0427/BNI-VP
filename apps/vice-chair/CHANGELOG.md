@@ -2,6 +2,9 @@
 
 ## 2026-07-20
 
+- 修正 GitHub Pages 對本機 `/api/*` 回傳 HTML 404、造成月會無法載入及 `Unexpected token '<'`：新增正式 `app-api` Edge Function，將月會、每月資料、分析草稿／版本、AI 設定／對話、離會、公司統編與測試資料重置共 9 組 API 全部改接 Supabase；Edge gateway JWT 與函式內角色／姓名雙重驗證均啟用。
+- 新增正式線上應用 migration：月會設定、單月 PALMS 出席摘要、AI 個人偏好、完整 service-role 最小必要權限及月會 leadership-only RLS；個人 AI Key 以獨立 Edge secret 進行 AES-GCM 加密，原始報表持續只存 Private Storage。
+- 分析核心新增純資料輸入介面，Edge Function 直接使用 `apps/bni-analysis/engine` 的同一套對帳、計分與診斷規則；本機 regression 仍為 46／46，未在工作台或資料庫複製計分規則。
 - 新增 `docs/DEPLOYMENT_LOG_2026-07-20.md`，完整記錄 Supabase schema／RLS／Auth／資料遷移、Sites 與 Supabase 暫時前台、驗證結果、安全事件、未完成資料層及待清理資源；明確禁止把暫時部署描述為正式上架完成。
 - 正式前台架構重新確認為 GitHub Pages，Supabase 只負責 Auth、Database、Private Storage、RLS 與 Edge Functions；先前建立的 Sites 與 Supabase `web-app`／`site` 前台列為 GitHub Pages 上線後必須移除的暫時繞路。
 - Supabase 已遷移 44 位會員、12 份 Private Storage 原始報表、2026-01-01 至 2026-06-30 已發布分析快照及 2026-06 單月出席資料；三角色登入、RLS、會員與 PALMS 讀取已驗證。

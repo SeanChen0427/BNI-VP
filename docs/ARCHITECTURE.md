@@ -43,7 +43,7 @@ Supabase Auth／Database／Private Storage
 
 正式版仍維持同一個總專案，但原始報表與會員資料不進 GitHub。分析核心必須在受保護的伺服器環境執行，AI 助手只解讀已有結果，不自行決定正式燈號或會員資格。
 
-2026-07-20 已建立 Supabase 正式後端並遷移 44 位會員、12 份原始報表與第一版分析快照；正式前台已部署至 <https://seanchen0427.github.io/BNI-VP/>。同日建立的 Sites 公開入口已關閉，Supabase 暫時前台已刪除，詳見 `apps/vice-chair/docs/DEPLOYMENT_LOG_2026-07-20.md`。
+2026-07-20 已建立 Supabase 正式後端並遷移 44 位會員、12 份原始報表與第一版分析快照；正式前台已部署至 <https://seanchen0427.github.io/BNI-VP/>。同日已部署受 JWT 保護的 `app-api` Edge Function，原本僅能由 `preview-server.mjs` 提供的 9 組 API 均改由 Supabase 執行；分析 Function 直接引用同一份 `apps/bni-analysis/engine`，不在工作台或資料庫重寫計分規則。Sites 公開入口已關閉，Supabase 暫時前台已刪除，詳見 `apps/vice-chair/docs/DEPLOYMENT_LOG_2026-07-20.md`。
 
 ## 遷移原則
 

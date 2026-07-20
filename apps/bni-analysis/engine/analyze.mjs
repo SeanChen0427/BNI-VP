@@ -49,7 +49,37 @@ export function buildAnalysis({ asOf = new Date().toISOString().slice(0, 10) } =
   const expiry = parseExpiry(paths.expiry);
   const tenure = parseTenure(paths.tenure);
   const departed = parseDeparted(paths.departed);
+  const annual = paths.annual ? parsePalms(paths.annual) : null;
+  const auditMonth = paths.auditDir ? loadAuditMonth(paths.auditDir) : null;
+  const sources = [fingerprint(paths.palms), fingerprint(paths.expiry), fingerprint(paths.tenure), fingerprint(paths.departed)];
+  if (paths.annual) sources.push(fingerprint(paths.annual));
 
+  return buildAnalysisFromParsed({
+    palms,
+    expiry,
+    tenure,
+    departed,
+    annual,
+    auditMonth,
+    auditMonthName: paths.auditDir ? path.basename(paths.auditDir) : null,
+    asOf,
+    sources,
+  });
+}
+
+// 正式伺服器與本機 CLI 共用同一分析流程。Edge Function 只負責從 Private
+// Storage 取回報表並解析；計分、診斷與對帳仍唯一存在於本檔及相鄰 engine 模組。
+export function buildAnalysisFromParsed({
+  palms,
+  expiry,
+  tenure,
+  departed,
+  annual = null,
+  auditMonth = null,
+  auditMonthName = null,
+  asOf = new Date().toISOString().slice(0, 10),
+  sources = [],
+} = {}) {
   // 先對帳：blocking 異常存在時直接回傳，不做任何分析。
   const reconciliation = reconcile({ palms, expiry, tenure, departed });
   const meta = {
@@ -57,7 +87,7 @@ export function buildAnalysis({ asOf = new Date().toISOString().slice(0, 10) } =
     generatedAt: new Date().toISOString(),
     asOf,
     period: palms.period,
-    sources: [fingerprint(paths.palms), fingerprint(paths.expiry), fingerprint(paths.tenure), fingerprint(paths.departed)],
+    sources,
   };
   if (!reconciliation.ok) {
     return { meta, reconciliation, aborted: true, reason: "對帳未通過，依「先對帳後分析」原則停止輸出" };
@@ -91,10 +121,8 @@ export function buildAnalysis({ asOf = new Date().toISOString().slice(0, 10) } =
 
   // 年度資料（續約審查弱項精算用）
   let annualByName = null;
-  if (paths.annual) {
-    const annual = parsePalms(paths.annual);
+  if (annual) {
     annualByName = new Map(annual.members.map((m) => [m.name, { visitors: m.visitors, ceu: m.ceu }]));
-    meta.sources.push(fingerprint(paths.annual));
     meta.annualPeriod = annual.period;
   }
 
@@ -108,9 +136,8 @@ export function buildAnalysis({ asOf = new Date().toISOString().slice(0, 10) } =
 
   // 審計（有當月資料才跑）
   let audit = null;
-  if (paths.auditDir) {
-    const month = loadAuditMonth(paths.auditDir);
-    audit = { month: path.basename(paths.auditDir), ...runAuditFamilies({ events: month.events, weeks: month.weeks, activeScored }) };
+  if (auditMonth) {
+    audit = { month: auditMonthName, ...runAuditFamilies({ events: auditMonth.events, weeks: auditMonth.weeks, activeScored }) };
   }
 
   // 分會結構性訊號（個人問題 vs 分會系統問題的判讀基礎）

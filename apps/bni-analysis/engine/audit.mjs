@@ -6,13 +6,13 @@ import path from "node:path";
 import { parseXmlSpreadsheet, toNumber } from "./xml-sheet.mjs";
 import { normalizeName } from "./parse-reports.mjs";
 
-export function parseAuditWeek(filePath) {
-  const rows = parseXmlSpreadsheet(readFileSync(filePath, "utf8"));
+export function parseAuditWeekText(xml, sourceLabel = "審計上傳檔") {
+  const rows = parseXmlSpreadsheet(xml);
   const title = String(rows[0]?.[0] || "");
   const wm = title.match(/(\d{2})\/(\d{2})\/(\d{4})/);
   const week = wm ? `${wm[3]}-${wm[2]}-${wm[1]}` : null;
   const headerIndex = rows.findIndex((r) => String(r[0] || "").trim() === "自");
-  if (headerIndex < 0) throw new Error(`找不到審計報告表頭（自）：${filePath}`);
+  if (headerIndex < 0) throw new Error(`找不到審計報告表頭（自）：${sourceLabel}`);
   const events = [];
   for (let i = headerIndex + 1; i < rows.length; i += 1) {
     const c = rows[i];
@@ -32,16 +32,23 @@ export function parseAuditWeek(filePath) {
   return { week, events };
 }
 
-export function loadAuditMonth(dirPath) {
-  const files = readdirSync(dirPath).filter((f) => f.endsWith(".xls")).sort();
+export function parseAuditWeek(filePath) {
+  return parseAuditWeekText(readFileSync(filePath, "utf8"), filePath);
+}
+
+export function combineAuditWeeks(reports) {
   const weeks = [];
   const events = [];
-  for (const f of files) {
-    const parsed = parseAuditWeek(path.join(dirPath, f));
-    weeks.push(parsed.week);
-    events.push(...parsed.events);
+  for (const report of reports) {
+    weeks.push(report.week);
+    events.push(...report.events);
   }
   return { weeks, events };
+}
+
+export function loadAuditMonth(dirPath) {
+  const files = readdirSync(dirPath).filter((f) => f.endsWith(".xls")).sort();
+  return combineAuditWeeks(files.map((f) => parseAuditWeek(path.join(dirPath, f))));
 }
 
 const pairKey = (a, b) => [a, b].sort().join("｜");

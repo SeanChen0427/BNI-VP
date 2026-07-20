@@ -11,6 +11,7 @@ const supabaseConfig=readFileSync(new URL("../assets/js/supabase-config.js",impo
 const supabaseData=readFileSync(new URL("../assets/js/supabase-data.js",import.meta.url),"utf8");
 const memberDirectory=readFileSync(new URL("../assets/js/member-directory.js",import.meta.url),"utf8");
 const edgeFunction=readFileSync(new URL("../../../supabase/functions/manage-shared-credentials/index.ts",import.meta.url),"utf8");
+const appApiFunction=readFileSync(new URL("../../../supabase/functions/app-api/index.ts",import.meta.url),"utf8");
 
 assert.doesNotMatch(html,/查看初版測試帳密|demo-accounts/);
 assert.match(source,/version:4/);
@@ -28,6 +29,14 @@ assert.match(settingsSource,/type="password"[^>]+autocomplete="new-password"/);
 assert.match(supabaseConfig,/sb_publishable_/);
 assert.doesNotMatch(supabaseConfig,/service_role|sb_secret_/);
 assert.match(supabaseData,/analysis_snapshots/);
+assert.match(supabaseData,/monthly_attendance_summaries/);
+assert.match(supabaseData,/\/functions\/v1\/app-api/);
+for(const endpoint of ["monthly-data","committee-meetings","analysis-draft","analysis-snapshots","ai-settings","ai-chat","member-departure","company","test-data-reset"]){
+  assert.match(appApiFunction,new RegExp(`/api/${endpoint}`),`Edge API 必須接管 /api/${endpoint}`);
+}
+assert.match(appApiFunction,/authenticate\(request, identity\)/);
+assert.match(appApiFunction,/account\.role/);
+assert.match(appApiFunction,/FULIAN_AI_ENCRYPTION_KEY/);
 assert.match(memberDirectory,/FulianData\.getMemberNames/);
 assert.doesNotMatch(memberDirectory,/members\s*[:=]\s*\[[^\]]+\]/s);
 assert.match(edgeFunction,/account\.role!=="admin"/);
