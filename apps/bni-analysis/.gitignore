@@ -1,0 +1,9 @@
+# 僅發佈儀表板頁面；以下為委員會內部資料，禁止推上公開 repo
+.DS_Store
+data/
+skill/
+report.html
+CLAUDE.md
+AGENTS.md
+CHANGELOG.md
+.claude/

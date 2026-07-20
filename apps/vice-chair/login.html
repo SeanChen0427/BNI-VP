@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#a5151b">
+  <title>登入｜富聯會員委員會系統</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/login.css?v=2"><script src="assets/js/supabase-config.js?v=1"></script><script src="assets/js/auth.js?v=5"></script>
+  <style>@media(max-width:900px){.login-shell{display:block}.brand-panel{min-height:420px;padding:34px;background-position:62% 42%}.brand-panel:after{inset:14px}.brand-story{padding:42px 0 34px;max-width:540px}.brand-story h1{font-size:36px}.brand-story p{font-size:13px}.brand-foot{display:none}.login-panel{margin:-25px auto 30px;position:relative;z-index:2;padding:28px}}</style>
+</head>
+<body>
+  <main class="login-shell">
+    <section class="brand-panel">
+      <div class="brand-top">
+        <span class="brand-mark">富</span>
+        <span class="brand-name"><b>富聯會員委員會</b><small>FULIAN CHAPTER</small></span>
+      </div>
+      <div class="brand-story">
+        <span class="eyebrow">MEMBERSHIP COMMITTEE</span>
+        <h1>連結每一份信任，<br>延續分會的成長。</h1>
+        <p>從會員關懷、訪談決議到出席管理，讓重要工作有脈絡、有進度，也能安心交接。</p>
+        <div class="brand-tags"><span>會員關懷</span><span>訪談決議</span><span>交接延續</span></div>
+      </div>
+      <div class="brand-foot"><span>副主席 × 會員委員會</span><b>讓每一次決議，都有值得信任的依據</b></div>
+    </section>
+    <section class="login-panel">
+      <div class="login-head"><span>SECURE ACCESS</span><h2>登入富聯工作台</h2><p>請使用目前職務對應的共用帳密。</p></div>
+      <form id="loginForm">
+        <label>帳號<input id="username" autocomplete="username" required placeholder="請輸入帳號"></label>
+        <label>密碼<input id="password" type="password" autocomplete="current-password" required placeholder="請輸入密碼"></label>
+        <label id="committeeField" hidden>會員委員身份<select id="committeeName"></select><small>委員共用同一組帳密，登入時請選擇自己的姓名。</small></label>
+        <p class="login-error" id="loginError"></p>
+        <button type="submit">登入系統</button>
+      </form>
+      <div class="security-note"><b>共用委員帳號的限制</b><span>系統會記錄登入時選擇的委員姓名，但無法嚴格證明是本人操作；若未來需要更強稽核，再升級成一人一帳號。</span></div>
+    </section>
+  </main>
+  <script src="assets/js/login.js?v=3"></script>
+</body>
+</html>

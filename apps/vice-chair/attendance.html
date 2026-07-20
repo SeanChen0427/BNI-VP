@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>每週點名與出席公告｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="assets/js/member-directory.js?v=2"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/attendance.css">
+  <link rel="stylesheet" href="assets/css/attendance-permissions.css?v=2">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・出席管理</span></div><label>目前登入身份<select id="loginUser" data-save></select></label></header>
+  <main>
+    <section class="hero attendance-hero"><div><span class="eyebrow">WEEKLY ATTENDANCE</span><h1>每週點名與出席公告</h1><p>委員逐位勾選並產生本週公告；正式出缺席與累計資料仍以副主席登錄 BNI Connect 後匯出的 PALMS 為準。</p></div><div class="save-state"><i></i><span id="saveState">尚未建立草稿</span><small id="saveTime">本週資料尚未開始</small></div></section>
+
+    <section class="meeting-setup form-card">
+      <div class="section-head"><span>01</span><div><h2>本週例會設定</h2><p>由委員手動勾選，方便現場確認與產生公告；本頁紀錄不作為月會正式統計來源</p></div></div>
+      <div class="fields setup-fields"><label>例會日期<input id="meetingDate" type="date" data-save></label><label>主要紀錄委員<select id="primaryRecorder" data-save><option value="">請選擇</option></select></label><label>協助點名委員<select id="assistantRecorder" data-save><option value="">請選擇</option></select></label><label>會員簡報秒數<select id="speechSeconds" data-save><option value="25" selected>25秒</option><option value="30">30秒</option></select></label></div>
+      <div class="meeting-stats"><article><small>會員總數</small><strong id="totalCount">44</strong><span>位</span></article><article><small>06:30到場</small><strong id="count630">0</strong><span>位</span></article><article><small>07:00到場</small><strong id="count700">0</strong><span>位</span></article><article><small>本週遲到</small><strong id="lateCount">0</strong><span>位</span></article><article><small>本週代理</small><strong id="proxyCount">0</strong><span>位</span></article><article><small>本週缺席</small><strong id="absenceCount">0</strong><span>位</span></article></div>
+    </section>
+
+    <div class="attendance-layout">
+      <section class="form-card roster-card">
+        <div class="section-head"><span>02</span><div><h2>會員點名</h2><p>橫向滑動可查看儀容與備註；資料會即時反映到公告預覽</p></div></div>
+        <div class="bulk-tools"><button type="button" data-bulk="at630">全選06:30</button><button type="button" data-bulk="at700">全選07:00</button><button type="button" data-bulk="speech">全選已完成簡報</button><button type="button" data-bulk="appearance">全選儀容與畫面</button><button type="button" id="clearWeek">清除本週狀態</button></div>
+        <div class="table-scroll"><table class="attendance-table"><thead><tr><th>會員姓名</th><th>06:30</th><th>07:00</th><th>遲到</th><th>早退</th><th>代理</th><th>缺席</th><th><span id="speechHeader">25秒</span></th><th>名牌</th><th>PIN章</th><th>西裝</th><th>開畫面</th><th>備註</th></tr></thead><tbody id="memberRows"></tbody></table></div>
+        <div class="table-note"><b>判定原則</b><span>06:30與07:00人數差異不自動判定遲到；代理與缺席的最終認定以主要紀錄委員確認為準。</span></div>
+      </section>
+
+      <aside class="preview-column">
+        <section class="form-card preview-card"><div class="section-head"><span>03</span><div><h2>LINE公告預覽</h2><p>本週資料取自現場勾選；累計取自最新半年 PALMS，再加上本週尚未回寫的紀錄</p><small id="palmsPeriod">正在讀取半年 PALMS…</small></div></div><pre id="announcementPreview"></pre><div class="preview-actions"><button type="button" class="ghost" id="copyAnnouncement">複製公告</button></div></section>
+        <section class="form-card approval-card"><div class="section-head"><span>04</span><div><h2>確認與發送</h2><p>LINE Bot尚未串接，初版只模擬發送</p></div></div><label><input type="checkbox" id="recorderConfirmed" data-save>主要紀錄委員已確認資料 <em>委員與副主席皆可</em></label><label class="vp-confirm" id="vpConfirmLabel"><input type="checkbox" id="vpConfirmed" data-save>副主席已完成最終確認 <em id="vpPermissionNote">僅副主席可操作</em></label><div class="send-state" id="sendState"><i></i><span>尚未達到發送條件</span></div><button type="button" class="primary send-button" id="simulateSend" disabled>模擬LINE Bot發送</button><small>正式版會將公告送至富聯公告群，並保存發送人、時間及公告快照。</small></section>
+      </aside>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="assets/js/attendance.js?v=7"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

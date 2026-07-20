@@ -1,0 +1,24 @@
+.approval-card label em {
+  margin-left: auto;
+  border-radius: 999px;
+  background: #edf5f0;
+  color: #277053;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-style: normal;
+  white-space: nowrap;
+}
+
+.approval-card label.permission-locked {
+  color: #999;
+}
+
+.approval-card label.permission-locked em {
+  background: #f0eeee;
+  color: #8a8581;
+}
+
+.approval-card input:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}

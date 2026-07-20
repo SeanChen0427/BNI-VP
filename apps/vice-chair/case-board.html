@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>進行中案件｜富聯分會</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/case-board.css?v=3">
+  <link rel="stylesheet" href="assets/css/case-creator.css">
+  <link rel="stylesheet" href="assets/css/case-delete.css?v=1">
+  <link rel="stylesheet" href="assets/css/case-stage-overrides.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+  <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
+  <style>.hero>.primary{border:0;font:inherit;cursor:pointer}</style>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="core/case-domain.js?v=4"></script>
+</head>
+<body>
+  <header class="topbar"><a href="index.html">← 回工作台</a><div><b>富聯分會</b><span>會員委員會案件中心</span></div><div class="identity"><small data-auth-role></small><strong data-auth-name></strong></div></header>
+  <main>
+    <section class="hero"><div><span>CASE OPERATIONS</span><h1>進行中案件</h1><p>每位會員都是獨立案件；訪談草稿、委員回饋、投票、董顧確認與結案紀錄不會互相覆蓋。</p></div><button class="primary" id="newCase" type="button">＋ 建立新案件</button></section>
+    <section class="summary" id="summary"></section>
+    <section class="workspace"><div class="toolbar"><nav id="stageTabs"></nav><label>搜尋案件<input id="search" type="search" placeholder="會員、專業別或負責人"></label></div><div class="flow-note"><b>案件流程</b><span>待安排訪談</span><i>→</i><span>訪談進行中</span><i>→</i><span>委員回饋</span><i>→</i><span>投票中</span><i>→</i><span>待董顧確認</span><i>→</i><span>已結案</span></div><div id="caseList" class="case-list"></div></section>
+  </main>
+  <div class="delete-modal" id="deleteModal" hidden>
+    <div class="delete-dialog" role="dialog" aria-modal="true" aria-labelledby="deleteTitle" aria-describedby="deleteDescription">
+      <span class="delete-warning">刪</span>
+      <div>
+        <small>DELETE CASE</small>
+        <h2 id="deleteTitle">確認刪除這個案件？</h2>
+        <p id="deleteDescription">刪除後，這個案件的訪談草稿、委員回饋、投票紀錄與附件也會一併移除，且無法復原。</p>
+        <strong id="deleteCaseName"></strong>
+      </div>
+      <div class="delete-actions">
+        <button type="button" id="cancelDelete">取消</button>
+        <button type="button" class="confirm-delete" id="confirmDelete">確認刪除</button>
+      </div>
+    </div>
+  </div>
+  <script src="assets/js/case-board.js?v=6"></script>
+  <script src="assets/js/case-creator.js?v=2"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

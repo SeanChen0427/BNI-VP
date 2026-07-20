@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>常用連結｜富聯分會</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/useful-links.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← 回工作台</a>
+    <div class="brand-title"><strong>富聯分會</strong><span>會員委員會常用資源</span></div>
+    <div class="session"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" data-auth-logout>登出</button></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><span>QUICK LINKS</span><h1>常用連結</h1><p>從工作平台直接開啟 BNI 日常使用網站；外部網站會在新分頁開啟。</p></div>
+      <div class="hero-mark" aria-hidden="true">鏈</div>
+    </section>
+
+    <section class="link-section" aria-labelledby="sharedLinksTitle">
+      <header><div><small>FOR EVERYONE</small><h2 id="sharedLinksTitle">所有成員可使用</h2><p>副主席、會員委員與系統管理員皆可開啟。</p></div><span>3 個入口</span></header>
+      <div class="link-grid" id="sharedLinks"></div>
+    </section>
+
+    <section class="link-section vp-section" id="vpLinksSection" aria-labelledby="vpLinksTitle" hidden>
+      <header><div><small>VICE PRESIDENT ONLY</small><h2 id="vpLinksTitle">副主席專用</h2><p>只在副主席登入時顯示，供例會填報、公告查閱與職務資料使用。</p></div><span>3 個入口</span></header>
+      <div class="link-grid" id="vpLinks"></div>
+    </section>
+
+    <aside class="external-note"><b>外部網站提醒</b><p>這些連結由各服務單位維護；如需登入，請使用該網站原有帳號。平台不會讀取或保存你在外部網站輸入的帳密。</p></aside>
+  </main>
+  <script src="assets/js/useful-links.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

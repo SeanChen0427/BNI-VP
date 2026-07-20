@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>新會員訪談｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/new-member-form.css">
+  <link rel="stylesheet" href="assets/css/new-member-form-v2.css">
+  <link rel="stylesheet" href="assets/css/interview-completion.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="case-board.html">← 回進行中案件</a><div><strong>富聯分會</strong><span>會員委員會工作台</span></div><label>目前登入身份<select id="loginUser"></select></label></header>
+  <main>
+    <section class="hero applicant-hero"><div><span class="eyebrow">高屏區會員訪談表・新會員用途</span><h1>新會員入會訪談</h1><p>依官方題目確認申請者的專業、經營穩定度、投入承諾與制度理解。</p></div><div class="save-state"><i></i><span id="saveState">草稿已儲存</span><small id="saveTime">尚未編輯</small></div></section>
+    <div class="layout">
+      <aside class="steps"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#professional">專業與321A</a><a href="#goals">加入目標</a><a href="#commitment">投入與出席</a><a href="#training">培訓與制度</a><a href="#network">組織與宣誓</a><a href="#closing">其他事項</a><a href="#contacts">20人名單</a><a href="#signatures">確認與簽名</a></nav><div class="privacy"><b>正式輸出邊界</b><p>官方題目與填寫內容會輸出；系統追問提示、321A內部判讀及委員內部備註不輸出。</p></div></aside>
+      <form id="newMemberForm">
+        <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>案件須已完成電子簽單與繳費</p></div></div><div class="case-gate"><span>流程前置</span><b>已簽單・已繳費</b><small>富聯完成付款後才安排會員委員訪談</small></div><div class="fields two"><label>會談日期與時間<input id="meetingDate" type="datetime-local" data-save></label><label>訪談方式／地址<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label><label>申請者姓名<input id="applicantSearch" list="applicantList" data-save><datalist id="applicantList"></datalist></label><label>申請專業類別<input id="profession" placeholder="請依申請書手動填寫" data-save></label><label>主訪委員<input id="leadInterviewer" readonly></label><label>陪訪委員<input id="companionInterviewer" list="committeeList" data-save></label><label>第二陪訪（選填）<input id="secondCompanion" list="committeeList" data-save></label><label>分會<input value="富聯" readonly></label><datalist id="committeeList"></datalist></div></section>
+
+        <section class="form-card" id="professional"><div class="section-head"><span>02</span><div><h2>專業資料與321A</h2><p>官方專業題目＋系統內部判讀</p></div></div><article class="question"><div class="question-head"><span>1.</span><h3>請清楚表明主要從事的業務、產品與服務內容，與同業不同的優勢或個人優勢，有何代表性客戶與成功見證？</h3></div><div class="system-hint"><b>系統訪談提示・不輸出至 Word</b><ul><li>請申請者說明最常承接的案件、服務流程及不承接的範圍。</li><li>優先記錄可查證的案例、客戶類型與客訴處理方式。</li></ul></div><div class="long-stack"><label class="long-field">主要業務、產品與服務<textarea id="businessContent" rows="6" data-save></textarea></label><label class="long-field">與同業或個人差異優勢<textarea id="advantages" rows="6" data-save></textarea></label><label class="long-field">代表性客戶<textarea id="representativeClients" rows="5" data-save></textarea></label><label class="long-field">成功見證<textarea id="successStories" rows="5" data-save></textarea></label></div></article>
+          <article class="question"><div class="question-head"><span>2.</span><h3>所申請的專業類別是全職或兼職？年資多久？</h3></div><div class="inline-fields"><label>投入型態<select id="employmentType" data-save><option value="">請選擇</option><option>全職</option><option>兼職</option></select></label><label>產業年資<input id="experienceYears" type="number" min="0" step="0.5" placeholder="年" data-save></label></div></article>
+          <article class="question"><div class="question-head"><span>3.</span><h3>請提供所屬專業類別必需的執照或證照，例如醫生證、執業許可證、技術師證照或特許行業批准函等。</h3></div><div class="system-hint"><b>系統訪談提示・不輸出至 Word</b><ul><li>確認該專業是否依法需要證照，以及證照是否屬申請者本人或公司。</li><li>如不需要特許資格，可記錄「此專業無法定證照要求」。</li></ul></div><label class="long-field">執照、證照或資格說明<textarea id="licenses" rows="4" data-save></textarea></label><div class="company-fields"><label>公司統編<div class="lookup-field"><input id="taxId" inputmode="numeric" maxlength="8" placeholder="輸入8碼統編" data-save><button type="button" id="lookupCompany">查詢公司資料</button></div><small class="company-name" id="companyNameHint">輸入統編後可由經濟部公司登記資料帶入</small><input id="companyName" type="hidden" data-save></label><label>公司資本額<input id="capital" placeholder="查詢後自動帶入，仍可修改" data-save></label><label>公司成立日期<input id="establishedDate" type="date" data-save></label></div><p class="lookup-status" id="companyLookupStatus"></p></article>
+          <div class="framework"><div><span>3</span><b>專業經驗</b><small>能力與邊界</small></div><div><span>2</span><b>經營穩定</b><small>流程與承接</small></div><div><span>1</span><b>專業聚焦</b><small>引薦是否清楚</small></div><div><span>A</span><b>合作態度</b><small>誠信與投入</small></div></div><label class="long-field internal-note">321A 委員內部觀察（不輸出正式表單）<textarea id="frameworkNotes" rows="5" data-save></textarea></label></section>
+
+        <section class="form-card" id="goals"><div class="section-head"><span>03</span><div><h2>加入目標與商務合作</h2><p>理解期待，確認是否適合長期使用BNI</p></div></div><div id="goalQuestions"></div></section>
+        <section class="form-card" id="commitment"><div class="section-head"><span>04</span><div><h2>投入、出席與入會承諾</h2><p>逐項說明後由申請者確認</p></div></div><div id="commitmentQuestions"></div></section>
+        <section class="form-card" id="training"><div class="section-head"><span>05</span><div><h2>培訓與制度理解</h2><p>MSP期限依收到開通信起算兩個月</p></div></div><div class="training-links"><a href="https://bnikaohsiung.com.tw/zh-TW/events" target="_blank" rel="noopener">查詢中心區培訓時間 ↗</a><a href="https://www.bnitraining.com/html/memberLogin" target="_blank" rel="noopener">前往培訓報名網站 ↗</a></div><div id="trainingQuestions"></div></section>
+        <section class="form-card" id="network"><div class="section-head"><span>06</span><div><h2>其他組織、專業席位與宣誓</h2><p>確認總政策四及宣誓邀請</p></div></div><div id="networkQuestions"></div></section>
+
+        <section class="form-card" id="closing"><div class="section-head"><span>07</span><div><h2>其他事項</h2><p>完成訪談最後兩題</p></div></div><article class="question"><div class="question-head"><span>25.</span><h3>您還想了解BNI的哪方面事項或其他資訊？</h3></div><label class="long-field">申請者想了解的事項<textarea id="otherQuestions" rows="5" data-save></textarea></label></article><article class="question"><div class="question-head"><span>26.</span><h3>分會相關規定備註說明</h3></div><label class="long-field">分會備註<textarea id="chapterNotes" rows="5" data-save></textarea></label></article></section>
+
+        <section class="form-card" id="contacts"><div class="section-head"><span>08</span><div><h2>20個商務名單</h2><p>訪談完成後，再陪新會員慢慢整理</p></div></div><div class="contact-head"><p>可填客戶、供應商、關聯人士或其他商務人脈；這份名單不代表系統會自動聯繫名單中的人。</p><strong id="contactCount">已填 0／20 位</strong></div><div class="contact-table"><div class="contact-row contact-title"><b>編號</b><b>姓名</b><b>行業別</b></div><div id="contactRows"></div></div></section>
+
+        <section class="form-card" id="signatures"><div class="section-head"><span>09</span><div><h2>內部結論與確認</h2><p>整理委員判讀與訪談人確認</p></div></div><div class="system-decision"><b>委員內部結論・不輸出正式表單</b><div class="fields two"><label>初步建議<select id="internalRecommendation" data-save><option value="">尚未決定</option><option>建議進入回饋與投票</option><option>需要補件後再確認</option><option>不建議進入投票</option></select></label><label>需補件／追蹤日期<input id="followUpDate" type="date" data-save></label></div><label class="long-field">內部總結與風險提醒<textarea id="internalSummary" rows="5" data-save></textarea></label></div><div class="fields two signature-fields"><label>入會申請人<input id="applicantSignature" data-save></label><label>確認日期<input id="signatureDate" type="date" data-save></label><label>見證人／主訪<input id="witness1" readonly></label><label>見證人／陪訪<input id="witness2" readonly></label><label>第三位見證人（如有）<input id="witness3" readonly></label></div></section>
+
+        <section class="actions"><div><b>新會員訪談</b><p>正式完成後會保存 Word，並把案件推進至待發送委員回饋。</p></div><button type="button" class="ghost" id="resetDraft">清除未完成草稿</button><button type="button" class="primary" id="downloadWord">完成訪談並產生 Word</button></section>
+      </form>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="core/case-domain.js?v=1"></script>
+  <script src="services/case-files.js?v=2"></script>
+  <script src="services/interview-completion.js?v=1"></script>
+  <script src="vendor/docx.iife.js"></script>
+  <script src="assets/js/new-member-form.js?v=4"></script>
+  <script src="assets/js/new-member-form-live.js?v=2"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

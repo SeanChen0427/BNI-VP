@@ -1,0 +1,130 @@
+/* Shared mobile refinements verified at a 390 × 844 CSS viewport. */
+@media(max-width:800px){
+  .cases-panel .panel-head{
+    display:block;
+  }
+
+  .cases-panel .filters{
+    display:flex;
+    overflow:auto;
+    margin-top:10px;
+    padding-bottom:3px;
+    scrollbar-width:none;
+  }
+
+  .cases-panel .filters::-webkit-scrollbar{
+    display:none;
+  }
+
+  .cases-panel .filters button{
+    min-height:44px;
+    flex:none;
+    padding:9px 12px!important;
+  }
+
+  .cases-panel .case-table{
+    overflow:visible;
+  }
+
+  .cases-panel .case-row.header{
+    display:none;
+  }
+
+  .cases-panel .case-row{
+    min-width:0;
+    grid-template-columns:1fr;
+    margin:10px 0;
+    padding:15px;
+    border:1px solid var(--line);
+    border-radius:14px;
+    gap:10px;
+    box-shadow:0 6px 18px #3c25100a;
+  }
+
+  .cases-panel .case-row>*:last-child{
+    grid-column:auto;
+  }
+
+  .cases-panel .case-progress{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+
+  .cases-panel .case-actions{
+    min-width:0;
+  }
+
+  .cases-panel .case-actions a,
+  .cases-panel .case-actions button{
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    padding:10px 12px;
+    font-size:11px;
+  }
+
+  .cases-panel .view-all,
+  .menu-button,
+  .notice{
+    min-width:44px;
+    min-height:44px;
+  }
+}
+
+@media(max-width:580px){
+  .flow-note{
+    overflow:auto;
+    scrollbar-width:none;
+  }
+
+  .flow-note::-webkit-scrollbar{
+    display:none;
+  }
+
+  .flow-note b,
+  .flow-note span,
+  .flow-note i{
+    flex:none;
+    white-space:nowrap;
+  }
+
+  .toolbar button,
+  .toolbar input,
+  .actions a{
+    min-height:44px;
+  }
+}
+
+@media(max-width:720px){
+  .workspace-grid input,
+  .workspace-grid select{
+    min-height:44px;
+  }
+
+  .workspace-grid .file-button,
+  .workspace-grid .ghost,
+  .workspace-grid .primary{
+    min-height:44px;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+  }
+}
+
+@media(max-width:680px){
+  .layout,
+  .layout form,
+  .form-card,
+  .performance-scroll{
+    min-width:0;
+    max-width:100%;
+  }
+
+  .performance-scroll{
+    width:100%;
+    overflow-x:auto;
+  }
+}

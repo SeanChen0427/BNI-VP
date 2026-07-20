@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9f171c">
+  <title>結案資料｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="core/case-domain.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/case-archive.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+  <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a href="case-board.html#closed">← 回已結案案件</a>
+    <div><strong>富聯分會</strong><span>會員委員會・結案資料</span></div>
+    <div class="identity"><span data-auth-name>副主席</span><small data-auth-role>副主席</small></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><span>CASE ARCHIVE</span><h1 id="pageTitle">結案資料</h1><p>保存當筆案件的訪談 Word、委員回饋、投票、董顧確認與案件歷程。</p></div>
+      <div class="archive-badge"><small>案件狀態</small><strong id="archiveStatus">讀取中</strong></div>
+    </section>
+
+    <section class="notice" id="accessNotice" hidden></section>
+
+    <div id="archiveContent" hidden>
+      <section class="card">
+        <div class="section-head"><span>01</span><div><h2>案件基本資料</h2><p>此頁為結案查詢，不會改寫原案件內容</p></div></div>
+        <dl class="facts" id="caseFacts"></dl>
+      </section>
+
+      <section class="card">
+        <div class="section-head"><span>02</span><div><h2>正式訪談 Word</h2><p>重新取得當次結案保存的正式檔案</p></div></div>
+        <div class="file-row">
+          <span class="word-icon">W</span>
+          <div><strong id="wordName">尚未找到 Word</strong><small id="wordStatus">正在檢查本機附件</small></div>
+          <button id="downloadWord" type="button" disabled>下載保存檔</button>
+        </div>
+      </section>
+
+      <section class="card" id="decisionSection">
+        <div class="section-head"><span>03</span><div><h2>委員回饋與投票決議</h2><p>保留結案當下的回饋、資格快照及票數</p></div></div>
+        <div class="decision-summary" id="decisionSummary"></div>
+        <div class="feedback-grid" id="feedbackList"></div>
+        <div class="vote-list" id="voteList"></div>
+      </section>
+
+      <section class="card" id="advisorSection">
+        <div class="section-head"><span>04</span><div><h2>三長群與董事顧問確認</h2><p>副主席的投票後續處理紀錄</p></div></div>
+        <dl class="facts" id="advisorFacts"></dl>
+      </section>
+
+      <section class="card">
+        <div class="section-head"><span>05</span><div><h2>案件歷程</h2><p>依保存時間由新到舊排列</p></div></div>
+        <ol class="timeline" id="activityLog"></ol>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast"></div>
+  <script src="services/case-files.js?v=3"></script>
+  <script src="assets/js/case-archive.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

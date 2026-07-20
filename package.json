@@ -1,0 +1,14 @@
+{
+  "name": "fulian-membership-committee-system",
+  "private": true,
+  "version": "0.1.0",
+  "description": "BNI 富聯分會會員委員會整合系統",
+  "type": "module",
+  "scripts": {
+    "start": "node apps/vice-chair/preview-server.mjs 4173",
+    "test": "node --test apps/vice-chair/tests/*.test.mjs",
+    "audit": "node scripts/unified-audit.mjs",
+    "regression": "node apps/bni-analysis/engine/regression.mjs",
+    "check": "npm run test && npm run audit && npm run regression"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "schema": "fulian.unified-project.v1",
+  "updated": "2026-07-17",
+  "product": "富聯分會會員委員會整合系統",
+  "runtime": {
+    "type": "local multi-page prototype with shared analysis backend",
+    "start": "npm start",
+    "workbenchUrl": "http://127.0.0.1:4173/",
+    "analysisUrl": "http://127.0.0.1:4173/analysis/",
+    "formalBackend": false
+  },
+  "applications": {
+    "viceChair": "apps/vice-chair",
+    "analysis": "apps/bni-analysis"
+  },
+  "domainOwners": {
+    "palmsAndDiagnostics": "apps/bni-analysis",
+    "analysisEngine": "apps/bni-analysis/engine",
+    "analysisDraftFlow": "apps/vice-chair/services/analysis-draft.mjs",
+    "caseAndVotingWorkflow": "apps/vice-chair/core/case-domain.js",
+    "calendarWindows": "apps/vice-chair/core/calendar-domain.js",
+    "analysisBridge": "apps/vice-chair/bni-bridge.mjs",
+    "localApi": "apps/vice-chair/preview-server.mjs"
+  },
+  "verification": [
+    "npm run test",
+    "npm run audit"
+  ]
+}

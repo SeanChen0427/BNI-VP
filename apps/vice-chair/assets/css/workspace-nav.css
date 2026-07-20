@@ -1,0 +1,165 @@
+.workspace-menu-button{
+  width:40px;
+  height:40px;
+  flex:0 0 40px;
+  display:inline-grid;
+  place-items:center;
+  border:1px solid #e4dcda;
+  border-radius:12px;
+  background:#fff;
+  color:#8f161b;
+  cursor:pointer;
+  box-shadow:0 5px 14px #5420130a;
+}
+.workspace-menu-button:hover{background:#fff5f3;border-color:#d7b8b5}
+.workspace-menu-button svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round}
+.workspace-back-button{
+  min-width:0!important;
+  min-height:34px!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  padding:6px 9px!important;
+  border:1px solid transparent!important;
+  border-radius:9px!important;
+  background:transparent!important;
+  color:#8f161b!important;
+  font-size:11px!important;
+  font-weight:700!important;
+  line-height:1!important;
+  text-decoration:none!important;
+  white-space:nowrap!important;
+}
+.workspace-back-button:hover{border-color:#ead6d4!important;background:#fff7f5!important}
+.workspace-back-button .workspace-back-arrow{font-size:17px;line-height:1}
+.workspace-menu-scrim{
+  position:fixed;
+  inset:0;
+  z-index:998;
+  border:0;
+  padding:0;
+  background:#19110e73;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .2s ease;
+}
+.workspace-menu-scrim.show{opacity:1;pointer-events:auto}
+.workspace-menu-drawer{
+  position:fixed;
+  inset:0 auto 0 0;
+  z-index:999;
+  width:min(88vw,314px);
+  display:flex;
+  flex-direction:column;
+  color:#fff;
+  background:#272320;
+  box-shadow:22px 0 55px #1e100d38;
+  transform:translateX(-105%);
+  transition:transform .24s ease;
+  overflow:hidden;
+}
+.workspace-menu-drawer.open{transform:none}
+.workspace-menu-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:22px 19px 17px;
+  border-bottom:1px solid #ffffff12;
+}
+.workspace-menu-brand{
+  width:42px;
+  height:42px;
+  flex:0 0 42px;
+  display:grid;
+  place-items:center;
+  border-radius:13px;
+  background:linear-gradient(145deg,#d93b35,#8f1016);
+  font-size:18px;
+  font-weight:800;
+}
+.workspace-menu-head div{min-width:0}
+.workspace-menu-head strong,.workspace-menu-head small{display:block}
+.workspace-menu-head strong{font-size:14px}
+.workspace-menu-head small{color:#aaa29b;font-size:10px}
+.workspace-menu-close{
+  width:36px;
+  height:36px;
+  margin-left:auto;
+  border:0;
+  border-radius:10px;
+  background:#ffffff0d;
+  color:#ddd4ce;
+  font-size:23px;
+  cursor:pointer;
+}
+.workspace-menu-close:hover{background:#ffffff18;color:#fff}
+.workspace-menu-content{flex:1;overflow:auto;padding:14px 12px 24px}
+.workspace-menu-group{margin:0 0 17px}
+.workspace-menu-group>small{
+  display:block;
+  margin:0 9px 7px;
+  color:#8f8781;
+  font-size:9px;
+  font-weight:800;
+  letter-spacing:.14em;
+}
+.workspace-menu-link{
+  display:grid;
+  grid-template-columns:31px minmax(0,1fr) 14px;
+  gap:9px;
+  align-items:center;
+  min-height:44px;
+  margin:3px 0;
+  padding:7px 9px;
+  border-radius:11px;
+  color:#c9c1bb;
+  font-size:12px;
+  font-weight:600;
+  text-decoration:none;
+}
+.workspace-menu-link:hover,.workspace-menu-link.current{background:#3a3430;color:#fff}
+.workspace-menu-link.current{box-shadow:inset 3px 0 #d93b35}
+.workspace-menu-icon{
+  width:29px;
+  height:29px;
+  display:grid;
+  place-items:center;
+  border:1px solid #514943;
+  border-radius:9px;
+  color:#e3aaa7;
+  font-size:10px;
+  font-weight:800;
+}
+.workspace-menu-link.current .workspace-menu-icon{border-color:#a84949;background:#5a2929;color:#fff}
+.workspace-menu-link i{color:#716a65;font-style:normal;text-align:right}
+.workspace-menu-user{
+  display:grid;
+  grid-template-columns:36px 1fr;
+  gap:10px;
+  align-items:center;
+  padding:14px 18px;
+  border-top:1px solid #ffffff12;
+  background:#211e1b;
+}
+.workspace-menu-user>span{
+  width:36px;
+  height:36px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#4a3c37;
+  color:#f2b7b1;
+  font-size:12px;
+  font-weight:800;
+}
+.workspace-menu-user strong,.workspace-menu-user small{display:block}
+.workspace-menu-user strong{font-size:11px}
+.workspace-menu-user small{color:#8f8781;font-size:9px}
+body.workspace-nav-open{overflow:hidden}
+@media(max-width:640px){
+  .workspace-menu-button{width:44px;height:44px;flex-basis:44px}
+  .workspace-back-button{width:44px!important;height:44px!important;justify-content:center!important;padding:0!important}
+  .workspace-menu-close{width:44px;height:44px}
+  .workspace-back-label{display:none}
+  body>.topbar,body>.meeting-topbar{gap:7px!important;padding-left:10px!important;padding-right:10px!important}
+}

@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>終期輔導｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="core/case-domain.js?v=1"></script>
+  <script src="services/case-files.js?v=2"></script>
+  <script src="services/interview-completion.js?v=1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/terminal-form-extra.css">
+  <link rel="stylesheet" href="assets/css/interview-completion.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar">
+    <a class="back" href="index.html">← 回工作台</a>
+    <div><strong>富聯分會</strong><span>副主席工作台</span></div>
+    <label>目前登入身份<select id="loginUser"></select></label>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><span class="eyebrow">363 會員留任計畫</span><h1>終期輔導</h1><p>續約訪談線上填寫。畫面提示只協助委員訪談，不會寫入正式 Word。</p></div>
+      <div class="save-state"><i></i><span id="saveState">草稿已儲存</span><small id="saveTime">尚未編輯</small></div>
+    </section>
+
+    <div class="layout">
+      <aside class="steps">
+        <b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong>
+        <nav id="sectionNav"></nav>
+        <div class="privacy"><b>輸出原則</b><p>Word 只包含官方題目、正式數據、核取結果及委員填寫內容。</p></div>
+      </aside>
+
+      <form id="terminalForm" autocomplete="off">
+        <section class="form-card" id="basic">
+          <div class="section-head"><span>01</span><div><h2>基本資料</h2><p>建立本次續約訪談快照</p></div></div>
+          <div class="fields two">
+            <label>會談日期<input id="meetingDate" type="datetime-local" data-save></label>
+            <label>分會<input value="富聯" readonly></label>
+            <label>會員姓名<input id="memberSearch" list="memberList" placeholder="輸入姓名搜尋" data-save><datalist id="memberList"></datalist></label>
+            <label>專業別<input id="profession" readonly></label>
+            <label>輔導專員<input id="counselor" readonly></label>
+            <label>陪訪專員（選填）<input id="companionCounselor" list="committeeList" placeholder="輸入或選擇陪訪專員" data-save><datalist id="committeeList"></datalist></label>
+            <label>續約次數<select id="renewalCount" data-save><option value="1">第一次續約</option><option value="2">第二次以上續約</option></select></label>
+          </div>
+        </section>
+
+        <section class="form-card" id="snapshot">
+          <div class="section-head"><span>02</span><div><h2>數據快照</h2><p>自動抓取訪談前一個完整月份的資料</p></div></div>
+          <div class="traffic-card"><div><small>個人紅綠燈</small><strong><span id="score">65</span> 分・<span id="light">黃燈</span></strong><p id="trafficPeriod"></p></div><span id="lightBadge">黃</span></div>
+          <div class="period-card"><small>PALMS 表計算週期</small><strong id="palmsPeriod"></strong><p id="periodNote"></p></div>
+          <h3>分會平均</h3>
+          <div class="averages" id="averages"></div>
+          <p class="note">平均值＝該期間分會總數 ÷ 計算人數，四捨五入、不保留小數。</p>
+        </section>
+
+        <section class="form-card" id="palms">
+          <div class="section-head"><span>03</span><div><h2>PALMS 與年度貢獻</h2><p>系統提供判讀提示；正式表單維持官方文字</p></div></div>
+          <div id="metricQuestions"></div>
+        </section>
+
+        <section class="form-card" id="experience">
+          <div class="section-head"><span>04</span><div><h2>會員經驗與續約行動</h2><p>依序完成官方訪談題目</p></div></div>
+          <div id="experienceQuestions"></div>
+        </section>
+
+        <section class="form-card" id="agreement">
+          <div class="section-head"><span>05</span><div><h2>制度確認與總結</h2><p>完成確認後即可產生 Word</p></div></div>
+          <div class="agreement-box">
+            <label class="check"><input id="mspUnderstood" type="checkbox" data-save><span>本人同意於副主席公告續約完成後，兩個月內完成 MSP（上）或（下）其中一堂培訓。已了解</span></label>
+            <div class="training-links">
+              <a href="https://bnikaohsiung.com.tw/zh-TW/events" target="_blank" rel="noopener noreferrer"><small>先確認時間</small><strong>查看中心區培訓場次 →</strong></a>
+              <a href="https://www.bnitraining.com/html/memberLogin" target="_blank" rel="noopener noreferrer"><small>確認後直接操作</small><strong>前往培訓報名網站 →</strong></a>
+            </div>
+            <div class="fields two"><label>MSP（上）日期<input id="mspUp" type="date" data-save></label><label>MSP（下）日期<input id="mspDown" type="date" data-save></label></div>
+          </div>
+          <label class="long-field">分會相關地基備註說明<textarea id="chapterNotes" rows="4" data-save></textarea></label>
+          <label class="long-field">訪談人總結和建議<textarea id="summary" rows="7" data-save></textarea></label>
+          <div class="fields two"><label>會員親簽（輸出為姓名欄）<input id="memberSignature" data-save></label><label>訪談人<input id="interviewer" readonly></label></div>
+          <label class="long-field">訪談人意見<textarea id="interviewerOpinion" rows="4" data-save></textarea></label>
+          <div class="policy-copy"><b>會員委員會權責確認</b><p>了解會員委員會有同意會員續約、謝絕會員續約或會員有條件續約的權力。正式決議仍須依委員會與董事顧問流程辦理。</p><label class="check"><input id="policyUnderstood" type="checkbox" data-save><span>已了解</span></label></div>
+        </section>
+
+        <section class="actions">
+          <div><b>終期輔導</b><p>正式完成後會保存 Word，並把案件推進至待發送委員回饋。</p></div>
+          <button type="button" class="ghost" id="resetDraft">清除未完成草稿</button>
+          <button type="button" class="primary" id="downloadWord">完成訪談並產生 Word</button>
+        </section>
+      </form>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="vendor/docx.iife.js"></script>
+  <script src="assets/js/terminal-form.js?v=7"></script>
+  <script src="assets/js/terminal-form-live.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

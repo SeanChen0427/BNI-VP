@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#991b1f">
+  <title>會員關懷儀表板｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="assets/js/member-directory.js?v=2"></script>
+  <script src="core/calendar-domain.js?v=1"></script>
+  <script src="core/case-domain.js?v=3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/member-care.css?v=2">
+  <link rel="stylesheet" href="assets/css/work-planner.css?v=1">
+  <link rel="stylesheet" href="assets/css/member-care-scheduler.css?v=2">
+  <link rel="stylesheet" href="assets/css/reminder-download.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="index.html">← 返回工作總覽</a><div class="identity"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" onclick="FulianAuth.logout()">登出</button></div></header>
+  <main>
+    <section class="hero"><div><span class="eyebrow">BNI ANALYSIS BRIDGE</span><h1>會員關懷儀表板</h1><p id="reportSubheading">正在讀取 BNI 分析工具的最新結果。</p></div><div class="source-card" id="sourceCard"><span class="source-dot"></span><div><small>橋接狀態</small><strong>連線中</strong><p>副主席系統只讀取分析結果，不重算燈號。</p></div></div></section>
+    <section class="loading" id="loading"><span></span><p>正在同步會員關懷資料…</p></section>
+    <section class="error-state" id="errorState" hidden><b>目前無法讀取 BNI 分析工具</b><p id="errorMessage"></p><button type="button" id="retryButton">重新讀取</button></section>
+    <div id="dashboard" hidden>
+      <section class="overview" aria-label="關懷摘要"><article class="primary"><small>現任會員</small><strong id="totalMembers">—</strong><span>人</span></article><article><small>綠燈率</small><strong id="greenRate">—</strong><span id="greenFraction"></span></article><article><small>本期續約截止</small><strong id="renewalDue">—</strong><span>件</span></article><article><small>續約審查預警</small><strong id="renewalWarnings">—</strong><span>人</span></article><article><small>審計觀察</small><strong id="auditObservations">—</strong><span>項</span></article></section>
+      <section class="traffic-panel"><div class="section-heading"><div><small>MEMBER HEALTH</small><h2>燈號分布</h2></div><p>灰燈與黑燈為同一狀態</p></div><div class="traffic-grid" id="trafficGrid"></div></section>
+      <nav class="section-nav" id="sectionNav" aria-label="分析內容"></nav><div class="analysis-sections" id="analysisSections"></div>
+      <footer class="bridge-meta"><div><b>資料來源</b><span id="sourcePath"></span></div><div><b>來源更新時間</b><span id="sourceTime"></span></div><div><b>資料指紋</b><code id="sourceFingerprint"></code></div><p>本頁透過橋接層呈現 BNI 分析工具的結果；燈號、續約與關懷規則仍由原分析工具負責。</p></footer>
+    </div>
+  </main>
+  <script src="assets/js/member-care.js?v=6"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body></html>

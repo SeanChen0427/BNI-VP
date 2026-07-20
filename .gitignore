@@ -1,0 +1,40 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and generated output
+node_modules/
+dist/
+.DS_Store
+apps/vice-chair-deploy-public-build-cache/
+supabase/.temp/
+
+# Private BNI and member data
+apps/bni-analysis/data/
+apps/bni-analysis/skill/
+apps/bni-analysis/index.html
+apps/bni-analysis/report.html
+apps/bni-analysis/AGENTS.md
+apps/bni-analysis/CLAUDE.md
+apps/bni-analysis/CHANGELOG.md
+apps/vice-chair/data/
+apps/vice-chair/uploads/
+apps/vice-chair/backups/
+apps/vice-chair/exports/
+*.xls
+*.xlsx
+*.csv
+
+# Credentials and local runtime state
+*.key
+*.enc
+.playwright-mcp/
+.codex-*/
+.claude/settings.local.json
+
+# Temporary hosting detours; final frontend is GitHub Pages
+apps/vice-chair-web/
+apps/vice-chair/dashboard-preview-temp.html
+scripts/deploy-static-to-supabase.mjs
+supabase/functions/site/

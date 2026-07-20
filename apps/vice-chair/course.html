@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>新任副主席上手指南｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script>if(FulianAuth.getSession()?.role==="committee")location.replace("index.html")</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <link rel="stylesheet" href="assets/css/fixes.css">
+  <link rel="stylesheet" href="assets/css/course-v2.css">
+  <link rel="stylesheet" href="assets/css/training-deck.css">
+  <style>.dashboard-back{color:#a91419;text-decoration:none;font-size:12px;font-weight:700;margin-right:18px}@media(max-width:720px){.dashboard-back{margin-left:8px;margin-right:8px}.crumb{display:none}}</style>
+</head>
+<body>
+  <a class="skip" href="#lesson">跳到課程內容</a>
+  <div class="shell">
+    <aside id="side">
+      <div class="brand"><b>富</b><div><strong>富聯分會</strong><small>副主席學習中心</small></div><button id="close">×</button></div>
+      <section class="side-progress"><div><span>整體進度</span><b id="percent">0%</b></div><i><em id="bar"></em></i><small id="progressText">已完成 0／12 章</small></section>
+      <nav id="nav"></nav>
+      <div class="tip"><b>小提醒</b><p>你不需要一次記住全部。系統會保存每一步。</p></div>
+    </aside>
+    <main>
+      <header><button id="open">☰</button><a class="dashboard-back" href="index.html">← 回工作台</a><div class="crumb">交接與學習　／　<b id="crumb">歡迎</b></div><button class="reset" id="reset">重新開始課程</button><span class="avatar">新</span></header>
+      <section class="welcome" id="welcome">
+        <div class="copy">
+          <span class="eyebrow">FULIAN VICE PRESIDENT ONBOARDING</span>
+          <h1>新任副主席您好！</h1>
+          <h2>從接任到上手，陪你掌握每一個關鍵節點。</h2>
+          <p class="welcome-lede">你不需要一次記住所有事情。我們會按照實際工作的順序，帶你了解例會、會員關懷、新會員審查、續約、投票與交接。</p>
+          <div class="welcome-highlights" aria-label="課程特色"><span>依實務順序學習</span><span>重要規則附適用依據</span><span>可隨時離開再續讀</span></div>
+          <div class="stats"><div><b>12</b><small>核心章節</small></div><div><b>26</b><small>實務單元</small></div><div><b>約 45</b><small>分鐘入門</small></div></div>
+          <div class="actions"><button class="primary" id="start">開始學習　→</button><button class="primary" id="continue" hidden>繼續上次課程　→</button></div>
+          <p class="progress-note"><i aria-hidden="true">✓</i>閱讀進度會自動保存，下次可從上次位置繼續。</p>
+        </div>
+        <div class="hero"><div class="hero-frame"><img src="assets/images/course-hero.png" alt="新任副主席與會員委員一起學習與合作的插圖"><div class="hero-caption"><small>ROLE READY</small><b>制度 × 資料 × 關懷 × 團隊</b><span>把複雜職責整理成清楚、可執行的工作順序。</span></div></div></div>
+      </section>
+      <section class="lesson-layout" id="lessonScreen" hidden><article id="lesson" tabindex="-1"></article><aside class="rail"><div class="rail-card"><small>本章進度</small><b id="chapterPercent">35%</b><i><em id="chapterBar"></em></i></div><div class="rail-card dark"><small>這一頁記住</small><p id="takeaway"></p></div><button class="back" id="back">← 回課程首頁</button></aside></section>
+      <footer id="footer" hidden><button class="secondary" id="prev">← 上一章</button><span id="position">第 1／12 章</span><button class="primary" id="complete">完成並繼續　→</button></footer>
+    </main>
+  </div>
+  <div id="toast"></div><div id="scrim"></div><script src="assets/js/course-data.js"></script><script src="assets/js/course-editorial.js"></script><script src="assets/js/app-v2.js?v=2"></script>
+</body></html>

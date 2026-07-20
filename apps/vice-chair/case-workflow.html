@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#9f171c">
+  <title>案件決議工作台｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="core/calendar-domain.js?v=1"></script>
+  <script src="core/case-domain.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/case-workflow.css?v=1">
+  <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+  <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
+</head>
+<body>
+  <header class="topbar">
+    <a href="case-board.html">← 回進行中案件</a>
+    <div><strong>富聯分會</strong><span>會員委員會・案件決議</span></div>
+    <label>目前登入身份
+      <select id="loginUser">
+        <option value="">登入後載入身份</option>
+      </select>
+    </label>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div><span class="eyebrow">CASE DECISION WORKSPACE</span><h1>訪談後回饋與投票流程</h1><p>從 Word 訪談表、委員回饋、投票、三長群到董事顧問確認，集中在同一案件完成。</p></div>
+      <div class="save-state"><i></i><span id="saveState">案件草稿已保存</span><small id="saveTime">尚未編輯</small></div>
+    </section>
+
+    <section class="case-head card">
+      <div class="section-title"><span>01</span><div><h2>案件基本資料</h2><p>依訪談類型接續委員回饋、投票與結案流程</p></div></div>
+      <div class="fields four">
+        <label>案件類型<select id="caseType" data-save><option value="renewal">續約</option><option value="new">新會員</option><option value="midterm">期中輔導</option><option value="industry">轉換行業別</option><option value="departure">離會訪談</option></select></label>
+        <label>申請者姓名<input id="applicant" data-save></label>
+        <label>專業類別<input id="profession" data-save></label>
+        <label>訪談日期<input id="interviewDate" type="date" data-save></label>
+        <label>主訪委員<select id="leadInterviewer" data-save></select></label>
+        <label>陪訪委員<select id="companionInterviewer" data-save></select></label>
+        <label>投票截止<input id="voteDeadline" type="datetime-local" data-save></label>
+        <label>申請者迴避<input id="recusedMember" value="無須迴避" readonly><small>僅當申請者本人是副主席或會員委員時自動迴避；主訪與陪訪仍須回饋並可投票。</small></label>
+      </div>
+    </section>
+
+    <nav class="workflow-strip" id="workflowStrip" aria-label="案件流程"></nav>
+
+    <div class="workspace-grid">
+      <div class="main-column">
+        <section class="card" id="wordSection">
+          <div class="section-title"><span>02</span><div><h2>訪談 Word 與委員通知</h2><p>保存訪談正式檔案後，再發出回饋通知</p></div></div>
+          <div class="file-zone" id="fileZone">
+            <div class="file-icon">W</div>
+            <div><strong id="wordName">尚未保存 Word</strong><span id="wordStatus">尚未保存訪談 Word</span></div>
+            <label class="file-button">選擇 Word<input id="wordFile" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
+            <button id="downloadWord" class="ghost" disabled>下載保存檔</button>
+          </div>
+          <div class="notice-compose">
+            <div><b>委員回饋通知</b><small>正式版由 LINE Bot 傳送至富聯會員委員會群；目前只模擬並保存紀錄。</small></div>
+            <button id="copyFeedbackNotice" class="ghost">複製文案</button>
+            <button id="sendFeedbackNotice" class="primary vp-control">模擬 LINE Bot 通知</button>
+          </div>
+          <pre id="feedbackNoticePreview" class="message-preview"></pre>
+        </section>
+
+        <section class="card" id="feedbackSection">
+          <div class="section-title"><span>03</span><div><h2>委員回饋</h2><p>每位委員以自己的帳號填寫；達過半門檻後才能開啟投票</p></div></div>
+          <div class="threshold-banner"><div><small>有效回饋</small><strong><span id="feedbackCount">0</span>／<span id="eligibleCount">7</span></strong></div><div><small>開票門檻</small><strong id="feedbackThreshold">4 人</strong></div><div class="threshold-result" id="feedbackResult">尚未達門檻</div></div>
+          <div class="feedback-editor">
+            <label><span><b id="feedbackEditorName">本人的回饋</b><small>請引用訪談內容、數據或具體觀察，並提出建議與期待。</small></span><textarea id="myFeedback" rows="6" placeholder="輸入本人的委員回饋……"></textarea></label>
+            <button id="saveFeedback" class="primary">儲存我的回饋</button>
+          </div>
+          <div class="feedback-list" id="feedbackList"></div>
+          <div class="open-vote-bar"><div><b id="openVoteTitle">尚未達回饋門檻</b><small>只有副主席可開啟投票；開啟時會保存投票資格快照。</small></div><button id="openVote" class="primary vp-control" disabled>開啟系統投票</button></div>
+        </section>
+
+        <section class="card vote-card" id="voteSection">
+          <div class="section-title"><span>04</span><div><h2>系統投票</h2><p>先判斷超過半數參與，再以贊成、反對票多數形成決議</p></div></div>
+          <div class="vote-locked" id="voteLocked"><b>投票尚未開啟</b><span>需先完成回饋門檻，再由副主席開啟。</span></div>
+          <div id="voteWorkspace" hidden>
+            <div class="vote-topline"><span id="voteSnapshot">投票資格快照 7 人</span><span id="deadlineLabel">截止時間尚未設定</span><button id="sendVoteNotice" class="ghost vp-control">模擬 LINE Bot 通知投票</button></div>
+            <div class="vote-grid">
+              <div class="my-vote">
+                <b id="voteForName">本人的投票</b>
+                <label><input type="radio" name="vote" value="approve"><span id="approveLabel">同意續約</span></label>
+                <label><input type="radio" name="vote" value="reject"><span id="rejectLabel">不同意續約</span></label>
+                <button id="submitVote" class="primary">確認送出票</button>
+                <small id="voteActionHint" class="vote-action-hint">請先完成投票通知。</small>
+                <small>每位有資格者一票；初版可覆蓋自己的示範票，正式版將鎖定並保留更正紀錄。</small>
+              </div>
+              <div class="vote-result">
+                <div class="result-numbers"><div><small>已投票</small><strong id="voteCount">0</strong></div><div><small>最低參與</small><strong id="quorum">4</strong></div><div><small>同意</small><strong id="approveCount">0</strong></div><div><small>不同意</small><strong id="rejectCount">0</strong></div></div>
+                <div class="decision-box" id="decisionBox"><small>目前判定</small><strong>等待投票</strong><span>尚未達到最低參與人數</span></div>
+              </div>
+            </div>
+            <div class="voter-status" id="voterStatus"></div>
+          </div>
+        </section>
+
+        <section class="card vp-only-section" id="resultSection">
+          <div class="section-title"><span>05</span><div><h2>三長群與董事顧問確認</h2><p>形成委員會決議後，才可送三長群請董事顧問確認</p></div></div>
+          <div class="fields two renewal-extra" id="renewalExtra"><label>過去一年培訓數<input id="annualTraining" placeholder="例如：20 分" data-save></label><label>過去一年來賓數<input id="annualVisitors" placeholder="例如：5 位" data-save></label></div>
+          <small id="annualDataSource" class="annual-data-source" hidden></small>
+          <pre id="leadersPreview" class="message-preview muted-preview"></pre>
+          <div class="action-row"><button id="copyLeaders" class="ghost" disabled>複製三長群文案</button><button id="sendLeaders" class="primary vp-control" disabled>模擬發送三長群</button></div>
+          <div class="advisor-box">
+            <div><b>董事顧問確認</b><small>請依董顧實際回覆登記，系統不代替董顧作成決定。</small></div>
+            <label>確認狀態<select id="advisorStatus" class="vp-control"><option value="pending">尚未回覆</option><option value="confirmed">同意會員委員會決議</option><option value="returned">退回補充資料</option></select></label>
+            <label>確認備註<textarea id="advisorNote" rows="3" placeholder="記錄董顧回覆、日期或需補充事項"></textarea></label>
+            <button id="saveAdvisor" class="ghost vp-control">保存董顧確認</button>
+          </div>
+        </section>
+
+        <section class="card close-card vp-only-section" id="closeSection">
+          <div><span class="close-mark">檔</span><div><h2>結案存檔</h2><p>結案後保存 Word 檔名、回饋、資格快照、票數、三長群與董顧確認紀錄。</p></div></div>
+          <button id="closeCase" class="primary vp-control" disabled>確認結案存檔</button>
+        </section>
+      </div>
+
+      <aside class="side-column vp-only-section">
+        <section class="card sticky-card">
+          <div class="side-head"><small>CASE STATUS</small><h2>案件狀態</h2></div>
+          <div class="case-stage"><span id="stageNumber">3</span><div><small>目前階段</small><strong id="stageTitle">蒐集委員回饋</strong></div></div>
+          <div class="progress"><i><em id="progressBar"></em></i><span id="progressText">30%</span></div>
+          <dl class="case-summary"><div><dt>案件編號</dt><dd id="caseId">未編號</dd></div><div><dt>申請者</dt><dd id="summaryApplicant">未填寫</dd></div><div><dt>有效基數</dt><dd id="summaryBase">7 人</dd></div><div><dt>最低參與</dt><dd id="summaryQuorum">4 人</dd></div><div><dt>LINE Bot</dt><dd>模擬模式</dd></div><div><dt>資料保存</dt><dd>本機草稿</dd></div></dl>
+          <div class="permission-note"><b>副主席權限</b><span id="permissionText">目前可操作開票、通知、送三長群與結案。</span></div>
+          <button id="resetCase" class="ghost reset-case">重設示範流程</button>
+        </section>
+        <section class="card log-card"><div class="side-head"><small>AUDIT LOG</small><h2>案件歷程</h2></div><ol id="activityLog"></ol></section>
+      </aside>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="assets/js/case-workflow.js?v=13"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

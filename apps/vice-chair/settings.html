@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#a5151b">
+  <title>系統與個人 AI 設定｜富聯分會</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/settings.css?v=3"><link rel="stylesheet" href="assets/css/ai-api-settings.css?v=1"><link rel="stylesheet" href="assets/css/test-data-reset.css?v=1"><link rel="stylesheet" href="assets/css/workspace-nav.css?v=2"><script src="assets/js/supabase-config.js?v=1"></script><script src="assets/js/auth.js?v=5"></script><script src="assets/js/supabase-data.js?v=1"></script><script src="assets/js/member-directory.js?v=2"></script>
+  <style>input[list]{padding-right:36px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a5151b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E") right 12px center/14px no-repeat}.picker-note{margin-top:7px;color:var(--muted);font-size:9px}.searchable-field input:focus{border-color:#b75d62;box-shadow:0 0 0 3px #a5151b12}
+.departure-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+.departure-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#6b7280}
+.departure-form input{border:1px solid #e7e5e0;border-radius:8px;padding:10px;font-size:14px;min-height:44px}
+.departure-warnings{background:#fdf8ee;border-left:3px solid #b7791f;border-radius:8px;padding:10px 14px;font-size:13px;color:#b7791f;margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+.departure-actions{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+.departure-actions button{background:#a5151b;color:#fff;border:0;border-radius:9px;padding:12px 20px;font-weight:600;cursor:pointer;min-height:44px}
+.departure-actions button:disabled{opacity:.45;cursor:not-allowed}
+.departure-actions span{font-size:13px;color:#6b7280}
+.departure-note-box{background:#f3f4f6;border-radius:8px;padding:10px 14px;font-size:13px;color:#6b7280;margin-bottom:14px;display:flex;flex-direction:column;gap:4px}
+.departure-note-box b{color:#1a1d21}
+.departure-list{display:flex;flex-direction:column;gap:8px}
+.departure-list article{display:flex;align-items:center;gap:12px;border:1px solid #e7e5e0;border-radius:8px;padding:10px 14px;font-size:13px;flex-wrap:wrap}
+.departure-list article b{font-size:14px}
+.departure-list article span{color:#6b7280}
+.departure-list article button{margin-left:auto;border:1px solid #e7e5e0;background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}</style>
+</head>
+<body>
+  <header class="topbar"><a href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>系統與個人 AI 設定</span></div><div class="session"><span data-auth-name></span><b data-auth-role></b><button data-auth-logout onclick="FulianAuth.logout()">登出</button></div></header>
+  <main>
+    <section class="hero"><div><span>ACCESS, COMMITTEE & PERSONAL AI</span><h1>系統權限與個人 AI</h1><p>人員權限集中管理；每位副主席與委員使用自己的 AI API 額度。</p></div><div class="role-summary"><div><strong>3</strong><span>AI 平台</span></div><div><strong id="committeeTotal">6</strong><span>會員委員</span></div></div></section>
+    <div class="grid">
+      <section class="card roles-card"><div class="section-title"><span>01</span><div><h2>三層權限</h2><p>權限固定，不追加更細角色</p></div></div><div class="role-list"><article><b>AD</b><div><strong>系統開發人員 Admin</strong><p>管理帳密、指定副主席、增減委員與系統維護。</p></div></article><article><b>VP</b><div><strong>副主席</strong><p>完整副主席功能，並可增減會員委員名單。</p></div></article><article><b>MC</b><div><strong>會員委員</strong><p>共用委員帳密；登入選姓名後填寫回饋、投票與執行任務。</p></div></article></div></section>
+      <section class="card vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>只有 Admin 可以變更</p></div></div><label>從現有會員選擇副主席<div class="inline searchable-field"><input id="vpName" list="vpMemberOptions" autocomplete="off" placeholder="搜尋或點選會員姓名"><datalist id="vpMemberOptions"></datalist><button id="saveVp">儲存副主席</button></div></label><div class="picker-note">可直接點選欄位查看名單，也可以輸入姓名快速篩選。</div><div class="hint">更換後，副主席共用帳號登入會自動顯示新任姓名；舊副主席工作階段會失效。</div></section>
+      <section class="card committee-card"><div class="section-title"><span>03</span><div><h2>會員委員名單</h2><p>Admin 與副主席皆可增減</p></div></div><div class="add-member searchable-field"><input id="newMember" list="committeeMemberOptions" autocomplete="off" placeholder="搜尋或點選現有會員"><datalist id="committeeMemberOptions"></datalist><button id="addMember">新增委員</button></div><div class="picker-note">只顯示尚未擔任副主席或會員委員的現有會員。</div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>共用帳號提醒</b><span>移除委員後，該姓名無法再以委員帳號登入；既有案件紀錄仍保留。</span></div></section>
+      <section class="card credentials-card" id="credentialsCard"><div class="section-title"><span>04</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
+      <section class="card ai-card" id="personalAiSettings">
+        <div class="section-title"><span>05</span><div><h2>我的 AI API 綁定</h2><p>只屬於目前登入的 <b data-auth-name></b>，不與其他委員共用</p></div></div>
+        <div class="ai-overview">
+          <label>預設回答平台<select id="defaultAiProvider"><option value="openai">GPT（OpenAI）</option><option value="gemini">Gemini（Google）</option><option value="anthropic">Claude（Anthropic）</option></select></label>
+          <div class="ai-owner"><small>目前綁定身份</small><strong id="aiOwnerName">—</strong><span id="aiStorageStatus">正在讀取個人設定…</span></div>
+        </div>
+        <div class="provider-grid">
+          <article class="provider-card" data-provider-card="openai"><div class="provider-head"><i>GPT</i><div><strong>OpenAI API</strong><span class="provider-status" id="openaiStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="openaiApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 OpenAI API Key"><button type="button" data-toggle-secret="openaiApiKey">顯示</button></div></label><p>ChatGPT Plus／Pro 訂閱與 API 額度分開計算，需在 OpenAI Platform 建立 API Key。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="openai">移除綁定</button></div></article>
+          <article class="provider-card" data-provider-card="gemini"><div class="provider-head"><i>G</i><div><strong>Gemini API</strong><span class="provider-status" id="geminiStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="geminiApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 Gemini API Key"><button type="button" data-toggle-secret="geminiApiKey">顯示</button></div></label><p>請從 Google AI Studio 建立 Gemini 專用金鑰，並留意自己的免費額度或計費設定。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="gemini">移除綁定</button></div></article>
+          <article class="provider-card" data-provider-card="anthropic"><div class="provider-head"><i>C</i><div><strong>Claude API</strong><span class="provider-status" id="anthropicStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="anthropicApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 Anthropic API Key"><button type="button" data-toggle-secret="anthropicApiKey">顯示</button></div></label><p>Claude 網頁版訂閱與 Anthropic API 額度分開，API Key 由 Anthropic Console 建立。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="anthropic">移除綁定</button></div></article>
+        </div>
+        <div class="ai-save-row"><div class="ai-security-note"><b>安全方式</b><span>Key 不寫入 GitHub、前端程式或會員資料；本機試作由預覽伺服器加密保存，畫面只回傳是否綁定及末四碼。</span></div><button type="button" id="saveAiSettings" class="save-all">儲存我的 AI 設定</button></div>
+        <div class="ai-next-step"><b>本階段不會消耗 token</b><span>目前只建立個人綁定。後續接上制度查詢對話框後，才會在使用者送出問題時呼叫所選平台。</span></div>
+      </section>
+      <section class="card ai-guide-card">
+        <div class="section-title"><span>06</span><div><h2>三家 API Key 申請教學</h2><p>依官方頁面操作；Key 建立後只貼回上方對應欄位</p></div></div>
+        <div class="guide-grid">
+          <details open><summary><b>GPT／OpenAI</b><span>約 3–5 分鐘</span></summary><ol><li>登入 OpenAI Platform。</li><li>進入 API Keys，建立新的 Secret Key。</li><li>如尚未啟用 API 計費，依頁面設定 Billing／Credits。</li><li>複製 Key，貼到上方 OpenAI 欄位並儲存。</li></ol><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">開啟 OpenAI API Keys 官方頁面 →</a></details>
+          <details><summary><b>Gemini／Google</b><span>約 3–5 分鐘</span></summary><ol><li>登入 Google AI Studio。</li><li>開啟 API Keys，選擇或建立 Google Cloud 專案。</li><li>建立 Gemini API Key；新 Key 建議使用官方目前提供的受限／授權金鑰。</li><li>複製 Key，貼到上方 Gemini 欄位並儲存。</li></ol><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">開啟 Google AI Studio API Keys →</a></details>
+          <details><summary><b>Claude／Anthropic</b><span>約 3–5 分鐘</span></summary><ol><li>登入 Anthropic Console。</li><li>確認 API 帳戶已有可用額度或計費方式。</li><li>進入 API Keys 建立新的金鑰。</li><li>複製 Key，貼到上方 Claude 欄位並儲存。</li></ol><a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener noreferrer">開啟 Anthropic Console API Keys →</a></details>
+        </div>
+        <p class="guide-footnote">API Key 等同密碼。不要貼到 LINE 群組、Google 文件、GitHub、截圖或交接文件；疑似外洩時請立即至原平台撤銷並重建。</p>
+      </section>
+      <section class="card departure-card" id="departureCard" hidden>
+        <div class="section-title"><span>07</span><div><h2>離會登記</h2><p>只有副主席與 Admin 可以操作；登記後分析自動排除該會員</p></div></div>
+        <div class="departure-form">
+          <label>離會會員<div class="searchable-field"><input id="departureName" list="departureMemberOptions" autocomplete="off" placeholder="搜尋或點選現任會員"><datalist id="departureMemberOptions"></datalist></div></label>
+          <label>離會確認日<input id="departureDate" type="date"></label>
+          <label>備註（原因）<input id="departureNote" maxlength="120" placeholder="例：會籍到期未續約／搬遷離會"></label>
+          <label>防呆確認：重新輸入完整姓名<input id="departureConfirmName" autocomplete="off" placeholder="再輸入一次該會員姓名"></label>
+        </div>
+        <div class="departure-warnings" id="departureWarnings" hidden></div>
+        <div class="departure-actions"><button type="button" id="registerDeparture" disabled>登記離會</button><span id="departureStatus"></span></div>
+        <div class="departure-note-box"><b>登記會同步三份名單</b><span>分析排除名單、會員主檔與所有表單的會員選單。登記錯誤可在下方名單按「撤銷」還原。進行中案件不會被自動處理，請另行結案或移轉。</span></div>
+        <div class="departure-list" id="departedList"></div>
+      </section>
+      <section class="card audit-card"><div class="section-title"><span>08</span><div><h2>設定紀錄</h2><p>保存最近的人員與權限異動；不記錄 API Key 內容</p></div></div><ol id="auditLog"></ol></section>
+      <section class="card test-reset-card" id="testDataResetCard" hidden>
+        <div class="section-title"><span>09</span><div><h2>測試資料重置</h2><p>副主席／Admin 本機除錯工具</p></div></div>
+        <div class="test-reset-intro">
+          <p>需要重新跑完整流程時，可在這裡一次清空測試案件與月會紀錄。清除後無法復原，請先確認目前沒有要保留的正式紀錄。</p>
+          <button type="button" class="test-reset-refresh" id="refreshTestDataSummary">重新統計</button>
+        </div>
+        <div class="test-reset-summary" aria-label="可清除的測試資料統計">
+          <article><small>案件與排定</small><strong id="resetTaskCount">—</strong></article>
+          <article><small>案件流程／回饋／投票</small><strong id="resetWorkflowCount">—</strong></article>
+          <article><small>訪談草稿</small><strong id="resetDraftCount">—</strong></article>
+          <article><small>訪談 Word 附件</small><strong id="resetAttachmentCount">—</strong></article>
+          <article><small>月會紀錄</small><strong id="resetMeetingCount">—</strong></article>
+        </div>
+        <div class="test-reset-scope">
+          <div class="removed"><b>會被清除</b><ul><li>月會草稿與正式月會紀錄</li><li>案件排定、訪談草稿與案件流程</li><li>委員回饋、投票、董顧及結案紀錄</li><li>案件產生的 Word 附件</li></ul></div>
+          <div class="preserved"><b>一定保留</b><ul><li>會員主檔與 BNI／PALMS 分析資料</li><li>帳號、角色、委員名單與個人 AI Key</li><li>出席紀錄、公告留言與課程進度</li><li>程式、制度文件及備份資料夾</li></ul></div>
+        </div>
+        <div class="test-reset-confirm">
+          <label>輸入「清除測試資料」才能執行
+            <span>這是第二層防呆，送出後還會再顯示最後確認。</span>
+            <input id="testResetConfirmation" autocomplete="off" placeholder="清除測試資料">
+          </label>
+          <button type="button" id="resetTestData" disabled>清除全部測試流程資料</button>
+          <p class="test-reset-result" id="testResetResult">正在統計目前資料…</p>
+        </div>
+      </section>
+    </div>
+  </main>
+  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=5"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

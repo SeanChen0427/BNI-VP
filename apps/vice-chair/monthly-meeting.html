@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>會員委員會月會｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <script src="assets/js/member-directory.js?v=2"></script>
+  <script src="core/case-domain.js?v=3"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/monthly-meeting.css?v=1">
+  <link rel="stylesheet" href="assets/css/monthly-meeting-access.css?v=2">
+  <link rel="stylesheet" href="assets/css/monthly-meeting-care.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="meeting-topbar">
+    <a href="index.html">← 回工作總覽</a>
+    <div><strong>富聯分會</strong><span>會員委員會月會</span></div>
+    <div class="identity"><small>目前登入</small><b data-auth-name></b><span data-auth-role></span></div>
+  </header>
+
+  <main class="meeting-shell">
+    <section class="meeting-hero">
+      <div><span>MONTHLY COMMITTEE MEETING</span><h1>會員委員會月會</h1><p>每月第一場實際例會後召開；資料先彙整，會議中直接補充與形成紀錄。</p></div>
+      <div class="save-indicator"><i></i><strong id="saveState">正在載入會議紀錄…</strong><small id="saveMeta">請稍候</small></div>
+    </section>
+    <div class="access-notice" id="accessNotice" hidden><b>歷史會議查詢模式</b><span>會員委員可以查閱及下載已結案的月會紀錄；新月份、編輯、重新帶入資料與結案功能由副主席操作。</span></div>
+
+    <div class="meeting-layout">
+      <aside class="meeting-history">
+        <div class="history-head"><div><small>MEETING ARCHIVE</small><h2>會議紀錄</h2></div><button type="button" id="newMeeting">＋ 新月份</button></div>
+        <div id="historyList" class="history-list"></div>
+        <p class="privacy-note">紀錄保存在本機私有應用資料區，不會寫入 GitHub。</p>
+      </aside>
+
+      <form id="meetingForm" class="meeting-form">
+        <section class="meeting-card setup-card">
+          <div class="section-title"><span>00</span><div><small>MEETING PROFILE</small><h2>會議基本資料</h2></div><em id="recordStatus">草稿</em></div>
+          <div class="field-grid four">
+            <label>會議月份<input id="meetingMonth" type="month" required></label>
+            <label>會議日期<input id="meetingDate" type="date" required></label>
+            <label>報告月份<input id="reportMonth" type="month" readonly></label>
+            <label>會議紀錄人<input id="recorder" type="text" readonly></label>
+          </div>
+          <label class="wide">出席委員<div id="attendeeOptions" class="attendee-options"></div></label>
+        </section>
+
+        <section class="meeting-card">
+          <div class="section-title"><span>01</span><div><small>ATTENDANCE REVIEW</small><h2>上個月會員出席狀況報告</h2><p id="attendanceSource">正在讀取上月單月 PALMS…</p></div><button type="button" class="soft-button" id="refreshAttendance">重新讀取 PALMS</button></div>
+          <div class="member-count-strip"><small>上月會員數</small><input id="attendanceMemberCount" type="number" min="0"><span>位</span><em id="attendanceMeetingCount">尚未載入正式 PALMS</em></div>
+          <div class="attendance-review-grid">
+            <article>
+              <header><span>缺</span><div><small>缺席</small><b>目標 0</b></div><label>實際 <input id="absenceActual" type="number" min="0"></label></header>
+              <label>名單及次數<textarea id="absenceList" rows="4" placeholder="例如：王小明（1次）"></textarea></label>
+            </article>
+            <article>
+              <header><span>遲</span><div><small>遲到／早退</small><b>目標 0</b></div><label>實際 <input id="lateActual" type="number" min="0"></label></header>
+              <label>名單及次數<textarea id="lateList" rows="4" placeholder="例如：王小明（2次）"></textarea></label>
+            </article>
+            <article>
+              <header><span>代</span><div><small>代理人</small><b>目標 0</b></div><label>實際 <input id="proxyActual" type="number" min="0"></label></header>
+              <label>名單及次數<textarea id="proxyList" rows="4" placeholder="例如：王小明（1次）"></textarea></label>
+            </article>
+          </div>
+          <label class="wide">出席狀況討論與後續行動<textarea id="attendanceNotes" rows="4" placeholder="記錄需要關懷、提醒或後續追蹤的事項"></textarea></label>
+        </section>
+
+        <section class="meeting-card">
+          <div class="section-title"><span>02</span><div><small>GROWTH & RETENTION</small><h2>分會成長及留員狀況</h2><p>會員實際人數來自最新 BNI 資料；案件數依系統紀錄帶入，仍可在會議中修正。</p></div></div>
+          <div class="growth-hero">
+            <label><small>分會規模目標</small><input id="chapterTarget" type="number" min="1"><span>人</span></label>
+            <div><small>目前實際</small><strong id="chapterActualDisplay">—</strong><span>人</span></div>
+            <div id="chapterGapCard"><small>距離目標</small><strong id="chapterGap">—</strong><span>人</span></div>
+          </div>
+          <div class="field-grid three">
+            <label>流失數<input id="lostCount" type="number" min="0"></label>
+            <label>申請數<input id="applicationCount" type="number" min="0"></label>
+            <label>會員成長數<input id="growthCount" type="number"></label>
+            <label>通過審查數<input id="approvedCount" type="number" min="0"></label>
+            <label>有條件通過<input id="conditionalCount" type="number" min="0"></label>
+            <label>待通過審查<input id="pendingReviewCount" type="number" min="0"></label>
+          </div>
+          <label class="wide">成長與留員討論紀錄<textarea id="growthNotes" rows="4"></textarea></label>
+        </section>
+
+        <section class="meeting-card">
+          <div class="section-title"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">只列出需要決定追蹤人員的項目；細節請另開會員關懷儀表板討論。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
+          <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
+          <div id="careVisualBoard" class="care-visual-board"></div>
+          <textarea id="careMembers" hidden readonly></textarea>
+          <label class="wide">討論結論、負責人與期限<textarea id="careActions" rows="5" placeholder="例如：由○○主責，於7/20前完成關懷"></textarea></label>
+        </section>
+
+        <section class="meeting-card">
+          <div class="section-title"><span>04</span><div><small>MEMBER SUPPORT</small><h2>目前是否有聽到任何會員有需要協助的地方呢？</h2></div></div>
+          <textarea id="memberAssistance" rows="8" placeholder="記錄會員近況、需要的資源、可協助的人員與後續追蹤方式"></textarea>
+        </section>
+
+        <section class="meeting-card">
+          <div class="section-title"><span>05</span><div><small>OTHER BUSINESS</small><h2>臨時動議</h2></div></div>
+          <textarea id="motions" rows="8" placeholder="逐項記錄提案、討論結果、負責人與完成期限"></textarea>
+        </section>
+
+        <section class="meeting-card conclusion-card">
+          <div class="section-title"><span>結</span><div><small>MEETING CONCLUSION</small><h2>會議結論與下次追蹤</h2></div></div>
+          <label class="wide">本次決議摘要<textarea id="conclusion" rows="6"></textarea></label>
+          <label class="wide">下次會議前需完成事項<textarea id="followUps" rows="6"></textarea></label>
+        </section>
+
+        <footer class="meeting-actions">
+          <div><strong id="footerStatus">草稿會自動保存</strong><small>所有委員可查閱；只有副主席能正式結案。</small></div>
+          <button type="button" class="ghost" id="saveDraft">立即儲存</button>
+          <button type="button" class="ghost" id="downloadWord">下載 Word</button>
+          <button type="button" class="primary" id="finalizeMeeting">完成會議並結案</button>
+        </footer>
+      </form>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="vendor/docx.iife.js"></script>
+  <script src="core/monthly-meeting-domain.js?v=1"></script>
+  <script src="assets/js/monthly-meeting.js?v=9"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

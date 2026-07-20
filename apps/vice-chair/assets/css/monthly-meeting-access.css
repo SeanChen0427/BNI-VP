@@ -1,0 +1,11 @@
+.access-notice{display:flex;align-items:center;gap:12px;margin-top:16px;padding:13px 17px;border:1px solid #d8e7df;border-radius:14px;background:#edf6f1;color:#315e49}
+.access-notice[hidden]{display:none}
+.access-notice b{font-size:12px}
+.access-notice span{font-size:10px;color:#61776c}
+.committee-history-mode .meeting-actions{position:static}
+.committee-history-mode .meeting-actions>div small{font-size:0}
+.committee-history-mode .meeting-actions>div small:after{content:"會員委員只能查閱已結案紀錄；內容如需修正，請聯絡副主席。";font-size:9px}
+.committee-history-mode .meeting-actions #downloadWord{margin-left:auto}
+.committee-history-mode .history-head button{display:none}
+.care-legacy-record{margin:0;padding:16px;border:1px solid #e7e2dd;border-radius:12px;background:#faf8f5;color:#555;font:500 10px/1.75 "Noto Sans TC",sans-serif;white-space:pre-wrap}
+.care-manage-card.missing-owner{border-color:#d8898d;border-left-color:var(--red);box-shadow:0 0 0 2px #a914190a}.care-manage-card.missing-owner [data-field="owner"]{border-color:#c96f73;background:#fff8f8}

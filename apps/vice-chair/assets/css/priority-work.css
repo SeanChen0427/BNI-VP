@@ -1,0 +1,47 @@
+.cases-panel {
+  margin: 0 0 16px;
+  border-top: 4px solid var(--red);
+}
+
+.cases-panel .panel-head {
+  align-items: center;
+}
+
+.case-progress {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+}
+
+.case-progress small {
+  color: var(--red);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.case-actions a.personal-action {
+  background: var(--red);
+  color: #fff;
+}
+
+.case-actions a.vote-action {
+  background: #9a681d;
+}
+
+@media (max-width: 800px) {
+  .cases-panel .panel-head {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .cases-panel .filters {
+    display: flex;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .cases-panel .filters button {
+    flex: 0 0 auto;
+  }
+}

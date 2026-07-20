@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#991b1f">
+  <title>月度分析審閱｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/analysis-review.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="index.html">← 返回工作總覽</a><div class="identity"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" onclick="FulianAuth.logout()">登出</button></div></header>
+  <main>
+    <section class="hero">
+      <div><span class="eyebrow">ANALYSIS DRAFT WORKFLOW</span><h1>月度分析審閱</h1><p>產出分析 → 草稿審視 → 確認發佈或退回重做。未經確認的分析不會進入系統。</p></div>
+      <div class="flow-note"><b>流程守則</b><span>對帳未過不產草稿；草稿僅副主席可見；已發佈快照不可改寫。</span></div>
+    </section>
+    <section class="forbidden" id="forbidden" hidden><b>分析草稿僅副主席可見</b><p>會員委員看到的是最後一版已確認發佈的分析結果（會員關懷儀表板）。</p></section>
+    <div id="workspace" hidden>
+      <section class="panel" id="generatePanel">
+        <div class="panel-head"><h2>一、產出分析</h2><span class="hint">讀取最新已入檔報表，先對帳後計分</span></div>
+        <div class="panel-actions"><button type="button" id="generateButton">產出本月分析草稿</button><span id="generateStatus"></span></div>
+        <div class="issues" id="reconcileIssues" hidden></div>
+      </section>
+      <section class="panel" id="draftPanel" hidden>
+        <div class="panel-head"><h2>二、草稿內容</h2><span class="hint" id="draftMeta"></span></div>
+        <div class="summary-grid" id="draftSummary"></div>
+        <div class="issues warning" id="draftWarnings" hidden></div>
+        <details class="raw-json"><summary>引擎完整結構化結果（JSON）</summary><pre id="draftJson"></pre></details>
+      </section>
+      <section class="panel" id="reviewPanel" hidden>
+        <div class="panel-head"><h2>三、AI 審視</h2><span class="hint">完整脈絡、品質優先；使用你綁定的個人 API Key</span></div>
+        <div class="panel-actions">
+          <label>平台
+            <select id="providerSelect"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI GPT</option><option value="gemini">Google Gemini</option></select>
+          </label>
+          <button type="button" id="reviewButton">執行 AI 審視</button>
+          <span id="reviewStatus"></span>
+        </div>
+        <div class="feedback-list" id="feedbackList" hidden></div>
+        <article class="review-output" id="reviewOutput" hidden><header id="reviewOutputMeta"></header><pre id="reviewText"></pre></article>
+      </section>
+      <section class="panel" id="decisionPanel" hidden>
+        <div class="panel-head"><h2>四、副主席決定</h2><span class="hint">確認發佈後全系統採用；退回必附原因</span></div>
+        <div class="decision-grid">
+          <div class="decision reject">
+            <h3>退回重做</h3>
+            <textarea id="rejectReason" rows="3" placeholder="哪裡判讀不對、哪裡要補充——AI 重跑時會逐點回應"></textarea>
+            <button type="button" id="rejectButton">退回並記錄原因</button>
+          </div>
+          <div class="decision publish">
+            <h3>確認發佈</h3>
+            <p>發佈為版本化快照，委員即可看到；快照不可改寫，之後只能發新版本。</p>
+            <button type="button" id="publishButton">確認無誤，正式發佈</button>
+          </div>
+        </div>
+      </section>
+      <section class="panel" id="historyPanel">
+        <div class="panel-head"><h2>已發佈版本</h2><span class="hint">歷史快照永久保留，供案件與月會回溯引用</span></div>
+        <div class="history" id="historyList"><p class="empty">尚無已發佈的分析快照。</p></div>
+      </section>
+    </div>
+  </main>
+  <script src="assets/js/workspace-nav.js?v=3"></script>
+  <script src="assets/js/analysis-review.js?v=1"></script>
+</body>
+</html>

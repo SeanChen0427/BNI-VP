@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>離會訪談｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=5"></script>
+  <script src="assets/js/supabase-data.js?v=1"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/departure-form.css">
+  <link rel="stylesheet" href="assets/css/interview-completion.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台</span></div><label>目前登入身份<select id="loginUser"></select></label></header>
+  <main>
+    <section class="hero departure-hero"><div><span class="eyebrow">離會訪談表 V2.1</span><h1>會員離會訪談</h1><p>理解會員的真實經驗與離會原因，完成必要提醒及後續行政交接。</p></div><div class="save-state"><i></i><span id="saveState">草稿已儲存</span><small id="saveTime">尚未編輯</small></div></section>
+    <div class="layout">
+      <aside class="steps"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#experience">會員經驗</a><a href="#departure">離會原因</a><a href="#policy">制度提醒</a><a href="#followup">內部追蹤</a><a href="#signatures">簽名確認</a></nav><div class="privacy"><b>敏感資料提醒</b><p>健康、家庭、工作或衝突等完整內容限案件負責人及授權人員使用；全體委員只看進度與必要摘要。</p></div></aside>
+      <form id="departureForm">
+        <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>會員資料由現有名單帶入</p></div></div><div class="fields two"><label>分會<input value="富聯" readonly></label><label>會員姓名<input id="memberSearch" list="memberList" data-save><datalist id="memberList"></datalist></label><label>專業類別<input id="profession" readonly></label><label>離會日期<input id="departureDate" type="date" data-save></label><label>訪談人員<input id="interviewer" readonly></label><label>訪談日期與時間<input id="interviewDate" type="datetime-local" data-save></label><label>陪訪人員（選填）<input id="companion" list="committeeList" data-save><datalist id="committeeList"></datalist></label><label>訪談方式／地點<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label></div></section>
+
+        <section class="form-card" id="experience"><div class="section-head"><span>02</span><div><h2>會員經驗與收穫</h2><p>先理解經驗，不急著辯解或挽留</p></div></div>
+          <article class="question"><h3><span>1</span>你在 BNI 有什麼收穫？</h3><div class="system-hint">可從人脈、商務、學習、信任及個人成長等面向追問具體例子。</div><textarea id="gains" rows="6" data-save></textarea></article>
+          <article class="question"><h3><span>2</span>關於 BNI，你最喜歡什麼呢？</h3><div class="system-hint">了解會員真正重視的體驗，也可作為分會未來留員與文化維護的依據。</div><textarea id="likes" rows="6" data-save></textarea></article>
+          <article class="question"><h3><span>3</span>你是否覺得你已充分了解有關 BNI 的各項培訓活動，以及能帶給你的好處呢？</h3><div class="choice-row"><label><input type="radio" name="trainingUnderstood" value="是" data-save>是</label><label><input type="radio" name="trainingUnderstood" value="否" data-save>否</label></div><textarea id="trainingUnderstandingNotes" rows="4" placeholder="訪談補充紀錄" data-save></textarea></article>
+          <article class="question"><h3><span>4</span>你是否有參加 MSP 培訓？</h3><div class="choice-row"><label><input type="radio" name="mspAttended" value="是" data-save>是</label><label><input type="radio" name="mspAttended" value="否" data-save>否</label></div><label class="inline-note">參與情況或日期<input id="mspNotes" data-save></label></article>
+        </section>
+
+        <section class="form-card" id="departure"><div class="section-head"><span>03</span><div><h2>離會原因與改善經驗</h2><p>以中性問題理解會員的真實決定</p></div></div>
+          <article class="question"><h3><span>5</span>您是否已辦妥離會手續（Email 通知副主席）？</h3><div class="choice-row"><label><input type="radio" name="procedureDone" value="是" data-save>是</label><label><input type="radio" name="procedureDone" value="否" data-save>否</label></div><label class="inline-note">Email 通知日期<input id="emailNoticeDate" type="date" data-save></label></article>
+          <article class="question"><h3><span>6</span>什麼原因讓你決定要離開？</h3><div class="system-hint">請讓會員完整說明，不先假設是個人投入不足；若涉及健康、家庭或衝突，只記錄完成流程所需內容。</div><textarea id="departureReason" rows="7" data-save></textarea></article>
+          <article class="question"><h3><span>7</span>什麼是你在 BNI 裡面不喜歡的事項？如果有，那是什麼？</h3><div class="system-hint">可區分制度、分會運作、商務成果、人際互動、時間成本或期待落差。</div><textarea id="dislikes" rows="6" data-save></textarea></article>
+          <article class="question"><h3><span>8</span>你有做過什麼事來改變它嗎？如果有，那是什麼？</h3><div class="system-hint">確認會員曾尋求哪些協助、向誰反映及結果如何，避免將離會原因簡化為單一事件。</div><textarea id="improvementAttempts" rows="6" data-save></textarea></article>
+        </section>
+
+        <section class="form-card" id="policy"><div class="section-head"><span>04</span><div><h2>制度提醒</h2><p>逐字確認離會後的商標使用規範</p></div></div><article class="question policy-question"><h3><span>9</span>提醒您，根據 BNI 總政策，離開分會後，亦即 BNI 公司取消會員對於名片、網站、標誌、名牌等商標使用之權利，敬請遵守以免觸犯刑法。</h3><div class="choice-row"><label><input type="checkbox" id="trademarkUnderstood" data-save>會員已了解</label></div></article></section>
+
+        <section class="form-card" id="followup"><div class="section-head"><span>05</span><div><h2>內部追蹤</h2><p>系統工作紀錄，不輸出正式離會訪談表</p></div></div><div class="internal-box"><div class="check-grid"><label><input type="checkbox" id="emailConfirmed" data-save>已確認離會 Email</label><label><input type="checkbox" id="secretaryNotified" data-save>已通知秘書財務</label><label><input type="checkbox" id="backofficeRemoval" data-save>已安排移除後台名單</label><label><input type="checkbox" id="certificateChecked" data-save>已確認會員資格證適用性</label></div><label>離會原因分類<select id="reasonCategory" data-save><option value="">尚未分類</option><option>個人／家庭因素</option><option>健康因素</option><option>工作／職涯異動</option><option>商務成果未達期待</option><option>時間投入困難</option><option>分會互動或制度因素</option><option>其他</option></select></label><label>全體委員可見的必要摘要<textarea id="committeeSummary" rows="4" data-save></textarea></label><label>副主席／案件人員內部備註<textarea id="internalNotes" rows="5" data-save></textarea></label></div></section>
+
+        <section class="form-card" id="signatures"><div class="section-head"><span>06</span><div><h2>簽名確認</h2><p>依原表保留主席、副主席及董事顧問簽名欄</p></div></div><div class="fields two"><label>主席簽名／姓名<input id="presidentSignature" data-save></label><label>副主席簽名／姓名<input id="vicePresidentSignature" data-save></label><label>董事顧問簽名／姓名<input id="directorSignature" data-save></label><label>文件確認日期<input id="signatureDate" type="date" data-save></label></div></section>
+
+        <section class="actions"><div><b>離會訪談表 V2.1</b><p>正式完成後會保存 Word，並把案件推進至待發送委員回饋。</p></div><button type="button" class="ghost" id="resetDraft">清除未完成草稿</button><button type="button" class="primary" id="downloadWord">完成訪談並產生 Word</button></section>
+      </form>
+    </div>
+  </main>
+  <div id="toast"></div>
+  <script src="core/case-domain.js?v=1"></script>
+  <script src="services/case-files.js?v=2"></script>
+  <script src="services/interview-completion.js?v=1"></script>
+  <script src="vendor/docx.iife.js"></script>
+  <script src="assets/js/departure-form.js?v=4"></script>
+  <script src="assets/js/departure-form-live.js?v=2"></script>
+  <script src="assets/js/workspace-nav.js?v=1"></script>
+</body>
+</html>

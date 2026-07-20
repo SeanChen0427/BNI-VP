@@ -1,0 +1,22 @@
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+dist/
+.next/
+
+# Private member data and uploaded reports
+data/
+uploads/
+backups/
+exports/
+*.xls
+*.xlsx
+*.csv
+
+# System files
+.DS_Store
+

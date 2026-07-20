@@ -1,0 +1,71 @@
+{
+  "schema": "fulian.project-manifest.v1",
+  "updated": "2026-07-20",
+  "product": "富聯分會會員委員會工作台",
+  "runtime": {
+    "type": "multi-page vanilla HTML/CSS/JavaScript prototype",
+    "start": "node preview-server.mjs 4173",
+    "url": "http://127.0.0.1:4173/",
+    "buildStep": false,
+    "formalBackend": false
+  },
+  "entryDocuments": [
+    "AGENTS.md",
+    "docs/AI_START_HERE.md",
+    "project-manifest.json"
+  ],
+  "canonicalDocuments": {
+    "currentDecisions": "docs/decision-log.md",
+    "requirements": "docs/requirements-draft.md",
+    "handoff": "docs/HANDOFF.md",
+    "openQuestions": "docs/OPEN_QUESTIONS.md",
+    "architecture": "docs/ARCHITECTURE_MAP.md",
+    "storage": "docs/STORAGE_SCHEMA.md",
+    "roadmap": "docs/REFACTOR_ROADMAP.md",
+    "changeHistory": "CHANGELOG.md",
+    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-07-20.md"
+  },
+  "domainOwners": {
+    "caseStageAndStorageKeys": "core/case-domain.js",
+    "dynamicDatesAndMonthWindows": "core/calendar-domain.js",
+    "caseWordStorageAndAdvance": "services/case-files.js",
+    "interviewCompletionFeedback": "services/interview-completion.js",
+    "monthlyMeetingCareAssignments": "core/monthly-meeting-domain.js",
+    "votingAndRecusal": [
+      "core/case-domain.js",
+      "docs/voting-rules.md"
+    ],
+    "bniScoresAndDiagnostics": "../bni-analysis",
+    "authenticationPrototype": "assets/js/auth.js",
+    "memberDirectoryPrototype": "assets/js/member-directory.js",
+    "localApiAndAiProxy": "preview-server.mjs"
+  },
+  "pages": {
+    "index.html": "工作總覽、待辦、公告、通知、AI 助手",
+    "case-board.html": "進行中案件與階段篩選",
+    "case-workflow.html": "回饋、投票、董顧確認與結案",
+    "member-care.html": "BNI 分析橋接與會員關懷",
+    "attendance.html": "每週點名與出席公告",
+    "terminal-form.html": "終期輔導／續約訪談",
+    "midterm-form.html": "期中輔導",
+    "new-member-form.html": "新會員訪談",
+    "industry-change-form.html": "轉換行業別訪談",
+    "departure-form.html": "離會訪談",
+    "course.html": "副主席交接課程",
+    "settings.html": "角色、人員、帳密與個人 AI 設定",
+    "login.html": "原型登入"
+  },
+  "nonNegotiableRules": [
+    "BNI 計分與診斷只由相鄰 bni-analysis 模組提供，不在工作台重寫",
+    "AGENTS.md 與 CLAUDE.md 必須完全相同",
+    "只有申請者本人同時是副主席或會員委員時才迴避",
+    "主訪、陪訪及案件負責人仍須回饋並保有投票權",
+    "正式會員資料、附件、Token 與 API Key 不得進公開 GitHub",
+    "影響資格、投票、計分與正式處置的規則變更必須先由 Sean 確認"
+  ],
+  "verification": [
+    "node scripts/project-audit.mjs",
+    "node tests/case-domain.test.mjs",
+    "node --test tests/*.test.mjs"
+  ]
+}

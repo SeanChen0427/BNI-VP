@@ -1,0 +1,97 @@
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],industryTaskId=new URLSearchParams(location.search).get("task");if(!industryTaskId)location.replace("case-board.html?new=industry");const STORE_KEY=window.FulianCaseDomain.draftStorageKey({id:industryTaskId,type:"industry"});
+const industryCompletion=window.FulianInterviewCompletion.setup({formLabel:"轉換行業別訪談"});
+let applicants=[
+  {name:"正式資料載入中",profession:""}
+];
+let currentApplicant=applicants[0],saveTimer;
+const goalQuestions=[
+  {no:4,id:"joinReason",title:"參加BNI的主要因素？（希望透過BNI與分會獲得什麼機會？）",hint:["確認期待是長期建立引薦關係，或只期待加入後立即取得訂單。","將期待轉成具體的客群、人脈或學習目標。"]},
+  {no:5,id:"cooperationIndustries",title:"請問哪些行業可以與您合作，服務相同目標客戶群？（業務人脈圈／產業鏈說明）",hint:["請申請者列出上下游及共同服務同一客群的產業。","確認與現有會員專業類別的合作方式與界線。"]},
+  {no:6,id:"annualGoal",title:"請問未來一年內您個人業績目標希望達到多少台幣？或公司營業額增長多少％？",hint:["記錄可衡量的目標，並了解目前基準。"]}
+];
+const commitmentQuestions=[
+  {no:7,id:"sixHours",type:"yesno",title:"您是否願意每週花6小時以上與會員互動（包含例會、一對一會談與培訓等）？",hint:["確認申請者已理解這是每週持續投入，不只包含例會時間。"]},
+  {no:8,id:"attendancePromise",type:"yesno",title:"您願意保證每週準時到場，並待到會議結束嗎？（不遲到、不早退，且了解遲到早退有可能被分會開放專業類別）",extra:"arrivalTime",hint:["請先確認實際工作、家庭與交通安排是否可長期配合。"]},
+  {no:9,id:"mentorPlan",type:"yesno",title:"在8週導師計畫內的新會員，需於6:15到會，由導師協助您更了解BNI。"},
+  {no:10,id:"membershipTransfer",type:"understood",title:"您是否了解會員資格不得轉讓；轉換專業類別須繳交一次性註冊費，且轉換時會籍未滿12個月需提前續約，若轉換不成功將開放專業類別？"},
+  {no:11,id:"feeUse",type:"understood",title:"請說明入會費用的使用方向：BNI是一家公司，不是社團協會；一旦宣誓入會將不退費，所繳金額不包含分會例會、培訓及相關會議的入席費。"},
+  {no:12,id:"attendancePolicy",type:"understood",title:"請說明出席相關規定（無代理人情況下，半年內四次缺席會開放專業類別）。",hint:["正式出席紀錄仍以負責紀錄的會員委員確認為準；如有異議，由會員委員會協調。"],guide:["出席以六個月為累計週期，會員應完整參與每週例會。","遲到與早退累計3次折算1次缺席。","缺席最多3次，第4次將開放專業類別。","例會中未完成當週25秒簡報，主席最後確認後仍未完成，直接列為缺席。","半年內代理最多8週，第9週代理將開放專業類別。","中心區目前沒有病假；無法出席時應事先安排代理人，並在來賓接龍群留下姓名與聯絡電話。"]},
+  {no:13,id:"proxyAvailable",type:"yesno",title:"若您無法出席會議，是否能找到代理人？",extra:"proxy"},
+  {no:14,id:"inviteVisitors",type:"yesno",title:"您願意邀約優秀的來賓（上下游廠商、客戶、朋友等）來參訪BNI交流嗎？請提供20個商務名單，確保您是商務人士（如附件）。"},
+  {no:15,id:"applicationCorrect",type:"correct",title:"請您確認申請表所填寫的資訊完全正確（專業別、身分證上姓名）。",hint:["請申請者現場出示身分證或其他足以佐證本人身分的證件供委員核對。","只做當下核對，不拍照、不截圖、不留存證件影本或證件號碼。"]},
+  {no:16,id:"trainingSystem",type:"yesno",title:"您是否願意積極參與BNI培訓學習系統，使用BNI成為優秀的商務人士（並非加入BNI就會有引薦生意）？"}
+];
+const trainingQuestions=[
+  {no:17,id:"mspCommitment",type:"yesno",title:"您是否願意在加入分會之後兩個月內完成MSP（上）、MSP（下）各一次培訓？（若未完成參與則開放專業類別）",extra:"msp",hint:["現行期限依中心區V9.1：自收到辦公室開通信後兩個月內完成。"]},
+  {no:18,id:"newMemberSession",type:"yesno",title:"您是否願意在加入後兩個月內完成新會員交流座談會？",extra:"session"},
+  {no:19,id:"greenStandard",type:"yesno",title:"您是否了解未來在BNI任何商務活動皆以綠燈會員為基準？",hint:["可向申請者說明：綠燈反映的是穩定出席、引薦、一對一、來賓、培訓與商務成果等BNI基本功。","綠燈不只是分數，也是參與跨分會商務活動及建立會員信任的重要基準。"]},
+  {no:20,id:"policyEthics",type:"yesno",title:"您是否願意遵守BNI相關政策、道德規範與營利合約？",hint:["提醒申請者：引薦代表會員把自己的信用交付出去，因此誠信、守約、保密、專業交付與客訴處理都很重要。","若對政策或合約內容有疑問，應在確認前提出並由副主席或中心區協助說明。"]}
+];
+const networkQuestions=[
+  {no:21,id:"otherOrganization",type:"yesno",title:"您是否有參加其他的社團、協會或組織？",extra:"organization",policy:true,hint:["重點不是禁止一般社團，而是不能同時加入與BNI性質相近、限制單一行業代表且以互相引薦為主要目的的團體。","原因是同一筆引薦與商務機會會產生『應該交給哪一個團體』的義務衝突，削弱對分會會員的承諾。","獅子會、扶輪社等沒有明確商務引薦KPI的公益或聯誼組織，原則上不屬於這類限制；若有疑義仍交由會員委員會與中心區確認。"]},
+  {no:23,id:"openCategory",type:"understood",title:"「開放專業類別」即喪失會員資格，不再出席本BNI分會會議。"},
+  {no:24,id:"pledgeGuests",type:"yesno",title:"您是否願意邀請2位親友／合作夥伴來觀禮您的宣誓儀式？",extra:"guests"}
+];
+function hintBox(items=[]){return items.length?`<div class="system-hint"><b>系統訪談提示・不輸出至 Word</b><ul>${items.map(x=>`<li>${x}</li>`).join("")}</ul></div>`:""}
+function choices(id,type){if(type==="understood")return`<div class="choice-row"><label><input type="checkbox" id="${id}" data-save>已了解</label></div>`;const labels=type==="correct"?[["correct","正確"],["incorrect","不正確"]]:[["yes","是"],["no","否"]];return`<div class="choice-row">${labels.map(([v,t])=>`<label><input type="radio" name="${id}" value="${v}" data-save>${t}</label>`).join("")}</div>`}
+const relationOptions=["伴侶","親友","同事","合作夥伴","客戶","供應商"];
+function relationField(label,id){return`<label>${label}<select id="${id}" data-save><option value="">請選擇</option>${relationOptions.map(x=>`<option value="${x}">${x}</option>`).join("")}<option value="其他">其他</option></select><input id="${id}Other" class="relation-other" placeholder="請填寫其他關係" data-save hidden></label>`}
+function extraFields(type){if(type==="arrivalTime")return`<div class="conditional"><label>承諾到場時間<input id="arrivalTime" type="time" value="06:15" data-save></label></div>`;if(type==="proxy")return`<div class="conditional"><label>代理人姓名<input id="proxyName" data-save></label>${relationField("與申請者關係","proxyRelation")}</div>`;if(type==="msp")return`<div class="conditional"><label>預定 MSP（上）日期<input id="mspUpDate" type="date" data-save></label><label>預定 MSP（下）日期<input id="mspDownDate" type="date" data-save></label></div>`;if(type==="session")return`<div class="conditional"><label>新會員交流座談會首選日期<input id="sessionDate1" type="date" data-save></label><label>備選日期<input id="sessionDate2" type="date" data-save></label></div>`;if(type==="organization")return`<div class="conditional"><label>組織名稱<input id="organizationName" data-save></label><label>參與方式／角色<input id="organizationRole" data-save></label></div>`;if(type==="guests")return`<div class="conditional"><label>觀禮者一姓名<input id="guest1Name" data-save></label>${relationField("觀禮者一關係","guest1Relation")}<label>觀禮者二姓名<input id="guest2Name" data-save></label>${relationField("觀禮者二關係","guest2Relation")}</div>`;return""}
+function renderOfficialQuestion(q){return`<article class="question"><div class="question-head"><span>${q.no}.</span><h3>${q.title}</h3></div>${hintBox(q.hint)}${q.guide?`<div class="rule-guide"><b>委員解說重點</b><ul>${q.guide.map(x=>`<li>${x}</li>`).join("")}</ul></div>`:""}${choices(q.id,q.type)}${extraFields(q.extra)}${q.policy?`<div class="policy-box"><b>BNI總政策四</b><br>任何個人會員均不得加入另一家分會，也不得加入只允許一個行業之代表，而主要目的在於互相引薦業務的其他組織，因為此舉將大幅削弱其對分會會員所承擔的義務。會員委員會必須強制實施該政策。</div><div class="choice-row"><label><input type="checkbox" id="policyFourUnderstood" data-save>已了解總政策四</label></div>`:""}</article>`}
+function render(){
+  $("#goalQuestions").innerHTML=goalQuestions.map(q=>`<article class="question"><div class="question-head"><span>${q.no}.</span><h3>${q.title}</h3></div>${hintBox(q.hint)}<label class="long-field">委員訪談紀錄<textarea id="${q.id}" rows="5" data-save></textarea></label></article>`).join("");
+  $("#commitmentQuestions").innerHTML=commitmentQuestions.map(renderOfficialQuestion).join("");
+  $("#trainingQuestions").innerHTML=trainingQuestions.map(renderOfficialQuestion).join("");
+  $("#networkQuestions").innerHTML=networkQuestions.map(renderOfficialQuestion).join("");
+  $("#contactRows").innerHTML=Array.from({length:20},(_,i)=>`<div class="contact-row"><span>${i+1}</span><input id="contactName${i+1}" aria-label="第${i+1}位姓名" data-save><input id="contactIndustry${i+1}" aria-label="第${i+1}位行業別" data-save></div>`).join("");
+}
+function localDateTime(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function localDate(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
+function selectApplicant(name,preserve=false){currentApplicant=applicants.find(x=>x.name===name)||applicants[0];$("#memberSearch").value=currentApplicant.name;$("#currentProfession").value=currentApplicant.profession;if(!preserve)$("#applicantSignature").value=currentApplicant.name}
+function serialize(){const out={applicant:currentApplicant.name,login:$("#loginUser").value};$$('[data-save]').forEach(el=>{if(el.type==="radio"){if(el.checked)out[`radio:${el.name}`]=el.value}else if(el.type==="checkbox")out[el.id]=el.checked;else out[el.id]=el.value});return out}
+function restore(data){if(!data)return;if(data.login)$("#loginUser").value=data.login;selectApplicant(data.applicant||applicants[0].name,true);$$('[data-save]').forEach(el=>{if(el.type==="radio")el.checked=data[`radio:${el.name}`]===el.value;else if(el.type==="checkbox"&&data[el.id]!==undefined)el.checked=data[el.id];else if(data[el.id]!==undefined)el.value=data[el.id]})}
+function saveDraft(){localStorage.setItem(STORE_KEY,JSON.stringify(serialize()));const t=new Date();$("#saveState").textContent="草稿已儲存";$("#saveTime").textContent=`最後儲存 ${t.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;updateProgress()}
+function bindInputs(){$$('[data-save]').forEach(el=>el.oninput=()=>{$("#saveState").textContent="儲存中…";clearTimeout(saveTimer);saveTimer=setTimeout(saveDraft,300)});$$('[data-save]').forEach(el=>el.onchange=el.oninput)}
+function updateProgress(){const textFields=$$('textarea[data-save],input[data-save]:not([type="radio"]):not([type="checkbox"]):not([type="hidden"])'),filled=textFields.filter(x=>x.value.trim()).length,groups=new Set($$('input[type="radio"][data-save]').map(x=>x.name)),chosen=[...groups].filter(n=>document.querySelector(`input[name="${n}"]:checked`)).length,checks=$$('input[type="checkbox"][data-save]'),checked=checks.filter(x=>x.checked).length,total=textFields.length+groups.size+checks.length,p=Math.round((filled+chosen+checked)/Math.max(total,1)*100);$("#progressBar").style.width=`${p}%`;$("#progressText").textContent=`${p}%`;const count=Array.from({length:20},(_,i)=>answer(`#contactName${i+1}`)||answer(`#contactIndustry${i+1}`)).filter(Boolean).length;$("#contactCount").textContent=`已填 ${count}／20 位`}
+function answer(selector){return $(selector)?.value.trim()||""}function radioValue(name){return document.querySelector(`input[name="${name}"]:checked`)?.value||""}function mark(value,target){return value===target?"■":"□"}function check(id){return $(id)?.checked?"■":"□"}function fileDateStamp(d=new Date()){return`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`}function safeFileName(text){return text.replace(/[\\/:*?"<>|]/g,"-").trim()}function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),2200)}
+function officialResult(q){if(q.type==="understood")return`${check(q.id)} 已了解`;if(q.type==="correct")return`${mark(radioValue(q.id),"correct")} 正確　${mark(radioValue(q.id),"incorrect")} 不正確`;return`${mark(radioValue(q.id),"yes")} 是　${mark(radioValue(q.id),"no")} 否`}
+function relationValue(id){const selected=answer(`#${id}`);return selected==="其他"?(answer(`#${id}Other`)||"其他（未填寫）"):selected}
+function extraText(type){if(type==="arrivalTime")return`承諾到場時間：${answer("#arrivalTime")||"未填寫"}`;if(type==="proxy")return`代理人姓名：${answer("#proxyName")||"未填寫"}　關係：${relationValue("proxyRelation")||"未填寫"}`;if(type==="msp")return`MSP（上）：${answer("#mspUpDate")||"未填寫"}　MSP（下）：${answer("#mspDownDate")||"未填寫"}`;if(type==="session")return`新會員交流座談會：${answer("#sessionDate1")||"未填寫"}／${answer("#sessionDate2")||"未填寫"}`;if(type==="organization")return`組織名稱：${answer("#organizationName")||"未填寫"}　參與方式／角色：${answer("#organizationRole")||"未填寫"}`;if(type==="guests")return`觀禮者一：${answer("#guest1Name")||"未填寫"}（${relationValue("guest1Relation")||"關係未填"}）　觀禮者二：${answer("#guest2Name")||"未填寫"}（${relationValue("guest2Relation")||"關係未填"}）`;return""}
+async function downloadWord(){
+  if(typeof docx==="undefined"){toast("Word元件尚未載入，請重新整理後再試");return}
+  industryCompletion.begin();
+  const{Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,BorderStyle,AlignmentType,PageOrientation,ShadingType}=docx,font="Arial Unicode MS",fontSpec={ascii:font,hAnsi:font,eastAsia:font,cs:font};
+  const run=(text,opts={})=>new TextRun({text:String(text??""),font:fontSpec,size:opts.size||21,bold:!!opts.bold,color:opts.color});
+  const para=(text="",opts={})=>new Paragraph({alignment:opts.align,spacing:{before:opts.before||0,after:opts.after===undefined?90:opts.after,line:300},children:[run(text,opts)]});
+  const noBorders={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
+  const metaCell=(label,value)=>new TableCell({width:{size:50,type:WidthType.PERCENTAGE},margins:{top:90,bottom:90,left:110,right:110},children:[new Paragraph({children:[run(label,{bold:true}),run(value||"（未填寫）")]})]});
+  const meeting=answer("#meetingDate")?new Date(answer("#meetingDate")).toLocaleString("zh-TW"):"（未填寫）";
+  const meta=new Table({width:{size:100,type:WidthType.PERCENTAGE},borders:noBorders,rows:[new TableRow({children:[metaCell("訪談地址：",answer("#meetingPlace")),metaCell("會談時間：",meeting)]}),new TableRow({children:[metaCell("會員姓名：",currentApplicant.name),metaCell("原專業別：",currentApplicant.profession)]}),new TableRow({children:[metaCell("申請轉換專業別：",answer("#profession")||"未填寫"),metaCell("分會：","富聯")]}),new TableRow({children:[metaCell("訪談者：",answer("#leadInterviewer")),metaCell("陪訪：",[answer("#companionInterviewer"),answer("#secondCompanion")].filter(Boolean).join("、"))]})]});
+  const children=[new Paragraph({alignment:AlignmentType.RIGHT,children:[run("V8.2　：20251022",{size:18})]}),new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:220},children:[run("高屏區會員訪談表－轉換行業別",{size:32,bold:true,color:"A91419"})]}),meta,
+    para("1. 請清楚表明主要從事的業務、產品與服務內容，與同業不同的優勢或個人優勢，有何代表性客戶與成功見證？",{bold:true,before:160}),para(`主要業務、產品與服務：${answer("#businessContent")||"（未填寫）"}`),para(`優勢：${answer("#advantages")||"（未填寫）"}`),para(`代表性客戶：${answer("#representativeClients")||"（未填寫）"}`),para(`成功見證：${answer("#successStories")||"（未填寫）"}`),
+    para(`2. 所申請的專業類別是全職或兼職？${answer("#employmentType")||"未填寫"}　年資：${answer("#experienceYears")||"未填寫"}年。`,{bold:true}),
+    para("3. 請提供所屬專業類別必需的執照或證照，例如醫生證、執業許可證、技術師證照或特許行業批准函等。",{bold:true}),para(answer("#licenses")||"（未填寫）"),para(`公司統編：${answer("#taxId")||"未填寫"}　公司名稱：${answer("#companyName")||"未填寫"}　公司資本額：${answer("#capital")||"未填寫"}　成立時間：${answer("#establishedDate")||"未填寫"}`)
+  ];
+  goalQuestions.forEach(q=>children.push(para(`${q.no}. ${q.title}`,{bold:true}),para(answer(`#${q.id}`)||"（未填寫）")));
+  [...commitmentQuestions,...trainingQuestions,...networkQuestions].forEach(q=>{children.push(para(`${q.no}. ${q.title}`,{bold:true}),para(officialResult(q)));const extra=extraText(q.extra);if(extra)children.push(para(extra));if(q.policy)children.push(para(`總政策四：${check("policyFourUnderstood")} 已了解`))});
+  children.push(para("25. 您還想了解BNI的哪方面事項或其他資訊？",{bold:true}),para(answer("#otherQuestions")||"（未填寫）"),para("26. 分會相關規定備註說明：",{bold:true}),para(answer("#chapterNotes")||"（未填寫）"),para("20個商務名單",{bold:true,size:26,color:"A91419",before:220}));
+  const tableCell=(text,header=false)=>new TableCell({shading:header?{fill:"A91419",type:ShadingType.CLEAR}:undefined,margins:{top:80,bottom:80,left:90,right:90},children:[para(text,{bold:header,color:header?"FFFFFF":undefined,after:0})]});
+  children.push(new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({tableHeader:true,children:[tableCell("編號",true),tableCell("姓名",true),tableCell("行業別",true)]}),...Array.from({length:20},(_,i)=>new TableRow({children:[tableCell(i+1),tableCell(answer(`#contactName${i+1}`)),tableCell(answer(`#contactIndustry${i+1}`))]}))]}));
+  children.push(para(`入會申請人：${answer("#applicantSignature")||"____________________"}`,{before:180}),para(`見證人（訪談者）：${answer("#witness1")||"________________"}／${answer("#witness2")||"________________"}／${answer("#witness3")||"________________"}`),para(`日期：${answer("#signatureDate")||"____________________"}`));
+  const wordDocument=new Document({styles:{default:{document:{run:{font:fontSpec,size:21},paragraph:{spacing:{line:300}}}}},sections:[{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.PORTRAIT},margin:{top:650,right:650,bottom:650,left:650}}},children}]});
+  const blob=await Packer.toBlob(wordDocument),fileName=`高屏區會員訪談表-轉換行業別-${safeFileName(currentApplicant.name)}-${fileDateStamp()}.docx`;
+  try{
+    await window.FulianCaseFiles.saveGeneratedWord({caseId:industryTaskId,blob,fileName,sourceLabel:"轉換行業別訪談表單",domain:window.FulianCaseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});
+    industryCompletion.success({blob,fileName,caseId:industryTaskId,memberName:currentApplicant.name});
+    toast("訪談已完成，案件待發送委員回饋");
+  }catch(error){
+    console.error("案件 Word 保存失敗",error);
+    industryCompletion.failure({blob,fileName,error});
+    toast("Word 已產生，但案件尚未完成保存");
+  }
+}
+function refreshCompanyName(){const name=answer("#companyName"),hint=$("#companyNameHint");hint.textContent=name?`公司名稱：${name}`:"輸入統編後可由經濟部公司登記資料帶入";hint.classList.toggle("found",!!name)}
+async function lookupCompany(){const taxId=answer("#taxId").replace(/\D/g,""),button=$("#lookupCompany"),status=$("#companyLookupStatus");if(!/^\d{8}$/.test(taxId)){status.textContent="請輸入完整8碼公司統編。";status.className="lookup-status error";return}button.disabled=true;button.textContent="查詢中…";status.textContent="正在查詢經濟部公司登記資料…";status.className="lookup-status";try{const response=await fetch(`/api/company?taxId=${encodeURIComponent(taxId)}`),data=await response.json();if(!response.ok||!data.found)throw new Error(data.message||"查無公司資料");$("#companyName").value=data.name||"";$("#capital").value=data.capital?`${Number(data.capital).toLocaleString("zh-TW")} 元`:"";$("#establishedDate").value=data.setupDate||"";refreshCompanyName();status.textContent=`已帶入公司資料（${data.status||"登記狀態未提供"}），請委員再次核對。`;status.className="lookup-status success";saveDraft()}catch(error){status.textContent=`${error.message}。可改為手動填寫；正式部署時需由系統後端代理官方API。`;status.className="lookup-status error"}finally{button.disabled=false;button.textContent="查詢公司資料"}}
+function bindRelationFields(){["proxyRelation","guest1Relation","guest2Relation"].forEach(id=>{const select=$(`#${id}`),other=$(`#${id}Other`);if(!select||!other)return;const sync=()=>{other.hidden=select.value!=="其他";if(!other.hidden)other.focus()};select.addEventListener("change",sync);sync()})}
+function init(){render();$("#memberList").innerHTML=applicants.map(x=>`<option value="${x.name}">${x.profession}</option>`).join("");$("#meetingDate").value=localDateTime();$("#signatureDate").value=localDate();$("#leadInterviewer").value=$("#loginUser").value;$("#witness1").value=$("#loginUser").value;selectApplicant(currentApplicant.name);restore(JSON.parse(localStorage.getItem(STORE_KEY)||"null"));bindRelationFields();refreshCompanyName();$("#witness2").value=answer("#companionInterviewer");$("#witness3").value=answer("#secondCompanion");$("#memberSearch").onchange=e=>{selectApplicant(e.target.value);saveDraft()};$("#loginUser").onchange=()=>{$("#leadInterviewer").value=$("#loginUser").value;$("#witness1").value=$("#loginUser").value;saveDraft()};$("#resetDraft").onclick=()=>{if(confirm("要清除這份尚未完成的轉換行業別訪談草稿嗎？已保存的案件附件與完成紀錄不會被刪除。")){localStorage.removeItem(STORE_KEY);location.reload()}};$("#downloadWord").onclick=downloadWord;$("#lookupCompany").onclick=lookupCompany;bindInputs();$("#companionInterviewer").addEventListener("input",()=>{$("#witness2").value=answer("#companionInterviewer")});$("#secondCompanion").addEventListener("input",()=>{$("#witness3").value=answer("#secondCompanion")});updateProgress()}
+init();
