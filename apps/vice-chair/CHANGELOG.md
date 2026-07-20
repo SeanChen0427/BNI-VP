@@ -1,5 +1,9 @@
 # 變更紀錄
 
+## 2026-07-21
+
+- 修正每週點名顯示「Supabase 保存失敗／Unexpected end of JSON input」：資料列其實已寫入，但 Edge API 將 PostgREST `return=minimal` 的成功空回應誤當 JSON 解析；共用資料庫回應處理現在接受空內容並回傳 `null`，避免保存成功卻誤報失敗。
+
 ## 2026-07-20
 
 - 每週點名正式接上 Supabase：草稿、已確認週次、紀錄人、PALMS 基準期間與 LINE 公告快照可跨裝置保存；既有瀏覽器內已雙重確認的歷史週次由副主席／Admin 首次載入時自動搬移。

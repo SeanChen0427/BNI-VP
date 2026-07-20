@@ -37,6 +37,8 @@ for(const endpoint of ["monthly-data","committee-meetings","analysis-draft","ana
 assert.match(appApiFunction,/authenticate\(request, identity\)/);
 assert.match(appApiFunction,/account\.role/);
 assert.match(appApiFunction,/FULIAN_AI_ENCRYPTION_KEY/);
+assert.match(appApiFunction,/const text = await response\.text\(\)/);
+assert.match(appApiFunction,/if \(!text\) return null/,"PostgREST return=minimal 的空回應不得再被強制解析為 JSON");
 assert.match(memberDirectory,/FulianData\.getMemberNames/);
 assert.doesNotMatch(memberDirectory,/members\s*[:=]\s*\[[^\]]+\]/s);
 assert.match(edgeFunction,/account\.role!=="admin"/);

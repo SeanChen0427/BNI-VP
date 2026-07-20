@@ -69,8 +69,13 @@ async function serviceFetch(path: string, options: RequestInit = {}) {
 
 async function db(path: string, options: RequestInit = {}) {
   const response = await serviceFetch(`/rest/v1/${path}`, options);
-  if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`Supabase 回應格式不正確：HTTP ${response.status}`);
+  }
 }
 
 async function ensurePerson(name: string) {
