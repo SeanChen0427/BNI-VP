@@ -2,6 +2,7 @@
 
 ## 2026-07-20
 
+- 修正已搬入 Private Storage 的 2026-06 審計報表顯示為未上傳：初次資料搬移誤用 PALMS 期間解析器，使 5 份審計檔的 `period_start`／`period_end` 為空；新增 migration 由 `audit_week_YYYY-MM-DD.xls` 補回日期，Edge API 同時加入舊檔名相容判斷，使用者不需重新上傳。
 - 修正 GitHub Pages 對本機 `/api/*` 回傳 HTML 404、造成月會無法載入及 `Unexpected token '<'`：新增正式 `app-api` Edge Function，將月會、每月資料、分析草稿／版本、AI 設定／對話、離會、公司統編與測試資料重置共 9 組 API 全部改接 Supabase；Edge gateway JWT 與函式內角色／姓名雙重驗證均啟用。
 - 新增正式線上應用 migration：月會設定、單月 PALMS 出席摘要、AI 個人偏好、完整 service-role 最小必要權限及月會 leadership-only RLS；個人 AI Key 以獨立 Edge secret 進行 AES-GCM 加密，原始報表持續只存 Private Storage。
 - 分析核心新增純資料輸入介面，Edge Function 直接使用 `apps/bni-analysis/engine` 的同一套對帳、計分與診斷規則；本機 regression 仍為 46／46，未在工作台或資料庫複製計分規則。

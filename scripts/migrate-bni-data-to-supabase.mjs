@@ -4,6 +4,7 @@ import path from "node:path";
 import {readFile,readdir} from "node:fs/promises";
 import {fileURLToPath} from "node:url";
 import {buildBniAnalysisSnapshot,parsePalmsReport} from "../apps/vice-chair/bni-bridge.mjs";
+import {parseAuditWeekText} from "../apps/bni-analysis/engine/audit.mjs";
 
 const projectUrl="https://fahrblkukuhgveiptufn.supabase.co";
 const publishableKey="sb_publishable_f5U5bDJjXjvRxYSzh7zqGQ__lF-jwPZ";
@@ -145,7 +146,12 @@ for(const file of files){
   });
   if(!upload.ok)throw new Error(`Private Storage 上傳失敗：${file.relative} ${upload.status} ${await upload.text()}`);
   let report=null;
-  try{report=parsePalmsReport(buffer.toString("utf8"))}catch{}
+  try{
+    if(reportType(file.relative)==="audit"){
+      const audit=parseAuditWeekText(buffer.toString("utf8"),file.relative);
+      report=audit.week?{periodStart:audit.week,periodEnd:audit.week}:null;
+    }else report=parsePalmsReport(buffer.toString("utf8"));
+  }catch{}
   importRows.push({
     report_type:reportType(file.relative),
     period_start:report?.periodStart||null,

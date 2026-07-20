@@ -170,6 +170,16 @@ function latestByCategory(rows: any[], category: string, period?: { start: strin
     && (!period || (row.period_start === period.start && row.period_end === period.end)));
 }
 
+function auditDate(row: any) {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(row?.period_start || ""))) return row.period_start;
+  const source = [
+    row?.storage_path,
+    row?.metadata?.originalPath,
+    row?.metadata?.originalFilename,
+  ].filter(Boolean).join(" ");
+  return source.match(/audit_week_(\d{4}-\d{2}-\d{2})\.xls/i)?.[1] || null;
+}
+
 async function downloadReport(row: any) {
   if (!row) throw new Error("缺少必要的 BNI 報表");
   const response = await serviceFetch(`/storage/v1/object/authenticated/${row.storage_bucket}/${row.storage_path}`);
@@ -225,8 +235,10 @@ async function monthlyDataStatus() {
   const monthly = monthWindow(-1, 1);
   const half = monthWindow(-1, 6);
   const annual = monthWindow(-1, 12);
-  const auditRows = rows.filter((row: any) => reportCategory(row) === "audit"
-    && row.period_start >= monthly.start && row.period_end <= monthly.end);
+  const auditRows = rows.filter((row: any) => {
+    const date = auditDate(row);
+    return reportCategory(row) === "audit" && date && date >= monthly.start && date <= monthly.end;
+  });
   const expectedAudits = expectedAuditWeeks(monthly.start, monthly.end);
   const items = [
     { type: "halfYear", label: "半年 PALMS", period: `${half.start} 至 ${half.end}`, complete: Boolean(latestByCategory(rows, "halfYear", half)), detail: latestByCategory(rows, "halfYear", half) ? "已上傳至 Private Storage" : "供燈號與關懷儀表板使用", accept: ".xls", multiple: false },
@@ -572,7 +584,9 @@ async function loadEngineSources() {
   const [halfText, expiryText, tenureText] = await Promise.all([downloadReport(half), downloadReport(expiry), downloadReport(tenure)]);
   const annualRow = latestByCategory(imports, "annual");
   const annual = annualRow ? parsePalmsText(await downloadReport(annualRow), annualRow.storage_path) : null;
-  const auditRows = imports.filter((row: any) => reportCategory(row) === "audit").slice(0, 8);
+  const allAuditRows = imports.filter((row: any) => reportCategory(row) === "audit" && auditDate(row));
+  const latestAuditMonth = allAuditRows.map((row: any) => auditDate(row).slice(0, 7)).sort().at(-1) || null;
+  const auditRows = allAuditRows.filter((row: any) => auditDate(row).startsWith(latestAuditMonth)).slice(0, 8);
   const audits = [];
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
@@ -586,7 +600,7 @@ async function loadEngineSources() {
       departed,
       annual,
       auditMonth: audits.length ? combineAuditWeeks(audits) : null,
-      auditMonthName: auditRows[0]?.period_start?.slice(0, 7) || null,
+      auditMonthName: latestAuditMonth,
       sources,
     }),
   };

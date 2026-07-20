@@ -34,6 +34,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `supabase/migrations/20260720074814_grant_service_role_privileges.sql`
   - `supabase/migrations/20260720095300_public_web_assets_bucket.sql`
   - `supabase/migrations/20260720153500_online_application_api.sql`
+  - `supabase/migrations/20260720170500_backfill_audit_report_dates.sql`
 - 第一版正式 schema 建立 26 個資料表、78 條 RLS policies 與 3 個 Private Storage buckets：
   - `raw-reports`
   - `case-files`
@@ -42,6 +43,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 新增正式 `app_settings`、`monthly_attendance_summaries`、`ai_profiles`；月會寫入 RLS 收斂為 Admin／副主席，委員只讀已結案紀錄。
 - 已部署 `app-api` Edge Function；Supabase gateway JWT 驗證與函式內 `app_accounts`／當期委員姓名驗證同時啟用。
 - `FULIAN_AI_ENCRYPTION_KEY` 已以隨機 Edge secret 設定，未輸出、未寫入專案；個人 AI Key 以 AES-GCM 密文保存在 `ai_credentials`。
+- 初次搬移的 5 份 2026-06 審計檔原本因誤用 PALMS 解析器而缺少期間欄位；已由 Private Storage 檔名補回每週日期，原始檔未重傳或改寫。
 
 ### Auth 與角色
 
