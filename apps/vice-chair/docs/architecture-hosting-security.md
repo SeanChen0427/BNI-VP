@@ -1,6 +1,6 @@
 # 上線、資料安全與 BNI 分析橋接架構
 
-狀態：Supabase 專案、正式 schema、RLS、Private Storage、共用 Auth 帳號、密碼管理 Edge Function、44 位會員及第一版 PALMS 快照已建立；正式前台確定使用 GitHub Pages，但尚未部署。  
+狀態：GitHub Pages 正式前台與 Supabase 正式後端均已部署，三角色 Auth／RLS／44 位會員／PALMS 快照已完成線上驗證。  
 確認日期：2026-07-20  
 決策來源：Sean 現行決策
 
@@ -10,7 +10,8 @@
 - GitHub 只保存程式碼、資料格式、空白範例與部署設定，不保存任何真實會員資料、原始報表、案件附件、正式帳密或 API Key。
 - 副主席系統與 BNI 分析工具之間建立「分析資料橋接層」；BNI 工具是計分與診斷的唯一來源，副主席系統負責呈現結果、建立關懷任務及串接訪談案件。
 - 正式上線採「GitHub Pages 靜態前台＋Supabase 後端」架構。真實資料不得部署為公開靜態檔。
-- 2026-07-20 建立的 OpenAI Sites 與 Supabase `web-app`／`site` 前台只屬暫時部署；GitHub Pages 驗證完成後移除。完整紀錄見 `DEPLOYMENT_LOG_2026-07-20.md`。
+- 正式前台：<https://seanchen0427.github.io/BNI-VP/>。
+- 2026-07-20 建立的 OpenAI Sites 與 Supabase `web-app`／`site` 前台只屬暫時部署；GitHub Pages 驗證後，Sites 已改為 owner-only，Supabase 暫時前台已刪除。完整紀錄見 `DEPLOYMENT_LOG_2026-07-20.md`。
 
 ## 二、整體架構
 
@@ -59,6 +60,7 @@ BNI 分析工具
 - 使用者畫面維持 `admin`、`vice`、`Fulian` 三個帳號名稱；內部 Email 對應只供程式呼叫 Supabase Auth，不要求日常使用者管理 Email。
 - `auth.js` 不含預設密碼，也不從 `localStorage` 讀寫密碼；舊 V2 認證設定載入時會自動清除既有密碼欄位。
 - 登入後以 `app_accounts` RLS 資料再次驗證 Admin／副主席／會員委員角色；停用或角色不一致即拒絕登入。
+- 現任角色姓名由登入後的 `committee_terms` 查詢載入，不嵌入 GitHub Pages。
 - token 只保存於分頁 `sessionStorage`，接近到期時自動更新；關閉分頁即移除，8 小時未操作要求重新登入。
 - Admin 透過 `manage-shared-credentials` Edge Function 一次更新三組密碼；函式再次檢查 Supabase 使用者與 `app_accounts.role = admin`，service role key 只存在函式環境。
 
@@ -138,10 +140,8 @@ BNI 分析工具
 6. 已建立個人 AI API Key 本機加密綁定與三家官方申請教學。
 7. 串接只依系統資料回答的制度查詢 AI、LINE Bot 與備份／還原流程。
 
-## 九、正式啟用前仍待確認
+## 九、正式啟用後仍待確認
 
-- GitHub repository 的建立／連接、可見性、GitHub Pages 網址及正式部署驗收。
-- GitHub Pages 驗證後移除 Sites 與 Supabase 暫時前台。
 - 輪替／撤銷 2026-07-20 曾顯示於本機 Codex CLI 輸出的 legacy service role key。
 - Supabase 專案由哪個富聯帳號持有、誰付款及誰是第二管理者。
 - 正式環境方案、資料區域與備份需求。

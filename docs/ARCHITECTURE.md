@@ -22,7 +22,7 @@ apps/bni-analysis
 
 工作台只負責呈現與工作流程。分析工具負責資料真實性、計分、續約、診斷及關懷依據。
 
-## 正式上架目標
+## 正式上架架構
 
 ```text
 GitHub repository／GitHub Pages
@@ -43,7 +43,7 @@ Supabase Auth／Database／Private Storage
 
 正式版仍維持同一個總專案，但原始報表與會員資料不進 GitHub。分析核心必須在受保護的伺服器環境執行，AI 助手只解讀已有結果，不自行決定正式燈號或會員資格。
 
-2026-07-20 已建立 Supabase 正式後端並遷移 44 位會員、12 份原始報表與第一版分析快照。正式前台仍待 GitHub Pages 部署；同日建立的 Sites 與 Supabase 前台只屬暫時繞路，詳見 `apps/vice-chair/docs/DEPLOYMENT_LOG_2026-07-20.md`。
+2026-07-20 已建立 Supabase 正式後端並遷移 44 位會員、12 份原始報表與第一版分析快照；正式前台已部署至 <https://seanchen0427.github.io/BNI-VP/>。同日建立的 Sites 公開入口已關閉，Supabase 暫時前台已刪除，詳見 `apps/vice-chair/docs/DEPLOYMENT_LOG_2026-07-20.md`。
 
 ## 遷移原則
 

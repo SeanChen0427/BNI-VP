@@ -3,7 +3,8 @@ import path from 'node:path';
 import { readFile } from 'node:fs/promises';
 
 const projectUrl = 'https://fahrblkukuhgveiptufn.supabase.co';
-const siteUrl = `${projectUrl}/functions/v1/site`;
+const siteUrl = process.env.FULIAN_SITE_URL
+  || 'https://seanchen0427.github.io/BNI-VP/login.html';
 const publishableKey = 'sb_publishable_f5U5bDJjXjvRxYSzh7zqGQ__lF-jwPZ';
 const credentialPath = process.env.FULIAN_BOOTSTRAP_CREDENTIALS
   || path.join(
@@ -97,10 +98,14 @@ if (
 const results = {};
 for (const role of ['admin', 'vp', 'committee']) {
   const accessToken = await signIn(role);
-  const [accounts, members, snapshots, rawReportObjects] = await Promise.all([
+  const [accounts, members, committeeTerms, snapshots, rawReportObjects] = await Promise.all([
     rest('app_accounts?select=role,enabled', accessToken),
     rest(
       'members?status=eq.active&select=people!inner(display_name)&order=created_at.asc',
+      accessToken,
+    ),
+    rest(
+      'committee_terms?status=eq.active&select=role,people!inner(display_name)&order=created_at.asc',
       accessToken,
     ),
     rest(
@@ -119,6 +124,12 @@ for (const role of ['admin', 'vp', 'committee']) {
     throw new Error(`${roleLabels[role]} 會員數不是 44`);
   }
   if (
+    committeeTerms.filter(term => term.role === 'vp').length !== 1
+    || committeeTerms.filter(term => term.role === 'committee').length !== 6
+  ) {
+    throw new Error(`${roleLabels[role]} 現任委員名單不是 1 位副主席與 6 位會員委員`);
+  }
+  if (
     !snapshot?.snapshot
     || snapshot.period_start !== '2026-01-01'
     || snapshot.period_end !== '2026-06-30'
@@ -133,6 +144,7 @@ for (const role of ['admin', 'vp', 'committee']) {
   results[role] = {
     role: account.role,
     members: members.length,
+    committeeTerms: committeeTerms.length,
     analysisPeriod: `${snapshot.period_start}..${snapshot.period_end}`,
     monthlyAttendance: Object.keys(snapshot.snapshot.monthlyAttendance),
     rawReportObjectsVisible: rawReportObjects,

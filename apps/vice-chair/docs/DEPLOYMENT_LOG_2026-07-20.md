@@ -1,6 +1,6 @@
 # 2026-07-20 Supabase 與前台上架作業紀錄
 
-狀態：**後端與第一批正式資料已上線；正式前台尚未依最終決策部署至 GitHub Pages。**
+狀態：**正式前台與後端均已上線；GitHub Pages → Supabase Auth／Database／Private Storage 已完成三角色驗證。**
 
 本文件如實記錄 2026-07-20 的實際操作、驗證結果、錯誤繞路與後續清理事項。不得把暫時網址或未完成項目描述為正式上架完成。
 
@@ -37,7 +37,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `raw-reports`
   - `case-files`
   - `case-confirmations`
-- 後續錯誤繞路另建立 `web-app` 公開 bucket；該 bucket 只含前端程式與圖片，不含正式會員或 PALMS 資料，待 GitHub Pages 驗證後移除。
+- 後續錯誤繞路另建立的 `web-app` 公開 bucket 已在 GitHub Pages 驗證後移除。
 
 ### Auth 與角色
 
@@ -45,6 +45,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 前台仍使用原本簡單名稱 `admin`、`vice`、`Fulian`，內部 Email 只供程式對接。
 - `auth.js` 已移除寫死的原型密碼。
 - 登入後以 `app_accounts` 與 RLS 再驗證角色。
+- 現任副主席與會員委員名單不寫入公開前端，登入後由 `committee_terms` 載入；目前為 1 位副主席、6 位會員委員。
 - token 只保存於 `sessionStorage`，支援更新、登出及 8 小時未操作逾時。
 - 已部署 `manage-shared-credentials` Edge Function，只有 Admin 可一次更新三組密碼。
 - 初始帳密保存在專案外：
@@ -66,12 +67,18 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 
 ## 三、前端已完成的程式修改
 
+- 正式網址：<https://seanchen0427.github.io/BNI-VP/>
+- GitHub repository：<https://github.com/SeanChen0427/BNI-VP>
+- GitHub Actions 每次推送 `main` 會重新建立只含公開前端的 Pages artifact。
+- Pages 部署只取 `apps/vice-chair/` 的 HTML／CSS／JavaScript／圖片與公版教材，不發布測試、內部文件、PALMS 或會員資料。
+
 - `assets/js/supabase-config.js`：Supabase 公開 URL 與 publishable key。
 - `assets/js/auth.js`：Supabase Auth、角色驗證、token 更新、登出及逾時。
 - `assets/js/supabase-data.js`：由 Supabase 讀取會員與已發布分析快照，攔截：
   - `/api/bni-analysis`
   - `/api/bni-monthly-attendance`
 - `assets/js/member-directory.js`：會員姓名不再寫死於公開前端，由登入後的 Supabase 查詢取得。
+- `assets/js/auth.js`：副主席與會員委員姓名同樣改由登入後的 Supabase `committee_terms` 取得。
 - `member-care.js`、`attendance.js`、`settings.js`、`work-planner.js` 已等待線上會員名單載入。
 - PALMS 教材 PDF 因 Supabase Storage 不接受中文物件鍵，檔名由中文改為 `palms-entry-guide-v1.0-20220505.pdf`；PDF 內容與畫面文案未改。
 
@@ -100,7 +107,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 網址：`https://fulian-committee.seankuichen.chatgpt.site`
 - 原前台畫面與圖片均保留；曾產生一張不必要的登入預覽圖，之後已從專案及所有引用移除。
 - 即使 access mode 設成 `public`，訪客仍須先使用 ChatGPT 登入，因此不適合作為會員正式入口。
-- 待 GitHub Pages 上線驗證後，應移除或停用此暫時站點。
+- GitHub Pages 驗證後已將 access mode 改為 owner-only；一般訪客不再能使用此暫時站點。
 
 ### Supabase 暫時前台
 
@@ -113,18 +120,22 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `auth.js`、`supabase-config.js`、`supabase-data.js`：200 JavaScript
   - PALMS 教材 PDF：200 `application/pdf`
 - 自動化瀏覽器受本機攔截器影響，開啟 Supabase Functions 網域時回報 `ERR_BLOCKED_BY_CLIENT`；這不是伺服器 HTTP 失敗，但尚未完成一般瀏覽器的實際點擊登入驗收。
-- 待 GitHub Pages 上線驗證後，移除：
-  - `web-app` bucket 與其中公開前端物件
-  - `site` Edge Function
-  - migration／部署腳本是否保留作歷史證據，屆時另行決定
+- GitHub Pages 驗證後已完成清理：
+  - `web-app` bucket 與其中公開前端物件已刪除
+  - `site` Edge Function 已刪除
+  - 建立 bucket 的 migration 保留歷史；Storage bucket 必須以 Storage API 清理，Supabase 不允許 migration 直接刪除 Storage 系統表
 
 ## 六、驗證結果
 
 - 根目錄 `npm run check` 已通過。
-- BNI regression 曾因 macOS 雲端檔案讀取延遲短暫失敗，重跑後 46／46 通過。
-- Supabase 三角色 Auth／RLS／44 位會員／PALMS 快照驗證通過。
-- Sites build、靜態資源及不嵌入會員姓名的測試通過。
-- `scripts/verify-online-supabase.mjs` 已建立，但在 Sean 要求暫停並先討論架構後尚未執行。
+- BNI regression 46／46 通過。
+- 公開 repository 檢查 196 個檔案通過；Supabase CLI 暫存、真實會員名單、PALMS、密鑰與暫時前台均未提交。
+- GitHub Pages workflow build 與 deploy 均成功。
+- 正式首頁、登入頁與 `auth.js` 均回應 HTTP 200。
+- `scripts/verify-online-supabase.mjs` 已對正式 GitHub Pages 執行：
+  - Admin／副主席／會員委員 Auth 與 `app_accounts` 角色一致
+  - 三角色均讀到 44 位會員、7 筆現任委員任期及 2026-01～06 已發布快照
+  - Admin／副主席可讀 Private `raw-reports`，會員委員讀不到
 
 ## 七、安全紀錄
 
@@ -134,12 +145,10 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 
 ## 八、下一步與清理順序
 
-1. Sean 在 GitHub 完成登入。
-2. 建立或連接正式 repository。
-3. 只提交程式、migration、文件與去識別化測試資料。
-4. 啟用 GitHub Pages，部署現成前台，不重做畫面。
-5. 以三組帳號驗證 GitHub Pages → Supabase Auth → RLS → 會員與 PALMS。
-6. 驗證完成後，移除 Sites 與 Supabase 的暫時前台託管。
-7. 輪替本次工具輸出中顯示過的 legacy service role key。
-8. 繼續把本機業務資料與 `/api/*` 遷移至 Supabase，直到可完全跨裝置使用。
+已完成：GitHub 連線、repository、公開邊界、GitHub Pages、三角色線上驗證、Supabase 暫時前台清理、Sites 公開入口關閉。
 
+後續順序：
+
+1. 輪替本次工具輸出中曾顯示過的 legacy service role key。
+2. 繼續把案件、表單、附件、月會、任務與其他本機 `/api/*` 遷移至 Supabase，直到所有工作流程都能跨裝置保存。
+3. 完成一般使用者的實際操作驗收與換屆交接規則。
