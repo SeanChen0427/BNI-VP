@@ -3,11 +3,11 @@
   "updated": "2026-07-20",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
-    "type": "multi-page vanilla HTML/CSS/JavaScript prototype",
+    "type": "multi-page vanilla HTML/CSS/JavaScript application",
     "start": "node preview-server.mjs 4173",
     "url": "http://127.0.0.1:4173/",
     "buildStep": false,
-    "formalBackend": false
+    "formalBackend": true
   },
   "entryDocuments": [
     "AGENTS.md",
@@ -31,6 +31,7 @@
     "caseWordStorageAndAdvance": "services/case-files.js",
     "interviewCompletionFeedback": "services/interview-completion.js",
     "monthlyMeetingCareAssignments": "core/monthly-meeting-domain.js",
+    "weeklyAttendanceReconciliation": "core/attendance-domain.js",
     "votingAndRecusal": [
       "core/case-domain.js",
       "docs/voting-rules.md"

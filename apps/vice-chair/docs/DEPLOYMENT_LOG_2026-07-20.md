@@ -35,6 +35,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `supabase/migrations/20260720095300_public_web_assets_bucket.sql`
   - `supabase/migrations/20260720153500_online_application_api.sql`
   - `supabase/migrations/20260720170500_backfill_audit_report_dates.sql`
+  - `supabase/migrations/20260720174000_attendance_palms_reconciliation.sql`
 - 第一版正式 schema 建立 26 個資料表、78 條 RLS policies 與 3 個 Private Storage buckets：
   - `raw-reports`
   - `case-files`
@@ -93,9 +94,11 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - `/api/member-departure`
   - `/api/company`
   - `/api/test-data-reset`
+  - `/api/attendance`
 - `assets/js/member-directory.js`：會員姓名不再寫死於公開前端，由登入後的 Supabase 查詢取得。
 - `assets/js/auth.js`：副主席與會員委員姓名同樣改由登入後的 Supabase `committee_terms` 取得。
 - `member-care.js`、`attendance.js`、`settings.js`、`work-planner.js` 已等待線上會員名單載入。
+- `attendance.js` 已將草稿、確認週次與 LINE 公告快照接上 `/api/attendance`；最新半年 PALMS 仍是正式基準，只加計報表截止日後且已確認的週次。
 - PALMS 教材 PDF 因 Supabase Storage 不接受中文物件鍵，檔名由中文改為 `palms-entry-guide-v1.0-20220505.pdf`；PDF 內容與畫面文案未改。
 
 ## 四、本輪完成與仍待遷移的資料層
@@ -106,9 +109,9 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 
 - 案件、任務、表單草稿與部分工作流程。
 - 訪談 Word 附件。
-- 出席現場點名、公告、課程進度等瀏覽器本機狀態。
+- 課程進度等瀏覽器本機狀態。
 
-這些屬下一階段的跨裝置資料同步，不是本次 HTML 404／月會／每月上傳 API 故障。
+每週點名已完成 Supabase 跨裝置同步；`localStorage` 只保留連線失敗時的草稿備援與一次性舊歷史搬移來源，不再是正式週次來源。
 
 ## 五、錯誤繞路與目前暫時資源
 
@@ -146,6 +149,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 公開 repository 檢查 196 個檔案通過；Supabase CLI 暫存、真實會員名單、PALMS、密鑰與暫時前台均未提交。
 - 本輪修改後 `npm run check`、46／46 計分回歸及公開 repository 掃描再次通過；GitHub Pages 公開 artifact 共 112 個檔案。
 - `20260720153500_online_application_api.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` Function bundler 成功帶入既有分析核心，沒有另建計分副本。
+- `20260720174000_attendance_palms_reconciliation.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` 已重新部署並保留 gateway JWT 驗證。
 - 本輪自動三角色線上驗證無法沿用專案外的初始密碼檔：三組密碼已在先前操作中更新，而初始檔未同步更新。未擅自重設正式密碼；完成 GitHub Pages 新版發佈後需使用目前有效密碼做一次實際點擊驗收。
 - GitHub Pages workflow build 與 deploy 均成功。
 - 正式首頁、登入頁與 `auth.js` 均回應 HTTP 200。
@@ -167,5 +171,5 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 後續順序：
 
 1. 輪替本次工具輸出中曾顯示過的 legacy service role key。
-2. 將案件、表單、附件、任務、現場點名與課程進度從瀏覽器本機狀態遷移至既有 Supabase schema，完成跨裝置同步。
+2. 將案件、表單、附件、任務與課程進度從瀏覽器本機狀態遷移至既有 Supabase schema，完成跨裝置同步。
 3. 完成一般使用者的實際操作驗收與換屆交接規則。

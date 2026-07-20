@@ -2,6 +2,9 @@
 
 ## 2026-07-20
 
+- 每週點名正式接上 Supabase：草稿、已確認週次、紀錄人、PALMS 基準期間與 LINE 公告快照可跨裝置保存；既有瀏覽器內已雙重確認的歷史週次由副主席／Admin 首次載入時自動搬移。
+- 出席公告累計改為「最新半年 PALMS＋其截止日後已確認的週次＋本週勾選」；下一份 PALMS 涵蓋舊週次後自動停止重複加計，週點名永遠不覆蓋 PALMS 正式數據。
+- 移除「模擬 LINE Bot 發送」，改為副主席確認鎖定與人工複製公告貼到 LINE；歷史週次保留確認當下的公告文字。
 - 修正已搬入 Private Storage 的 2026-06 審計報表顯示為未上傳：初次資料搬移誤用 PALMS 期間解析器，使 5 份審計檔的 `period_start`／`period_end` 為空；新增 migration 由 `audit_week_YYYY-MM-DD.xls` 補回日期，Edge API 同時加入舊檔名相容判斷，使用者不需重新上傳。
 - 修正 GitHub Pages 對本機 `/api/*` 回傳 HTML 404、造成月會無法載入及 `Unexpected token '<'`：新增正式 `app-api` Edge Function，將月會、每月資料、分析草稿／版本、AI 設定／對話、離會、公司統編與測試資料重置共 9 組 API 全部改接 Supabase；Edge gateway JWT 與函式內角色／姓名雙重驗證均啟用。
 - 新增正式線上應用 migration：月會設定、單月 PALMS 出席摘要、AI 個人偏好、完整 service-role 最小必要權限及月會 leadership-only RLS；個人 AI Key 以獨立 Edge secret 進行 AES-GCM 加密，原始報表持續只存 Private Storage。

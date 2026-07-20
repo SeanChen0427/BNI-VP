@@ -3,6 +3,7 @@ import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysi
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
+import "../../../apps/vice-chair/core/attendance-domain.js";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -17,6 +18,7 @@ const MODELS = {
 } as const;
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
+const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
 
 type Provider = typeof PROVIDERS[number];
 type Context = {
@@ -228,6 +230,258 @@ async function saveMonthlyAttendance(report: any, importId: string, storagePath:
     body: JSON.stringify({ month: `${month}-01`, summary, report_import_id: importId, generated_at: summary.fetchedAt }),
   });
   return summary;
+}
+
+async function latestAttendancePalms() {
+  const imports = await reportImports();
+  const source = latestByCategory(imports, "halfYear");
+  if (!source) throw new Error("尚未上傳可作為出席基準的最新半年 PALMS");
+  const parsed = parsePalmsText(await downloadReport(source), source.storage_path);
+  return {
+    importId: source.id,
+    periodStart: parsed.period.start,
+    periodEnd: parsed.period.end,
+    importedAt: source.imported_at,
+    source: `BNI Connect 半年 PALMS｜Private Storage/${source.storage_path}`,
+    members: new Map(parsed.members.map((member: any) => [member.name, {
+      late: Number(member.late) || 0,
+      proxy: Number(member.substitute) || 0,
+      absence: Number(member.absent) || 0,
+    }])),
+  };
+}
+
+function apiAttendanceRow(record: any, memberById: Map<string, any>) {
+  const member = memberById.get(record.member_id);
+  return {
+    name: member?.name || "",
+    at630: Boolean(record.present_0630),
+    at700: Boolean(record.present_0700),
+    late: Boolean(record.late),
+    early: Boolean(record.left_early),
+    proxy: Boolean(record.proxy),
+    absent: Boolean(record.absent),
+    speech: Boolean(record.presentation_completed),
+    badge: Boolean(record.name_badge),
+    pin: Boolean(record.pin_badge),
+    suit: Boolean(record.suit),
+    camera: Boolean(record.camera_on),
+    note: record.notes || "",
+  };
+}
+
+function operationalCounts(record: any) {
+  return attendanceDomain.operationalCounts(record);
+}
+
+async function attendanceState(meetingDate: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
+  const [baseline, memberRows, peopleRows, sessions] = await Promise.all([
+    latestAttendancePalms(),
+    db("members?status=eq.active&select=id,profession,people!inner(id,display_name)&order=created_at.asc"),
+    db("people?status=eq.active&select=id,display_name"),
+    db("attendance_sessions?select=*&order=meeting_date.desc&limit=30"),
+  ]);
+  const members = memberRows.map((row: any) => ({
+    id: row.id,
+    personId: row.people.id,
+    name: String(row.people.display_name || "").replace(/\s+/g, ""),
+    profession: row.profession || "",
+  }));
+  const memberById = new Map(members.map((member: any) => [member.id, member]));
+  const memberByName = new Map(members.map((member: any) => [member.name, member]));
+  const people = new Map(peopleRows.map((person: any) => [person.id, person.display_name]));
+  const currentSession = sessions.find((session: any) => session.meeting_date === meetingDate) || null;
+  const currentRecords = currentSession
+    ? await db(`attendance_records?session_id=eq.${currentSession.id}&select=*&order=created_at.asc`)
+    : [];
+  const overlaySessions = (await db(
+    `attendance_sessions?status=eq.confirmed&select=id,meeting_date,attendance_records(*)&order=meeting_date.asc`,
+  )).filter((session: any) =>
+    attendanceDomain.isUnreconciledMeeting(session.meeting_date, baseline.periodEnd, meetingDate)
+  );
+  const overlay: Record<string, { late: number; proxy: number; absence: number }> = {};
+  for (const member of members) overlay[member.name] = { late: 0, proxy: 0, absence: 0 };
+  for (const session of overlaySessions) {
+    for (const record of session.attendance_records || []) {
+      const member = memberById.get(record.member_id);
+      if (!member) continue;
+      const counts = operationalCounts(record);
+      overlay[member.name].late += counts.late;
+      overlay[member.name].proxy += counts.proxy;
+      overlay[member.name].absence += counts.absence;
+    }
+  }
+  const official: Record<string, { late: number; proxy: number; absence: number }> = {};
+  const missing: string[] = [];
+  for (const member of members) {
+    const values: any = baseline.members.get(member.name);
+    if (!values) missing.push(member.name);
+    official[member.name] = values || { late: 0, proxy: 0, absence: 0 };
+  }
+  return {
+    members: members.map(({ id, name, profession }: any) => ({ id, name, profession })),
+    palms: {
+      ready: missing.length === 0,
+      importId: baseline.importId,
+      periodStart: baseline.periodStart,
+      periodEnd: baseline.periodEnd,
+      importedAt: baseline.importedAt,
+      source: baseline.source,
+      official,
+      missing,
+    },
+    overlay: {
+      from: baseline.periodEnd,
+      through: meetingDate,
+      sessionCount: overlaySessions.length,
+      totals: overlay,
+    },
+    session: currentSession ? {
+      id: currentSession.id,
+      meetingDate: currentSession.meeting_date,
+      status: currentSession.status,
+      primaryRecorder: people.get(currentSession.primary_recorder_id) || "",
+      assistantRecorder: people.get(currentSession.assistant_recorder_id) || "",
+      recorderConfirmed: currentSession.status === "confirmed",
+      vpConfirmed: currentSession.status === "confirmed",
+      confirmedAt: currentSession.confirmed_at,
+      confirmedBy: people.get(currentSession.confirmed_by) || "",
+      announcementSnapshot: currentSession.announcement_snapshot || "",
+      rows: currentRecords.map((record: any) => apiAttendanceRow(record, memberById)).filter((row: any) => memberByName.has(row.name)),
+    } : null,
+    history: sessions.map((session: any) => ({
+      meetingDate: session.meeting_date,
+      status: session.status,
+      confirmedAt: session.confirmed_at,
+    })),
+  };
+}
+
+async function saveAttendanceSession(body: any, context: Context, { confirm = false, importing = false } = {}) {
+  const meetingDate = String(body.meetingDate || "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
+  if (meetingDate > new Date().toISOString().slice(0, 10)) throw new Error("例會日期不可在未來");
+  const existingRows = await db(`attendance_sessions?meeting_date=eq.${meetingDate}&select=*&limit=1`);
+  const existing = existingRows?.[0] || null;
+  if (existing?.status === "confirmed") {
+    if (importing) return existing;
+    throw Object.assign(new Error("此週點名已由副主席確認，歷史紀錄為唯讀"), { status: 409 });
+  }
+  if (confirm) {
+    leadership(context);
+    if (!body.recorderConfirmed || !body.vpConfirmed) throw new Error("主要紀錄委員與副主席都必須完成確認");
+  }
+  const [recorderRows, memberRows, baseline] = await Promise.all([
+    db("committee_terms?status=eq.active&select=person_id,people!inner(display_name)"),
+    db("members?status=eq.active&select=id,people!inner(display_name)"),
+    latestAttendancePalms(),
+  ]);
+  const peopleByName = new Map(recorderRows.map((term: any) => [term.people.display_name, term.person_id]));
+  const membersByName = new Map(memberRows.map((member: any) => [String(member.people.display_name || "").replace(/\s+/g, ""), member.id]));
+  const primaryRecorderId = peopleByName.get(body.primaryRecorder)
+    || (peopleByName.get(context.name) ? context.personId : null);
+  const assistantRecorderId = peopleByName.get(body.assistantRecorder) || null;
+  if (!primaryRecorderId) throw new Error("請選擇當期副主席或會員委員作為主要紀錄人");
+  if (assistantRecorderId && assistantRecorderId === primaryRecorderId) throw new Error("主要紀錄與協助點名不可為同一人");
+  const now = new Date().toISOString();
+  const sessionPayload: any = {
+    meeting_date: meetingDate,
+    status: "draft",
+    primary_recorder_id: primaryRecorderId,
+    assistant_recorder_id: assistantRecorderId,
+    palms_report_import_id: baseline.importId,
+    palms_period_start: baseline.periodStart,
+    palms_period_end: baseline.periodEnd,
+    announcement_snapshot: String(body.announcement || "").slice(0, 30000) || null,
+  };
+  const sessionRows = await db("attendance_sessions?on_conflict=meeting_date", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(sessionPayload),
+  });
+  const session = sessionRows[0];
+  const recordsByMember = new Map<string, any>();
+  for (const row of (Array.isArray(body.rows) ? body.rows : []).slice(0, 100)) {
+    const memberId = membersByName.get(String(row.name || "").replace(/\s+/g, ""));
+    if (!memberId) continue;
+    const absent = Boolean(row.absent) && !Boolean(row.proxy);
+    const proxy = Boolean(row.proxy);
+    recordsByMember.set(memberId, {
+      session_id: session.id,
+      member_id: memberId,
+      present_0630: absent ? false : Boolean(row.at630),
+      present_0700: absent ? false : Boolean(row.at700),
+      late: Boolean(row.late),
+      left_early: Boolean(row.early),
+      proxy,
+      absent,
+      presentation_completed: proxy ? true : Boolean(row.speech),
+      name_badge: Boolean(row.badge),
+      pin_badge: Boolean(row.pin),
+      suit: Boolean(row.suit),
+      camera_on: Boolean(row.camera),
+      notes: String(row.note || "").slice(0, 1000) || null,
+      updated_by: context.personId,
+    });
+  }
+  const records = [...recordsByMember.values()];
+  if (records.length) {
+    await db("attendance_records?on_conflict=session_id,member_id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(records),
+    });
+  }
+  if (confirm) {
+    const confirmed = await db(`attendance_sessions?id=eq.${session.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "confirmed",
+        confirmed_by: context.personId,
+        confirmed_at: now,
+        announcement_snapshot: String(body.announcement || "").slice(0, 30000) || null,
+      }),
+    });
+    return confirmed[0];
+  }
+  return session;
+}
+
+async function attendanceApi(request: Request, url: URL, context: Context) {
+  if (request.method === "GET") {
+    const meetingDate = url.searchParams.get("date") || new Date().toISOString().slice(0, 10);
+    return attendanceState(meetingDate);
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "save-draft") {
+    const session = await saveAttendanceSession(body, context);
+    return { message: "本週點名草稿已保存至 Supabase", session };
+  }
+  if (body.action === "confirm") {
+    const session = await saveAttendanceSession(body, context, { confirm: true });
+    return { message: "本週點名已由副主席確認；後續週次將納入 LINE 公告暫時累計", session };
+  }
+  if (body.action === "import-history") {
+    leadership(context);
+    const history = (Array.isArray(body.history) ? body.history : [])
+      .filter((item: any) => item?.recorderConfirmed && item?.vpConfirmed)
+      .slice(0, 30);
+    let imported = 0;
+    for (const item of history) {
+      await saveAttendanceSession({
+        ...item,
+        announcement: item.announcement || "",
+        recorderConfirmed: true,
+        vpConfirmed: true,
+      }, context, { confirm: true, importing: true });
+      imported += 1;
+    }
+    return { message: `已匯入 ${imported} 筆既有已確認週次`, imported };
+  }
+  throw new Error("不支援的動作");
 }
 
 async function monthlyDataStatus() {
@@ -740,6 +994,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/analysis-snapshots") result = await analysisSnapshotsApi(context);
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
+    else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
     else throw Object.assign(new Error("找不到指定的應用服務"), { status: 404 });
     return respond(request, 200, result);
   } catch (error) {

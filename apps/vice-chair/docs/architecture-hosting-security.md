@@ -47,7 +47,7 @@ BNI 分析工具
 | 委員回饋 | PostgreSQL：`case_feedback` | 當期有效委員，結案後鎖定 |
 | 投票資格、票向及時間 | PostgreSQL：`vote_snapshots`、`votes` | 依投票制度與查閱規則限制 |
 | 董事顧問確認 | PostgreSQL：`advisor_confirmations`＋必要附件 | 副主席、Admin；其他角色依案件顯示結果 |
-| 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可記錄，副主席最終確認 |
+| 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可保存草稿，副主席／Admin 最終確認；只作 PALMS 截止日後的 LINE 公告暫時增量 |
 | BNI 分析結果 | PostgreSQL：`analysis_snapshots` | 登入且有權限者 |
 | 完整分析交換檔 | 私人 Storage 或登入後即時 API | 不得部署為公開 JSON |
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |

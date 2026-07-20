@@ -13,7 +13,9 @@
 | `fulian-new-member-interview-v2-{caseId}` | 新會員訪談草稿 | `assets/js/new-member-form.js` |
 | `fulian-industry-change-interview-v2-{caseId}` | 轉換行業別草稿 | `assets/js/industry-change-form.js` |
 | `fulian-departure-interview-v2-{caseId}` | 離會訪談草稿 | `assets/js/departure-form.js` |
-| `fulian-attendance-prototype-v1` | 點名與確認 | `assets/js/attendance.js` |
+| `fulian-attendance-prototype-v1` | Supabase 保存失敗時的點名草稿備援；不是正式週次來源 | `assets/js/attendance.js` |
+| `fulian-attendance-history-v1` | 舊版已確認週次；首次載入後由副主席／Admin 搬入 Supabase，原值保留作復原 | `assets/js/attendance.js` |
+| `fulian-attendance-history-supabase-v1` | 本瀏覽器舊版週次搬移完成標記 | `assets/js/attendance.js` |
 | `fulian-announcement-board-v1` | 首頁留言公告 | `assets/js/announcement-board.js` |
 | `fulian-auth-config-v1` | 原型角色、人員名單與固定共用帳號名稱；V3 起不含密碼 | `assets/js/auth.js`、`assets/js/settings.js` |
 | `fulian-auth-audit-v1` | 原型設定異動紀錄 | `assets/js/settings.js` |
@@ -46,6 +48,7 @@
 - `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
+- `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
 
 上述資料不得複製進 GitHub、公開備份範例或截圖。
 
