@@ -793,23 +793,65 @@ function extractOpenAiText(data: any) {
   return (data?.output || []).flatMap((item: any) => item?.content || []).filter((item: any) => item?.type === "output_text").map((item: any) => item.text).join("\n").trim();
 }
 
+function assertCompleteAiResponse(provider: Provider, payload: any) {
+  const reason = provider === "openai"
+    ? (payload?.status === "incomplete" ? payload?.incomplete_details?.reason || "incomplete" : "")
+    : provider === "gemini"
+      ? payload?.candidates?.[0]?.finishReason || ""
+      : payload?.stop_reason || "";
+  const complete = provider === "openai"
+    ? !reason
+    : provider === "gemini"
+      ? !reason || reason === "STOP"
+      : !reason || reason === "end_turn" || reason === "stop_sequence";
+  if (complete) return;
+  if (["max_output_tokens", "MAX_TOKENS", "max_tokens", "model_context_window_exceeded"].includes(reason)) {
+    throw Object.assign(new Error("AI 平台回應達到長度上限，系統已阻止顯示不完整答案；請重新提問"), { status: 502 });
+  }
+  throw Object.assign(new Error(`AI 平台未完整產生回答（${String(reason).slice(0, 60)}）`), { status: 502 });
+}
+
 async function callProvider(provider: Provider, apiKey: string, system: string, prompt: string, maxTokens = 1000) {
   let response;
   let payload: any;
   if (provider === "openai") {
     response = await fetch("https://api.openai.com/v1/responses", { method: "POST", headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" }, body: JSON.stringify({ model: MODELS.openai, instructions: system, input: prompt, max_output_tokens: maxTokens }) });
     payload = await response.json().catch(() => ({}));
-    if (response.ok) return { text: extractOpenAiText(payload), model: MODELS.openai };
+    if (response.ok) {
+      assertCompleteAiResponse(provider, payload);
+      return { text: extractOpenAiText(payload), model: MODELS.openai };
+    }
   } else if (provider === "gemini") {
     response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent`, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }) });
     payload = await response.json().catch(() => ({}));
-    if (response.ok) return { text: (payload?.candidates?.[0]?.content?.parts || []).map((part: any) => part?.text || "").join("\n").trim(), model: MODELS.gemini };
+    if (response.ok) {
+      assertCompleteAiResponse(provider, payload);
+      return { text: (payload?.candidates?.[0]?.content?.parts || []).map((part: any) => part?.text || "").join("\n").trim(), model: MODELS.gemini };
+    }
   } else {
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" }, body: JSON.stringify({ model: MODELS.anthropic, max_tokens: maxTokens, system, messages: [{ role: "user", content: prompt }] }) });
     payload = await response.json().catch(() => ({}));
-    if (response.ok) return { text: (payload?.content || []).filter((item: any) => item?.type === "text").map((item: any) => item.text).join("\n").trim(), model: MODELS.anthropic };
+    if (response.ok) {
+      assertCompleteAiResponse(provider, payload);
+      return { text: (payload?.content || []).filter((item: any) => item?.type === "text").map((item: any) => item.text).join("\n").trim(), model: MODELS.anthropic };
+    }
   }
   throw new Error(`AI 平台回應失敗：${String(payload?.error?.message || payload?.error?.status || `HTTP ${response.status}`).slice(0, 180)}`);
+}
+
+function compactAiSource(source: any, queryContext: string) {
+  const members = Array.isArray(source?.members) ? source.members : [];
+  const matched = members.filter((member: any) => {
+    const name = String(member?.name || "").replace(/\s+/g, "");
+    return name && queryContext.replace(/\s+/g, "").includes(name);
+  });
+  if (!matched.length) return JSON.stringify(source).slice(0, 80000);
+  return JSON.stringify({
+    report: source.report || null,
+    memberData: source.memberData || null,
+    publishedVersion: source.publishedVersion || null,
+    members: matched,
+  });
 }
 
 async function latestPublished() {
@@ -827,9 +869,9 @@ async function aiChatApi(request: Request, context: Context) {
   const published = await latestPublished();
   const source = published?.snapshot || {};
   const history = Array.isArray(body.history) ? body.history.slice(-6).map((item: any) => `${item.role === "assistant" ? "助手" : "使用者"}：${String(item.text || "").slice(0, 500)}`).join("\n") : "";
-  const prompt = `${history ? `最近對話：\n${history}\n\n` : ""}本次問題：\n${question}\n\n[來源1] Supabase 已發佈會員分析快照\n${JSON.stringify(source).slice(0, 80000)}`;
-  const system = "你是富聯分會會員委員會系統內的查詢助手。只能依據提供的系統資料回答；資料不足時明確說請向中心區確認。不得代替投票、核准或處置會員。使用繁體中文，直接回答並標示 [來源1]。";
-  const result = await callProvider(provider, await credential(context.personId, provider), system, prompt);
+  const prompt = `${history ? `最近對話：\n${history}\n\n` : ""}本次問題：\n${question}\n\n[來源1] Supabase 已發佈會員分析快照\n${compactAiSource(source, `${history}\n${question}`)}`;
+  const system = "你是富聯分會會員委員會系統內的查詢助手。只能依據提供的系統資料回答；資料不足時明確說請向中心區確認。不得代替投票、核准或處置會員。使用繁體中文，先直接回答結論，最多六個簡短條列並標示 [來源1]。資料期間之後的未來數值不得推測；例如新月份 PALMS 尚未上傳時，必須說明要等新報表才能確定。";
+  const result = await callProvider(provider, await credential(context.personId, provider), system, prompt, 1800);
   if (!result.text) throw new Error("AI 平台未回傳可顯示的文字");
   return { answer: result.text, model: result.model, sources: [{ title: "最新已發佈會員分析快照", path: "Supabase/analysis_snapshots" }] };
 }
