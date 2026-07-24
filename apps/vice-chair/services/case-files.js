@@ -46,6 +46,40 @@
     });
   }
 
+  async function blobBase64(blob) {
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let binary = "";
+    const chunk = 0x8000;
+    for (let index = 0; index < bytes.length; index += chunk) {
+      binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+    }
+    return btoa(binary);
+  }
+
+  function base64Blob(value, type) {
+    const binary = atob(value);
+    const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+    return new Blob([bytes], { type });
+  }
+
+  async function uploadPrivateWord(caseId, file) {
+    if (typeof fetch !== "function" || typeof window === "undefined") return null;
+    const response = await fetch("/api/task-file", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        taskId: caseId,
+        filename: file.name,
+        type: file.type,
+        base64: await blobBase64(file),
+      }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.message || `Word 上傳失敗：HTTP ${response.status}`);
+    return data;
+  }
+
   async function saveGeneratedWord({
     caseId,
     blob,
@@ -79,6 +113,7 @@
       database.close();
     }
 
+    await uploadPrivateWord(caseId, file);
     const workflowKey = domain.workflowStorageKey(caseId);
     const existing = domain.parseJson(storage.getItem(workflowKey), {});
     const closeWithoutDecision =
@@ -94,6 +129,9 @@
       { closeWithoutDecision }
     );
     storage.setItem(workflowKey, JSON.stringify(state));
+    if (typeof window !== "undefined") {
+      await window.FulianCaseStateStore?.flush();
+    }
     if (closeWithoutDecision) {
       const tasks = domain.parseJson(storage.getItem(domain.TASK_STORAGE_KEY), []);
       const target = Array.isArray(tasks)
@@ -106,11 +144,31 @@
         storage.setItem(domain.TASK_STORAGE_KEY, JSON.stringify(tasks));
       }
     }
+    if (typeof window !== "undefined") {
+      await window.FulianTaskStore?.flush();
+    }
     return state;
   }
 
   async function getCaseFile({caseId, indexedDb}) {
     if (!caseId) throw new Error("缺少案件編號");
+    if (typeof fetch === "function" && typeof window !== "undefined") {
+      try {
+        const response = await fetch(`/api/task-file?task=${encodeURIComponent(caseId)}`, { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (response.ok && data.base64) {
+          return new File(
+            [base64Blob(data.base64, data.type)],
+            data.name,
+            { type: data.type }
+          );
+        }
+        if (response.status !== 404) throw new Error(data.message || `Word 下載失敗：HTTP ${response.status}`);
+      } catch (error) {
+        if (!indexedDb) throw error;
+        console.warn("Supabase Word 載入失敗，改讀本機備援", error);
+      }
+    }
     const database = await openDatabase(indexedDb);
     try {
       return await new Promise((resolve, reject) => {

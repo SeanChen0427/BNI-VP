@@ -31,7 +31,7 @@ assert.doesNotMatch(supabaseConfig,/service_role|sb_secret_/);
 assert.match(supabaseData,/analysis_snapshots/);
 assert.match(supabaseData,/monthly_attendance_summaries/);
 assert.match(supabaseData,/\/functions\/v1\/app-api/);
-for(const endpoint of ["monthly-data","committee-meetings","analysis-draft","analysis-snapshots","ai-settings","ai-chat","member-departure","company","test-data-reset","attendance"]){
+for(const endpoint of ["monthly-data","committee-meetings","analysis-draft","analysis-snapshots","ai-settings","ai-chat","member-departure","company","test-data-reset","attendance","tasks","case-states","task-file"]){
   assert.match(appApiFunction,new RegExp(`/api/${endpoint}`),`Edge API 必須接管 /api/${endpoint}`);
 }
 assert.match(appApiFunction,/authenticate\(request, identity\)/);

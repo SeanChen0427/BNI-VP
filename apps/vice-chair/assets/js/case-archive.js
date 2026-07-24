@@ -119,6 +119,7 @@
 
   async function init() {
     await window.FulianTaskStore.ready;
+    await window.FulianCaseStateStore.ready;
     if (session?.role !== "vp") {
       $("#accessNotice").hidden = false;
       $("#accessNotice").innerHTML = "<b>只有副主席可以查閱結案資料</b><span>會員委員的工作範圍為訪談、回饋與投票。</span>";

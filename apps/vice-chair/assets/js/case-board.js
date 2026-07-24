@@ -1,5 +1,6 @@
 (async function () {
   await window.FulianTaskStore.ready;
+  await window.FulianCaseStateStore.ready;
   const domain = window.FulianCaseDomain;
   const TASK_KEY = domain.TASK_STORAGE_KEY;
   const session = FulianAuth.getSession();
@@ -218,13 +219,21 @@
       render();
       return;
     }
-    localStorage.setItem(TASK_KEY, JSON.stringify(tasks.filter(item => item.id !== id)));
-    localStorage.removeItem(domain.workflowStorageKey(id));
-    const key = draftKey(task);
-    if (key) localStorage.removeItem(key);
-    await deleteAttachment(id);
-    closeDeleteDialog();
-    render();
+    const button = $("#confirmDelete");
+    button.disabled = true;
+    try {
+      await window.FulianTaskStore.remove(id);
+      localStorage.removeItem(domain.workflowStorageKey(id));
+      const key = draftKey(task);
+      if (key) localStorage.removeItem(key);
+      await deleteAttachment(id);
+      closeDeleteDialog();
+      render();
+    } catch (error) {
+      alert(error.message || "案件刪除失敗，伺服器資料未變更");
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function bindDeleteDialog() {

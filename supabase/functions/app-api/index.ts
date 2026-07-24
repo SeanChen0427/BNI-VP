@@ -1038,18 +1038,26 @@ function cleanTaskInput(value: any) {
     localSource: value?.source ? String(value.source).slice(0, 100) : "",
     sourceMeetingId: value?.sourceMeetingId ? String(value.sourceMeetingId).slice(0, 160) : "",
     sourceCareId: value?.sourceCareId ? String(value.sourceCareId).slice(0, 160) : "",
+    revision: Number.isSafeInteger(Number(value?._revision)) ? Number(value._revision) : null,
   };
 }
 
 async function taskDirectory() {
-  const [people, members] = await Promise.all([
+  const [people, members, terms] = await Promise.all([
     db("people?select=id,display_name,status"),
     db("members?select=id,people!inner(display_name)"),
+    db("committee_terms?status=eq.active&select=person_id,role,starts_on,ends_on,people!inner(display_name,status)"),
   ]);
+  const today = new Date().toISOString().slice(0, 10);
+  const activeCommittee = (terms || []).filter((term: any) =>
+    term.people?.status === "active"
+    && term.starts_on <= today
+    && (!term.ends_on || term.ends_on >= today)
+  );
   return {
     people,
     personById: new Map(people.map((person: any) => [person.id, person.display_name])),
-    personByName: new Map(people.filter((person: any) => person.status === "active").map((person: any) => [person.display_name, person.id])),
+    personByName: new Map(activeCommittee.map((term: any) => [term.people.display_name, term.person_id])),
     memberByName: new Map(members.map((member: any) => [member.people?.display_name, member.id])),
   };
 }
@@ -1095,6 +1103,7 @@ async function taskResponse(context: Context) {
       completedBy: directory.personById.get(row.completed_by) || meta.completedBy || "",
       createdAt: row.created_at,
       createdBy: meta.createdBy || "",
+      _revision: Number(row.revision || 1),
       ...(meta.localSource ? { source: meta.localSource } : {}),
       ...(meta.sourceMeetingId ? { sourceMeetingId: meta.sourceMeetingId } : {}),
       ...(meta.sourceCareId ? { sourceCareId: meta.sourceCareId } : {}),
@@ -1112,9 +1121,11 @@ async function saveLeadershipTask(input: any, context: Context, directory: any) 
     if (!personId) throw new Error(`陪訪人「${name}」不在有效委員名單`);
     return personId;
   });
-  const completedBy = task.completed
-    ? directory.personByName.get(task.completedBy) || context.personId
-    : null;
+  const dueAt = task.scheduledAt
+    ? (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(task.scheduledAt)
+      ? `${task.scheduledAt}${task.scheduledAt.length === 16 ? ":00" : ""}+08:00`
+      : task.scheduledAt)
+    : "";
   const meta = {
     profession: task.profession,
     scheduledAt: task.scheduledAt,
@@ -1126,82 +1137,292 @@ async function saveLeadershipTask(input: any, context: Context, directory: any) 
     sourceMeetingId: task.sourceMeetingId,
     sourceCareId: task.sourceCareId,
   };
-  const payload: any = {
-    title: task.member,
-    category: task.type,
-    status: task.completed ? "completed" : "pending",
-    lead_person_id: leadId,
-    due_at: task.scheduledAt || null,
-    completed_at: task.completed ? task.completedAt || new Date().toISOString() : null,
-    result_summary: JSON.stringify(meta),
-    source: TASK_SOURCE,
-    source_reference: task.id,
-    created_by: context.personId,
-    completed_by: completedBy,
-    member_id: directory.memberByName.get(task.member) || null,
-  };
-  if (task.createdAt && !Number.isNaN(new Date(task.createdAt).getTime())) payload.created_at = task.createdAt;
-  const saved = await db("tasks?on_conflict=source_reference", {
+  await db("rpc/edge_save_task", {
     method: "POST",
-    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify(payload),
-  });
-  const taskId = saved?.[0]?.id;
-  if (!taskId) throw new Error("排程寫入後未取得任務編號");
-  await db(`task_assignments?task_id=eq.${taskId}`, { method: "DELETE" });
-  await db("task_assignments", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-    body: JSON.stringify([
-      { task_id: taskId, person_id: leadId, role: "lead" },
-      ...companionIds.map((personId: string) => ({ task_id: taskId, person_id: personId, role: "companion" })),
-    ]),
-  });
-  await db("task_private_details?on_conflict=task_id", {
-    method: "POST",
-    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-    body: JSON.stringify({ task_id: taskId, details: JSON.stringify({ notes: task.notes }), updated_by: context.personId }),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_task: {
+        id: task.id,
+        type: task.type,
+        member: task.member,
+        completed: task.completed,
+        completedAt: task.completedAt,
+        dueAt,
+        meta: JSON.stringify(meta),
+        notes: task.notes,
+      },
+      p_actor: context.personId,
+      p_lead: leadId,
+      p_companions: companionIds,
+      p_member: directory.memberByName.get(task.member) || null,
+      p_expected_revision: task.revision,
+      p_import: Boolean(input?._legacyImport),
+    }),
   });
 }
 
 async function completeAssignedTask(input: any, context: Context) {
   const task = cleanTaskInput(input);
-  if (task.type !== "special" || !task.completed) throw Object.assign(new Error("會員委員只能完成自己主責的一般關懷"), { status: 403 });
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,lead_person_id,status&limit=1`);
+  if (!["special", "midterm", "departure"].includes(task.type) || !task.completed) {
+    throw Object.assign(new Error("此案件必須依正式流程完成，不能直接結案"), { status: 403 });
+  }
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,lead_person_id,status,revision&limit=1`);
   const row = rows?.[0];
-  if (!row || row.lead_person_id !== context.personId) throw Object.assign(new Error("只有此工作的主責委員可以完成一般關懷"), { status: 403 });
+  if (!row || row.lead_person_id !== context.personId) throw Object.assign(new Error("只有此工作的主責委員可以完成"), { status: 403 });
+  if (task.revision !== Number(row.revision)) {
+    throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
+  }
+  if (task.type !== "special") {
+    const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow&limit=1`);
+    if (!states?.[0]?.workflow?.wordSaved) {
+      throw Object.assign(new Error("訪談 Word 尚未成功保存，不能結案"), { status: 409 });
+    }
+  }
   if (row.status === "completed") return;
-  await db(`tasks?id=eq.${row.id}`, {
+  const updated = await db(`tasks?id=eq.${row.id}&revision=eq.${row.revision}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify({
       status: "completed",
       completed_at: task.completedAt || new Date().toISOString(),
       completed_by: context.personId,
+      revision: Number(row.revision) + 1,
     }),
   });
+  if (!updated?.length) throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
 }
 
 async function tasksApi(request: Request, context: Context) {
   if (request.method === "GET") return taskResponse(context);
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
-  if (body.action !== "sync") throw new Error("不支援的排程動作");
-  const tasks = Array.isArray(body.tasks) ? body.tasks.slice(0, 250) : [];
-  const deletedIds = Array.isArray(body.deletedIds)
-    ? [...new Set(body.deletedIds.map((id: unknown) => String(id || "").trim()).filter(Boolean))].slice(0, 250)
-    : [];
+  if (!["upsert", "import", "delete"].includes(body.action)) throw new Error("不支援的排程動作");
+  if (body.action === "delete") {
+    leadership(context);
+    const id = String(body.id || "").trim();
+    if (!id) throw new Error("缺少要刪除的案件編號");
+    const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,revision&limit=1`);
+    const row = rows?.[0];
+    if (!row) return taskResponse(context);
+    const files = await db(`task_case_files?task_id=eq.${row.id}&select=object_path`);
+    try {
+      await db("rpc/edge_delete_task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ p_source_reference: id, p_expected_revision: Number(body.revision) }),
+      });
+    } catch (error) {
+      if (String((error as any)?.message).includes("TASK_CONFLICT")) {
+        throw Object.assign(new Error("這項工作已在其他裝置更新，已重新載入最新資料，請確認後再刪除"), { status: 409 });
+      }
+      throw error;
+    }
+    for (const file of files || []) {
+      await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
+    }
+    return taskResponse(context);
+  }
+  const tasks = Array.isArray(body.tasks) ? body.tasks : [];
+  if (tasks.length > 250) throw Object.assign(new Error("單次排程同步不可超過 250 筆"), { status: 413 });
   if (["admin", "vp"].includes(context.role)) {
     const directory = await taskDirectory();
-    for (const task of tasks) await saveLeadershipTask(task, context, directory);
-    for (const id of deletedIds) {
-      await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+    for (const task of tasks) {
+      try {
+        await saveLeadershipTask(body.action === "import" ? { ...task, _legacyImport: true } : task, context, directory);
+      } catch (error) {
+        if (String((error as any)?.message).includes("TASK_CONFLICT")) {
+          throw Object.assign(new Error("這項工作已在其他裝置更新，已重新載入最新資料，請重新操作"), { status: 409 });
+        }
+        throw error;
+      }
     }
   } else {
-    if (deletedIds.length) throw Object.assign(new Error("會員委員不能刪除排程"), { status: 403 });
+    if (body.action !== "upsert") throw Object.assign(new Error("會員委員不能匯入或刪除排程"), { status: 403 });
     for (const task of tasks) await completeAssignedTask(task, context);
   }
   return taskResponse(context);
+}
+
+async function taskAccess(sourceReference: string, context: Context) {
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,source_reference,category,lead_person_id,revision&limit=1`);
+  const task = rows?.[0];
+  if (!task) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
+  const assignments = await db(`task_assignments?task_id=eq.${task.id}&select=person_id`);
+  const assigned = (assignments || []).some((item: any) => item.person_id === context.personId);
+  return { task, assigned, leadership: ["admin", "vp"].includes(context.role) };
+}
+
+function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole: boolean) {
+  const decisionCase = ["renewal", "new", "industry"].includes(task.category);
+  const fullWorkflow = row?.workflow || {};
+  const workflow = leadershipRole || assigned || decisionCase
+    ? fullWorkflow
+    : {
+      wordSaved: Boolean(fullWorkflow.wordSaved),
+      closed: Boolean(fullWorkflow.closed),
+      interviewCompletedAt: fullWorkflow.interviewCompletedAt || "",
+    };
+  return {
+    taskId: task.source_reference,
+    workflow,
+    draft: leadershipRole || assigned ? row?.draft || {} : null,
+    revision: Number(row?.revision || 0),
+    canReadFile: leadershipRole || assigned || decisionCase,
+  };
+}
+
+async function caseStatesApi(request: Request, context: Context) {
+  if (request.method === "GET") {
+    const [tasks, assignments, states] = await Promise.all([
+      db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,category`),
+      db("task_assignments?select=task_id,person_id"),
+      db("task_case_states?select=task_id,workflow,draft,revision"),
+    ]);
+    const stateByTask = new Map((states || []).map((row: any) => [row.task_id, row]));
+    const assignedIds = new Set((assignments || [])
+      .filter((row: any) => row.person_id === context.personId)
+      .map((row: any) => row.task_id));
+    const leadershipRole = ["admin", "vp"].includes(context.role);
+    return {
+      states: (tasks || []).map((task: any) =>
+        visibleCaseState(stateByTask.get(task.id), task, assignedIds.has(task.id), leadershipRole)
+      ),
+    };
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  const access = await taskAccess(String(body.taskId || ""), context);
+  const rows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  const existing = rows?.[0] || null;
+  const expectedRevision = Number(body.revision || 0);
+  if (existing && expectedRevision !== Number(existing.revision)) {
+    throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再操作"), { status: 409 });
+  }
+  let workflow = existing?.workflow || {};
+  let draft = existing?.draft || {};
+  if (body.kind === "draft") {
+    if (!access.leadership && !access.assigned) {
+      throw Object.assign(new Error("只有副主席或本案受指派人員可以保存訪談草稿"), { status: 403 });
+    }
+    draft = body.value && typeof body.value === "object" ? body.value : {};
+  } else if (body.kind === "workflow") {
+    const proposed = body.value && typeof body.value === "object" ? body.value : {};
+    if (access.leadership) {
+      workflow = proposed;
+    } else {
+      const feedback = { ...(workflow.feedback || {}) };
+      const votes = { ...(workflow.votes || {}) };
+      if (Object.prototype.hasOwnProperty.call(proposed.feedback || {}, context.name)) {
+        feedback[context.name] = String(proposed.feedback[context.name] || "").slice(0, 10000);
+      }
+      if (
+        workflow.votingOpen
+        && workflow.voteNoticeSent
+        && Array.isArray(workflow.voterSnapshot)
+        && workflow.voterSnapshot.includes(context.name)
+        && ["approve", "reject"].includes(proposed.votes?.[context.name])
+      ) {
+        votes[context.name] = proposed.votes[context.name];
+      }
+      if (access.assigned) {
+        const protectedKeys = new Set([
+          "votingOpen", "voteNoticeSent", "voterSnapshot", "leadersSent",
+          "advisorStatus", "advisorNote", "closed",
+        ]);
+        workflow = { ...workflow };
+        for (const [key, value] of Object.entries(proposed)) {
+          if (!protectedKeys.has(key) && !["feedback", "votes"].includes(key)) workflow[key] = value;
+        }
+        if (["midterm", "departure"].includes(access.task.category) && proposed.wordSaved) workflow.closed = true;
+      }
+      workflow.feedback = feedback;
+      workflow.votes = votes;
+    }
+  } else {
+    throw new Error("不支援的案件同步類型");
+  }
+  let saved;
+  if (existing) {
+    saved = await db(`task_case_states?task_id=eq.${access.task.id}&revision=eq.${existing.revision}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ workflow, draft, revision: Number(existing.revision) + 1, updated_by: context.personId }),
+    });
+    if (!saved?.length) throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再操作"), { status: 409 });
+  } else {
+    saved = await db("task_case_states", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ task_id: access.task.id, workflow, draft, revision: 1, updated_by: context.personId }),
+    });
+  }
+  return visibleCaseState(saved[0], access.task, access.assigned, access.leadership);
+}
+
+function decodeBase64(value: string) {
+  const binary = atob(value);
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+function encodeBase64(value: Uint8Array) {
+  let binary = "";
+  const chunk = 0x8000;
+  for (let index = 0; index < value.length; index += chunk) {
+    binary += String.fromCharCode(...value.subarray(index, index + chunk));
+  }
+  return btoa(binary);
+}
+
+async function taskFileApi(request: Request, url: URL, context: Context) {
+  const body = request.method === "POST" ? await requestBody(request) : {};
+  const taskId = String(url.searchParams.get("task") || body.taskId || "");
+  const access = await taskAccess(taskId, context);
+  const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
+  const canRead = access.leadership || access.assigned || decisionCase;
+  if (!canRead) throw Object.assign(new Error("你沒有權限讀取此案件附件"), { status: 403 });
+  if (request.method === "GET") {
+    const rows = await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`);
+    const file = rows?.[0];
+    if (!file) throw Object.assign(new Error("此案件尚未保存 Word"), { status: 404 });
+    const response = await serviceFetch(`/storage/v1/object/authenticated/case-files/${file.object_path}`);
+    return {
+      name: file.original_filename,
+      type: file.content_type,
+      size: file.size_bytes,
+      base64: encodeBase64(new Uint8Array(await response.arrayBuffer())),
+    };
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  if (!access.leadership && !access.assigned) {
+    throw Object.assign(new Error("只有副主席或本案受指派人員可以保存附件"), { status: 403 });
+  }
+  const filename = String(body.filename || "interview.docx").trim().slice(0, 240);
+  const contentType = String(body.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+  if (contentType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
+    throw Object.assign(new Error("訪談附件目前只接受 Word .docx"), { status: 415 });
+  }
+  const bytes = decodeBase64(String(body.base64 || ""));
+  if (!bytes.length || bytes.length > 25 * 1024 * 1024) throw Object.assign(new Error("Word 檔案大小無效"), { status: 413 });
+  const objectPath = `${access.task.id}/interview.docx`;
+  await serviceFetch(`/storage/v1/object/case-files/${objectPath}`, {
+    method: "POST",
+    headers: { "Content-Type": contentType, "x-upsert": "true" },
+    body: bytes,
+  });
+  await db("task_case_files?on_conflict=task_id", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({
+      task_id: access.task.id,
+      bucket_id: "case-files",
+      object_path: objectPath,
+      original_filename: filename,
+      content_type: contentType,
+      size_bytes: bytes.length,
+      uploaded_by: context.personId,
+    }),
+  });
+  return { message: "Word 已保存至 Supabase Private Storage", name: filename, size: bytes.length };
 }
 
 async function companyApi(url: URL) {
@@ -1222,13 +1443,26 @@ async function companyApi(url: URL) {
 
 async function testResetApi(request: Request, context: Context) {
   leadership(context);
-  const rows = await db("committee_meetings?select=id");
-  if (request.method === "GET") return { meetings: rows.length };
+  const [meetings, tasks, files] = await Promise.all([
+    db("committee_meetings?select=id"),
+    db(`tasks?source=eq.${TASK_SOURCE}&select=id`),
+    db("task_case_files?select=object_path"),
+  ]);
+  if (request.method === "GET") return { meetings: meetings.length, tasks: tasks.length, files: files.length };
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   if (body.confirmation !== "RESET_FULIAN_TEST_DATA") throw new Error("缺少測試資料清除確認");
   await db("committee_meetings?id=not.is.null", { method: "DELETE" });
-  return { meetings: rows.length, message: "Supabase 月會測試資料已清除" };
+  await db(`tasks?source=eq.${TASK_SOURCE}`, { method: "DELETE" });
+  for (const file of files || []) {
+    await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
+  }
+  return {
+    meetings: meetings.length,
+    tasks: tasks.length,
+    files: files.length,
+    message: "Supabase 月會、案件、草稿與附件測試資料已清除",
+  };
 }
 
 Deno.serve(async (request) => {
@@ -1249,6 +1483,8 @@ Deno.serve(async (request) => {
     else if (path === "/api/analysis-draft") result = await analysisDraftApi(request, context);
     else if (path === "/api/analysis-snapshots") result = await analysisSnapshotsApi(context);
     else if (path === "/api/tasks") result = await tasksApi(request, context);
+    else if (path === "/api/case-states") result = await caseStatesApi(request, context);
+    else if (path === "/api/task-file") result = await taskFileApi(request, url, context);
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);

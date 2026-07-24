@@ -159,6 +159,17 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - `20260720153500_online_application_api.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` Function bundler 成功帶入既有分析核心，沒有另建計分副本。
 - `20260720174000_attendance_palms_reconciliation.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` 已重新部署並保留 gateway JWT 驗證。
 - `20260724090000_task_cross_device_sync.sql` 已正式 `db push`；`app-api` 新增 `/api/tasks` 並部署完成。
+
+## 2026-07-24 案件跨裝置同步與安全加固
+
+- 正式套用 migration：`20260724170000_case_cloud_sync_and_task_hardening.sql`。
+- `app-api` 已部署為 version 8、狀態 `ACTIVE`、`verify_jwt = true`。
+- 任務改為單筆明確 upsert／delete，加入 revision 衝突檢查與資料庫交易 RPC，避免舊裝置誤刪或覆蓋新資料。
+- 新增 `/api/case-states`，將案件流程與五種訪談草稿保存至 `task_case_states`。
+- 新增 `/api/task-file`，將訪談 Word 保存至 Private Storage `case-files`，附件索引保存於 `task_case_files`。
+- 撤銷 authenticated 對任務敏感表及案件 Storage 的直接存取，正式操作統一經 Edge API 依角色與受派關係驗證。
+- 測試資料重置擴大為伺服器月會、案件、草稿、流程與附件；會員主檔、PALMS、登入、AI Key 與出席資料不受影響。
+- 本機固定驗證：28/28 測試通過、專案健檢 0 錯誤、PALMS 46/46 逐人逐項完全吻合。
 - 排程跨裝置專用測試 3 項通過，根目錄測試總數為 28/28；BNI regression 維持 46/46。
 - 點名上線後發現 PostgREST `return=minimal` 會以成功但空白的 response body 回應；原共用 `db()` 強制執行 `response.json()`，導致資料已保存卻顯示 `Unexpected end of JSON input`。已改為先讀文字、空內容回傳 `null`，並重新部署 `app-api`。
 - 2026-07-21 制度查詢 AI 曾把 Claude `stop_reason = max_tokens` 的半截內容直接顯示；已補三家平台的完成狀態檢查，截斷時改為明確錯誤。會員姓名問題同時改成只傳該會員的必要快照，降低 API 成本與截斷機率。

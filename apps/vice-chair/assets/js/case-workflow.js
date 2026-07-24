@@ -37,6 +37,7 @@ const initialState = {
 
 let state = loadState();
 let saveTimer;
+let lastPersist=Promise.resolve();
 
 function loadState(){
   try{return {...initialState, ...JSON.parse(localStorage.getItem(STORAGE_KEY)||"null")};}
@@ -55,7 +56,7 @@ function nowLabel(){return new Date().toLocaleString("zh-TW",{year:"numeric",mon
 function dateLabel(value){if(!value)return"未設定";const d=new Date(value);return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
 function config(){return typeConfig[$("#caseType").value];}
 function escapeHtml(text){return String(text).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));}
-function toast(message){const node=$("#toast");node.textContent=message;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2200);}
+function toast(message){const show=text=>{const node=$("#toast");node.textContent=text;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2200)};if(/已(儲存|保存|開啟|記錄|結案)|狀態已|已模擬/.test(message)){lastPersist.then(()=>show(message)).catch(error=>show(error.message||"Supabase 保存失敗"));return}show(message);}
 function addLog(text){state.log.unshift({text,time:nowLabel(),done:true});state.log=state.log.slice(0,20);}
 
 function feedbackReady(){return feedbackCount()>=threshold();}
@@ -285,12 +286,11 @@ function restoreForm(){
   }
 }
 
-function persistNow(){state.form=collectForm();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));$("#saveState").textContent="案件草稿已保存";$("#saveTime").textContent=`最後儲存 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;render();}
+function persistNow(){state.form=collectForm();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));$("#saveState").textContent="正在同步 Supabase…";render();lastPersist=window.FulianCaseStateStore.flush().then(()=>{$("#saveState").textContent="案件資料已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`}).catch(error=>{$("#saveState").textContent="Supabase 保存失敗";throw error});return lastPersist;}
 function scheduleSave(){$("#saveState").textContent="儲存中…";clearTimeout(saveTimer);saveTimer=setTimeout(persistNow,180);render();}
 
-function openDb(){return new Promise((resolve,reject)=>{const request=indexedDB.open("fulian-case-files",1);request.onupgradeneeded=()=>request.result.createObjectStore("files");request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});}
-async function storeWord(file){const db=await openDb();await new Promise((resolve,reject)=>{const tx=db.transaction("files","readwrite");tx.objectStore("files").put(file,CASE_ID);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);});db.close();}
-async function getWord(){const db=await openDb();const file=await new Promise((resolve,reject)=>{const req=db.transaction("files").objectStore("files").get(CASE_ID);req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error);});db.close();return file;}
+async function storeWord(file){await window.FulianCaseFiles.saveGeneratedWord({caseId:CASE_ID,caseType:sourceTask?.type||"",blob:file,fileName:file.name,sourceLabel:"案件流程頁",domain:caseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});state=loadState();}
+async function getWord(){return window.FulianCaseFiles.getCaseFile({caseId:CASE_ID,indexedDb:indexedDB});}
 
 function bindEvents(){
   $$('[data-save]').forEach(node=>{node.addEventListener("change",scheduleSave);node.addEventListener("input",scheduleSave);});
@@ -301,7 +301,7 @@ function bindEvents(){
     persistNow();
     toast("截止時間已更新，請重新通知委員投票");
   });
-  $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;await storeWord(file);state.wordSaved=true;state.wordReal=true;state.wordName=file.name;addLog(`訪談 Word 已保存：${file.name}`);persistNow();toast("Word 已保存於此瀏覽器");});
+  $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $("#copyFeedbackNotice").addEventListener("click",async()=>{await navigator.clipboard.writeText(feedbackNotice());toast("回饋通知已複製");});
   $("#sendFeedbackNotice").addEventListener("click",()=>{if(!isVp())return;state.feedbackNotified=true;addLog("已模擬發送委員回饋通知至會員委員會群");persistNow();toast("已模擬通知委員");});
@@ -312,12 +312,14 @@ function bindEvents(){
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
   $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});
   $("#saveAdvisor").addEventListener("click",()=>{if(!isVp())return;state.advisorStatus=$("#advisorStatus").value;state.advisorNote=$("#advisorNote").value.trim();addLog(state.advisorStatus==="confirmed"?"董事顧問已同意會員委員會決議":state.advisorStatus==="returned"?"董事顧問退回補充資料":"董事顧問確認仍待回覆");persistNow();toast("董顧確認狀態已保存");});
-  $("#closeCase").addEventListener("click",()=>{if(!isVp()||state.advisorStatus!=="confirmed")return;state.closed=true;addLog("案件已由副主席確認結案存檔");if(sourceTask){const tasks=JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]");const target=tasks.find(item=>item.id===CASE_ID);if(target){target.completed=true;target.completedAt=new Date().toISOString();target.stage="已結案";localStorage.setItem(caseDomain.TASK_STORAGE_KEY,JSON.stringify(tasks));}}persistNow();toast("案件已結案存檔");});
+  $("#closeCase").addEventListener("click",async()=>{if(!isVp()||state.advisorStatus!=="confirmed")return;state.closed=true;addLog("案件已由副主席確認結案存檔");if(sourceTask){const tasks=JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]");const target=tasks.find(item=>item.id===CASE_ID);if(target){target.completed=true;target.completedAt=new Date().toISOString();target.stage="已結案";localStorage.setItem(caseDomain.TASK_STORAGE_KEY,JSON.stringify(tasks));}}try{await persistNow();await window.FulianTaskStore.flush();toast("案件已結案存檔")}catch(error){toast(error.message||"案件結案同步失敗")}});
   $("#resetCase").addEventListener("click",()=>{if(!isVp())return toast("只有副主席可以重設案件");if(!confirm("要重設這個案件嗎？目前的回饋、投票與流程紀錄會清除。"))return;state=cloneInitial();localStorage.removeItem(STORAGE_KEY);location.reload();});
 }
 
 async function init(){
   await window.FulianTaskStore.ready;
+  await window.FulianCaseStateStore.ready;
+  state=loadState();
   try{sourceTask=(JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]")||[]).find(item=>item.id===CASE_ID)||null}catch{}
   configureIdentity();
   populateSelects();

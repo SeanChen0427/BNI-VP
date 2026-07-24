@@ -1,5 +1,15 @@
 # 變更紀錄
 
+## 2026-07-24－案件與附件完整跨裝置同步、安全加固
+
+- 任務同步改為單筆 upsert 與明確刪除，不再從舊裝置的整份 localStorage 快照推斷刪除。
+- 任務加入 revision 樂觀鎖與資料庫交易 RPC，任務、指派人及敏感備註同時成功或同時失敗。
+- 正式訪談草稿與案件流程搬入 Supabase `task_case_states`，不同電腦登入後載入同一狀態。
+- 訪談 Word 搬入 Private Storage `case-files`，IndexedDB 降為目前電腦的備援快取。
+- 撤銷前端共用帳號對任務敏感表與案件 Storage 的直接權限，統一由 Edge API 依登入角色、所選姓名及受派關係驗證。
+- 所有主要任務／草稿／Word 操作改為等待 Supabase 確認後才顯示成功；失敗時保留本機資料並顯示固定警示。
+- 測試資料重置同步清除 Supabase 月會、案件、流程索引及 Private Storage 附件。
+
 ## 2026-07-21
 
 - 修正制度查詢 AI 偶爾顯示半截回答：後端現在檢查 OpenAI、Gemini 與 Claude 的完成／停止原因，達到 token 或 context 上限時不再把殘缺內容當成正式答案；一般查詢輸出額度提高並要求簡短直接回答。

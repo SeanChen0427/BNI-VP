@@ -178,7 +178,15 @@ function restore(data) {
 }
 function saveDraft() {
   localStorage.setItem(STORE_KEY, JSON.stringify(serialize()));
-  const t = new Date(); $("#saveState").textContent = "草稿已儲存"; $("#saveTime").textContent = `最後儲存 ${t.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`; updateProgress();
+  $("#saveState").textContent = "正在同步 Supabase…";
+  window.FulianCaseStateStore.flush().then(() => {
+    const t = new Date();
+    $("#saveState").textContent = "草稿已保存至 Supabase";
+    $("#saveTime").textContent = `最後同步 ${t.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
+  }).catch(error => {
+    $("#saveState").textContent = `同步失敗：${error.message}`;
+  });
+  updateProgress();
 }
 function bindInputs() {
   $$('[data-save]').forEach(el => { el.oninput = () => { $("#saveState").textContent = "儲存中…"; clearTimeout(saveTimer); saveTimer = setTimeout(saveDraft, 300); }; });
@@ -266,7 +274,8 @@ async function downloadWord() {
   }
 }
 
-function init() {
+async function init() {
+  await window.FulianCaseStateStore.ready;
   $("#memberList").innerHTML = members.map(m=>`<option value="${m.name}">${m.profession}</option>`).join("");
   $("#sectionNav").innerHTML = [["basic","基本資料"],["snapshot","數據快照"],["palms","PALMS 貢獻"],["experience","會員經驗"],["agreement","制度與總結"]].map(([id,t])=>`<a href="#${id}">${t}</a>`).join("");
   renderExperienceQuestions();

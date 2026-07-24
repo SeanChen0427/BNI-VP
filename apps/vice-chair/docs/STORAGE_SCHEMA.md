@@ -1,18 +1,14 @@
 # 資料與儲存 Schema
 
-本文件記錄正式後端與仍待遷移的瀏覽器本機資料。
+本文件記錄正式後端與瀏覽器離線備援資料。
 
 ## localStorage
 
 | Key／前綴 | 資料 | 主要讀寫者 |
 |---|---|---|
-| `fulian-work-plan-v1` | 案件與工作排定陣列 | `assets/js/work-planner.js`、`assets/js/case-board.js`、`assets/js/case-creator.js` |
-| `fulian-case-workflow-v2-{caseId}` | 回饋、投票、董顧、結案 | `assets/js/case-workflow.js` |
-| `fulian-terminal-counseling-draft-v3-{caseId}` | 終期輔導草稿 | `assets/js/terminal-form.js` |
-| `fulian-midterm-counseling-draft-v2-{caseId}` | 期中輔導草稿 | `assets/js/midterm-form.js` |
-| `fulian-new-member-interview-v2-{caseId}` | 新會員訪談草稿 | `assets/js/new-member-form.js` |
-| `fulian-industry-change-interview-v2-{caseId}` | 轉換行業別草稿 | `assets/js/industry-change-form.js` |
-| `fulian-departure-interview-v2-{caseId}` | 離會訪談草稿 | `assets/js/departure-form.js` |
+| `fulian-work-plan-v1` | Supabase `tasks` 的目前分頁快取；不可作正式唯一來源 | `assets/js/task-store.js` |
+| `fulian-case-workflow-v2-{caseId}` | Supabase `task_case_states.workflow` 的快取 | `assets/js/case-state-store.js`、`assets/js/case-workflow.js` |
+| 五種訪談草稿 Key | Supabase `task_case_states.draft` 的快取 | `assets/js/case-state-store.js`、各表單 |
 | `fulian-attendance-prototype-v1` | Supabase 保存失敗時的點名草稿備援；不是正式週次來源 | `assets/js/attendance.js` |
 | `fulian-attendance-history-v1` | 舊版已確認週次；首次載入後由副主席／Admin 搬入 Supabase，原值保留作復原 | `assets/js/attendance.js` |
 | `fulian-attendance-history-supabase-v1` | 本瀏覽器舊版週次搬移完成標記 | `assets/js/attendance.js` |
@@ -32,13 +28,14 @@
 | `fulian-auth-session-v1` | 目前登入身分與短期 Supabase access／refresh token；關閉分頁即移除，8 小時未操作逾時 |
 | `fulian-ai-chat-v1:*` | 本次登入期間的 AI 對話 |
 
-## IndexedDB
+## IndexedDB（離線備援）
 
 - Database：`fulian-case-files`
 - Object store：`files`
 - Key：案件 ID
 - Value：訪談 Word `File`
 - 唯一讀寫服務：`services/case-files.js`
+- 正式附件會先保存到 Private Storage `case-files`；IndexedDB 只作目前電腦的下載備援。
 
 ## Supabase 伺服器端加密資料
 
@@ -49,6 +46,9 @@
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
+- `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
+- `task_case_states`：既有工作台案件流程及五種訪談草稿的跨裝置狀態。
+- `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
 
 上述資料不得複製進 GitHub、公開備份範例或截圖。
 

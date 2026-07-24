@@ -55,12 +55,12 @@ async function loadTestDataSummary(){
       window.FulianTestDataReset.summary({storage:localStorage,indexedDb:indexedDB}),
       resetServerSummary()
     ]);
-    $("#resetTaskCount").textContent=browserSummary.tasks;
+    $("#resetTaskCount").textContent=serverSummary.tasks;
     $("#resetWorkflowCount").textContent=browserSummary.workflows;
     $("#resetDraftCount").textContent=browserSummary.drafts;
-    $("#resetAttachmentCount").textContent=browserSummary.attachments;
+    $("#resetAttachmentCount").textContent=serverSummary.files;
     $("#resetMeetingCount").textContent=serverSummary.meetings;
-    const total=browserSummary.tasks+browserSummary.workflows+browserSummary.drafts+browserSummary.attachments+serverSummary.meetings;
+    const total=serverSummary.tasks+browserSummary.workflows+browserSummary.drafts+serverSummary.files+serverSummary.meetings;
     $("#testResetResult").textContent=total?`目前共有 ${total} 筆／份測試流程資料可清除。`:"目前沒有可清除的測試流程資料。";
   }catch(error){
     $("#testResetResult").textContent=`統計失敗：${error.message}`;
@@ -78,7 +78,7 @@ async function resetAllTestData(){
     $("#testResetConfirmation").value="";
     window.dispatchEvent(new CustomEvent("fulian:data-changed",{detail:{source:"test-data-reset"}}));
     await loadTestDataSummary();
-    $("#testResetResult").textContent=`清除完成：${browserResult.tasks} 筆案件、${browserResult.workflows} 筆流程、${browserResult.drafts} 份草稿、${browserResult.attachments} 份附件、${serverResult.meetings} 筆月會紀錄。`;
+    $("#testResetResult").textContent=`清除完成：${serverResult.tasks} 筆伺服器案件、${browserResult.workflows} 筆本機流程、${browserResult.drafts} 份本機草稿、${serverResult.files} 份 Private Storage 附件、${serverResult.meetings} 筆月會紀錄。`;
     toast("測試流程資料已全部清除");
   }catch(error){
     $("#testResetResult").textContent=`清除失敗：${error.message}`;
