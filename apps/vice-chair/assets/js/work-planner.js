@@ -1,5 +1,6 @@
 (async function(){
   await window.FulianMemberDirectory.ready;
+  await window.FulianTaskStore.ready;
   const domain=window.FulianCaseDomain,calendar=window.FulianCalendarDomain,KEY=domain.TASK_STORAGE_KEY,session=FulianAuth.getSession(),auth=FulianAuth.getConfig();
   const canManage=session.role==="vp"||session.role==="admin",committee=[auth.vpName,...auth.committee];
   const memberNames=window.FulianMemberDirectory?.members||[];

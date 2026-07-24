@@ -1,4 +1,5 @@
 (async function(){
+  await window.FulianTaskStore.ready;
   const session=FulianAuth.getSession(),config=FulianAuth.getConfig(),taskId=new URLSearchParams(location.search).get("task");
   const task=()=>{try{return(JSON.parse(localStorage.getItem(window.FulianCaseDomain.TASK_STORAGE_KEY)||"[]")||[]).find(item=>item.id===taskId&&item.type==="renewal")||null}catch{return null}};
   const currentTask=task(),identity=document.querySelector("#loginUser"),role=session.role==="vp"?"副主席":session.role==="admin"?"系統管理員":"會員委員";

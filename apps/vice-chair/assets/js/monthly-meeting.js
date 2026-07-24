@@ -142,6 +142,7 @@
   }
   async function init(){
     try{
+      await window.FulianTaskStore.ready;
       await Promise.all([loadBni(),api().then(data=>store=data)]);
       if(!canManage){
         document.body.classList.add("committee-history-mode");$("#accessNotice").hidden=false;

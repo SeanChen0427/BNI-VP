@@ -105,9 +105,17 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 
 本輪已完成所有舊 `/api/*` 的正式後端接管；月會、每月報表、單月出席、分析草稿、離會、AI 與公司查詢不再依賴本機 `preview-server.mjs` 或 macOS 應用資料。
 
-以下既有前端模組仍明確使用瀏覽器 `localStorage`／IndexedDB，尚未跨裝置同步：
+案件排程已於 2026-07-24 完成 Supabase 跨裝置同步：
 
-- 案件、任務、表單草稿與部分工作流程。
+- `tasks`、`task_assignments`、`task_private_details` 成為正式排程來源。
+- 舊瀏覽器 `fulian-work-plan-v1` 只作為第一次搬移來源及離線畫面快取。
+- 首次由副主席原本的瀏覽器開啟新版時，尚未存在於伺服器的舊排程會自動上傳；既有伺服器資料優先，不以舊快取覆蓋。
+- 全體當期委員可看工作進度；工作備註只回傳副主席、Admin 與受派人員。
+- 只有副主席／Admin 可建立、改派與刪除；會員委員只能完成自己主責的「特定會員關懷」。
+
+以下既有前端模組仍使用瀏覽器 `localStorage`／IndexedDB，尚未跨裝置同步：
+
+- 表單草稿與部分案件工作流程。
 - 訪談 Word 附件。
 - 課程進度等瀏覽器本機狀態。
 
@@ -150,6 +158,8 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 本輪修改後 `npm run check`、46／46 計分回歸及公開 repository 掃描再次通過；GitHub Pages 公開 artifact 共 112 個檔案。
 - `20260720153500_online_application_api.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` Function bundler 成功帶入既有分析核心，沒有另建計分副本。
 - `20260720174000_attendance_palms_reconciliation.sql` 遠端 dry-run 與正式 `db push` 完成；`app-api` 已重新部署並保留 gateway JWT 驗證。
+- `20260724090000_task_cross_device_sync.sql` 已正式 `db push`；`app-api` 新增 `/api/tasks` 並部署完成。
+- 排程跨裝置專用測試 3 項通過，根目錄測試總數為 28/28；BNI regression 維持 46/46。
 - 點名上線後發現 PostgREST `return=minimal` 會以成功但空白的 response body 回應；原共用 `db()` 強制執行 `response.json()`，導致資料已保存卻顯示 `Unexpected end of JSON input`。已改為先讀文字、空內容回傳 `null`，並重新部署 `app-api`。
 - 2026-07-21 制度查詢 AI 曾把 Claude `stop_reason = max_tokens` 的半截內容直接顯示；已補三家平台的完成狀態檢查，截斷時改為明確錯誤。會員姓名問題同時改成只傳該會員的必要快照，降低 API 成本與截斷機率。
 - 本輪自動三角色線上驗證無法沿用專案外的初始密碼檔：三組密碼已在先前操作中更新，而初始檔未同步更新。未擅自重設正式密碼；完成 GitHub Pages 新版發佈後需使用目前有效密碼做一次實際點擊驗收。

@@ -1,4 +1,5 @@
 (async function(){
+  await window.FulianTaskStore.ready;
   const session=FulianAuth.getSession(),config=FulianAuth.getConfig(),taskId=new URLSearchParams(location.search).get("task");
   const role=session.role==="vp"?"副主席":session.role==="admin"?"系統管理員":"會員委員";
   const identity=document.querySelector("#loginUser");

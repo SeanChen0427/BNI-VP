@@ -995,6 +995,215 @@ async function analysisSnapshotsApi(context: Context) {
   return { snapshots, latest: snapshots.at(-1) || null };
 }
 
+const TASK_SOURCE = "vice-chair-work-plan";
+const TASK_TYPES = new Set(["renewal", "new", "midterm", "industry", "departure", "special"]);
+
+function parseTaskJson(value: unknown) {
+  if (!value) return {};
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function cleanTaskInput(value: any) {
+  const id = String(value?.id || "").trim().slice(0, 160);
+  const type = String(value?.type || "").trim();
+  const member = String(value?.member || "").trim().slice(0, 100);
+  const lead = String(value?.lead || "").trim().slice(0, 100);
+  const companions = [...new Set((Array.isArray(value?.companions) ? value.companions : [])
+    .map((name: unknown) => String(name || "").trim().slice(0, 100))
+    .filter(Boolean))]
+    .filter((name) => name !== lead)
+    .slice(0, 2);
+  if (!id || !TASK_TYPES.has(type) || !member || !lead) throw new Error("排程資料缺少有效的案件編號、類型、對象或主責人");
+  return {
+    id,
+    type,
+    member,
+    profession: String(value?.profession || "").trim().slice(0, 200),
+    scheduledAt: String(value?.scheduledAt || "").trim().slice(0, 40),
+    lead,
+    companions,
+    priority: value?.priority === "high" ? "high" : "normal",
+    stage: String(value?.stage || "").trim().slice(0, 200),
+    notes: String(value?.notes || "").trim().slice(0, 10000),
+    completed: Boolean(value?.completed),
+    completedAt: value?.completedAt ? String(value.completedAt).slice(0, 40) : null,
+    completedBy: value?.completedBy ? String(value.completedBy).trim().slice(0, 100) : "",
+    createdAt: value?.createdAt ? String(value.createdAt).slice(0, 40) : null,
+    createdBy: value?.createdBy ? String(value.createdBy).trim().slice(0, 100) : "",
+    localSource: value?.source ? String(value.source).slice(0, 100) : "",
+    sourceMeetingId: value?.sourceMeetingId ? String(value.sourceMeetingId).slice(0, 160) : "",
+    sourceCareId: value?.sourceCareId ? String(value.sourceCareId).slice(0, 160) : "",
+  };
+}
+
+async function taskDirectory() {
+  const [people, members] = await Promise.all([
+    db("people?select=id,display_name,status"),
+    db("members?select=id,people!inner(display_name)"),
+  ]);
+  return {
+    people,
+    personById: new Map(people.map((person: any) => [person.id, person.display_name])),
+    personByName: new Map(people.filter((person: any) => person.status === "active").map((person: any) => [person.display_name, person.id])),
+    memberByName: new Map(members.map((member: any) => [member.people?.display_name, member.id])),
+  };
+}
+
+async function taskResponse(context: Context) {
+  const [rows, assignments, details, directory] = await Promise.all([
+    db(`tasks?source=eq.${TASK_SOURCE}&select=*&order=created_at.asc`),
+    db("task_assignments?select=task_id,person_id,role&order=assigned_at.asc"),
+    db("task_private_details?select=task_id,details"),
+    taskDirectory(),
+  ]);
+  const assignmentByTask = new Map<string, any[]>();
+  for (const assignment of assignments || []) {
+    if (!assignmentByTask.has(assignment.task_id)) assignmentByTask.set(assignment.task_id, []);
+    assignmentByTask.get(assignment.task_id)!.push(assignment);
+  }
+  const detailByTask = new Map((details || []).map((detail: any) => [detail.task_id, detail.details]));
+  const isLeader = ["admin", "vp"].includes(context.role);
+  const tasks = (rows || []).map((row: any) => {
+    const assigned = assignmentByTask.get(row.id) || [];
+    const assignedIds = new Set(assigned.map((item: any) => item.person_id));
+    const meta: any = parseTaskJson(row.result_summary);
+    const privateMeta: any = isLeader || assignedIds.has(context.personId)
+      ? parseTaskJson(detailByTask.get(row.id))
+      : {};
+    const companions = assigned
+      .filter((item: any) => item.role === "companion")
+      .map((item: any) => directory.personById.get(item.person_id))
+      .filter(Boolean);
+    return {
+      id: row.source_reference,
+      type: row.category,
+      member: row.title,
+      profession: meta.profession || "",
+      scheduledAt: meta.scheduledAt || row.due_at || "",
+      lead: directory.personById.get(row.lead_person_id) || "",
+      companions,
+      priority: meta.priority === "high" ? "high" : "normal",
+      stage: meta.stage || "",
+      notes: privateMeta.notes || "",
+      completed: row.status === "completed",
+      completedAt: row.completed_at || null,
+      completedBy: directory.personById.get(row.completed_by) || meta.completedBy || "",
+      createdAt: row.created_at,
+      createdBy: meta.createdBy || "",
+      ...(meta.localSource ? { source: meta.localSource } : {}),
+      ...(meta.sourceMeetingId ? { sourceMeetingId: meta.sourceMeetingId } : {}),
+      ...(meta.sourceCareId ? { sourceCareId: meta.sourceCareId } : {}),
+    };
+  });
+  return { tasks, syncedAt: new Date().toISOString() };
+}
+
+async function saveLeadershipTask(input: any, context: Context, directory: any) {
+  const task = cleanTaskInput(input);
+  const leadId = directory.personByName.get(task.lead);
+  if (!leadId) throw new Error(`主責人「${task.lead}」不在有效委員名單`);
+  const companionIds = task.companions.map((name: string) => {
+    const personId = directory.personByName.get(name);
+    if (!personId) throw new Error(`陪訪人「${name}」不在有效委員名單`);
+    return personId;
+  });
+  const completedBy = task.completed
+    ? directory.personByName.get(task.completedBy) || context.personId
+    : null;
+  const meta = {
+    profession: task.profession,
+    scheduledAt: task.scheduledAt,
+    priority: task.priority,
+    stage: task.stage,
+    createdBy: task.createdBy || context.name,
+    completedBy: task.completedBy || (task.completed ? context.name : ""),
+    localSource: task.localSource,
+    sourceMeetingId: task.sourceMeetingId,
+    sourceCareId: task.sourceCareId,
+  };
+  const payload: any = {
+    title: task.member,
+    category: task.type,
+    status: task.completed ? "completed" : "pending",
+    lead_person_id: leadId,
+    due_at: task.scheduledAt || null,
+    completed_at: task.completed ? task.completedAt || new Date().toISOString() : null,
+    result_summary: JSON.stringify(meta),
+    source: TASK_SOURCE,
+    source_reference: task.id,
+    created_by: context.personId,
+    completed_by: completedBy,
+    member_id: directory.memberByName.get(task.member) || null,
+  };
+  if (task.createdAt && !Number.isNaN(new Date(task.createdAt).getTime())) payload.created_at = task.createdAt;
+  const saved = await db("tasks?on_conflict=source_reference", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload),
+  });
+  const taskId = saved?.[0]?.id;
+  if (!taskId) throw new Error("排程寫入後未取得任務編號");
+  await db(`task_assignments?task_id=eq.${taskId}`, { method: "DELETE" });
+  await db("task_assignments", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify([
+      { task_id: taskId, person_id: leadId, role: "lead" },
+      ...companionIds.map((personId: string) => ({ task_id: taskId, person_id: personId, role: "companion" })),
+    ]),
+  });
+  await db("task_private_details?on_conflict=task_id", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ task_id: taskId, details: JSON.stringify({ notes: task.notes }), updated_by: context.personId }),
+  });
+}
+
+async function completeAssignedTask(input: any, context: Context) {
+  const task = cleanTaskInput(input);
+  if (task.type !== "special" || !task.completed) throw Object.assign(new Error("會員委員只能完成自己主責的一般關懷"), { status: 403 });
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,lead_person_id,status&limit=1`);
+  const row = rows?.[0];
+  if (!row || row.lead_person_id !== context.personId) throw Object.assign(new Error("只有此工作的主責委員可以完成一般關懷"), { status: 403 });
+  if (row.status === "completed") return;
+  await db(`tasks?id=eq.${row.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({
+      status: "completed",
+      completed_at: task.completedAt || new Date().toISOString(),
+      completed_by: context.personId,
+    }),
+  });
+}
+
+async function tasksApi(request: Request, context: Context) {
+  if (request.method === "GET") return taskResponse(context);
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action !== "sync") throw new Error("不支援的排程動作");
+  const tasks = Array.isArray(body.tasks) ? body.tasks.slice(0, 250) : [];
+  const deletedIds = Array.isArray(body.deletedIds)
+    ? [...new Set(body.deletedIds.map((id: unknown) => String(id || "").trim()).filter(Boolean))].slice(0, 250)
+    : [];
+  if (["admin", "vp"].includes(context.role)) {
+    const directory = await taskDirectory();
+    for (const task of tasks) await saveLeadershipTask(task, context, directory);
+    for (const id of deletedIds) {
+      await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}`, { method: "DELETE" });
+    }
+  } else {
+    if (deletedIds.length) throw Object.assign(new Error("會員委員不能刪除排程"), { status: 403 });
+    for (const task of tasks) await completeAssignedTask(task, context);
+  }
+  return taskResponse(context);
+}
+
 async function companyApi(url: URL) {
   const taxId = (url.searchParams.get("taxId") || "").replace(/\D/g, "");
   if (!/^\d{8}$/.test(taxId)) throw new Error("統編必須為 8 碼數字");
@@ -1039,6 +1248,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/ai-chat") result = await aiChatApi(request, context);
     else if (path === "/api/analysis-draft") result = await analysisDraftApi(request, context);
     else if (path === "/api/analysis-snapshots") result = await analysisSnapshotsApi(context);
+    else if (path === "/api/tasks") result = await tasksApi(request, context);
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);

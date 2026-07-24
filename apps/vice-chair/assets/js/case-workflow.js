@@ -6,7 +6,6 @@ const caseDomain=window.FulianCaseDomain;
 const calendarDomain=window.FulianCalendarDomain;
 const STORAGE_KEY = caseDomain.workflowStorageKey(CASE_ID);
 let sourceTask=null;
-try{sourceTask=(JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]")||[]).find(item=>item.id===CASE_ID)||null}catch{}
 const authConfig=FulianAuth.getConfig(),authSession=FulianAuth.getSession();
 const committee=[authConfig.vpName,...authConfig.committee];
 const roles=Object.fromEntries(committee.map(name=>[name,name===authConfig.vpName?"副主席":"會員委員"]));
@@ -318,6 +317,8 @@ function bindEvents(){
 }
 
 async function init(){
+  await window.FulianTaskStore.ready;
+  try{sourceTask=(JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]")||[]).find(item=>item.id===CASE_ID)||null}catch{}
   configureIdentity();
   populateSelects();
   restoreForm();

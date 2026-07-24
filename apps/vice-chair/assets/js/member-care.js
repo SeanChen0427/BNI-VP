@@ -1,5 +1,6 @@
 (async function(){
 await window.FulianMemberDirectory.ready;
+await window.FulianTaskStore.ready;
 const $=selector=>document.querySelector(selector);
 const escapeHtml=value=>String(value??"").replace(/[&<>'\"]/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'\"':"&quot;"}[char]));
 const fmtTime=value=>value?new Intl.DateTimeFormat("zh-TW",{dateStyle:"medium",timeStyle:"short"}).format(new Date(value)):"—";

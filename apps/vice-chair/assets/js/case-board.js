@@ -1,4 +1,5 @@
-(function () {
+(async function () {
+  await window.FulianTaskStore.ready;
   const domain = window.FulianCaseDomain;
   const TASK_KEY = domain.TASK_STORAGE_KEY;
   const session = FulianAuth.getSession();
