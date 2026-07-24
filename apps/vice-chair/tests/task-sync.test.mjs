@@ -125,6 +125,11 @@ test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {
   assert.match(edge, /path === "\/api\/case-states"/);
   assert.match(edge, /path === "\/api\/task-file"/);
   assert.match(edge, /只有副主席或本案受指派人員可以保存訪談草稿/);
+  assert.equal(
+    edge.match(/function decodeBase64\(/g)?.length,
+    1,
+    "Edge Function 不得重複宣告 decodeBase64，否則正式環境會 BOOT_ERROR",
+  );
 });
 
 test("兩位委員同時提交回饋與投票時，各自資料不共用案件 revision", async () => {

@@ -8,7 +8,8 @@
 
 - 已套用 `20260725150000_transactional_case_operations.sql`：開票、案件狀態、正式結案、任務完成、回饋、投票、重設與刪除改為 service-role-only 交易 RPC。
 - migration 已補搬具正式資格快照的舊版 JSON 票，並以 `LEGACY_MIGRATION` 保留來源；沒有正式快照的舊案會在首次開票／投票時交易式補搬。
-- `app-api` 已部署為 version 12、狀態 `ACTIVE`、`verify_jwt = true`。
+- `app-api` version 12 曾因重複宣告 `decodeBase64` 發生 `503 BOOT_ERROR`；已移除重複宣告並部署 version 13，狀態 `ACTIVE`、`verify_jwt = true`。
+- 正式案件同步端點的 CORS 預檢已回應 HTTP 200 與 `ok`，前台「案件資料同步失敗：Failed to fetch」的啟動錯誤已解除。
 - 前台資產版本更新為 `auth v7`、`task-store v4`、`case-state-store v3`、`login v4`、`case-workflow v15`，避免 GitHub Pages／瀏覽器沿用舊快取。
 - 完整驗證：32／32 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
 

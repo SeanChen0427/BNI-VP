@@ -1610,11 +1610,6 @@ async function caseStatesApi(request: Request, context: Context) {
   return caseStateResponse(access, latestRows?.[0], context);
 }
 
-function decodeBase64(value: string) {
-  const binary = atob(value);
-  return Uint8Array.from(binary, character => character.charCodeAt(0));
-}
-
 function encodeBase64(value: Uint8Array) {
   let binary = "";
   const chunk = 0x8000;
