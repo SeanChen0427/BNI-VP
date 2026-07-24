@@ -113,11 +113,7 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 全體當期委員可看工作進度；工作備註只回傳副主席、Admin 與受派人員。
 - 只有副主席／Admin 可建立、改派與刪除；會員委員只能完成自己主責的「特定會員關懷」。
 
-以下既有前端模組仍使用瀏覽器 `localStorage`／IndexedDB，尚未跨裝置同步：
-
-- 表單草稿與部分案件工作流程。
-- 訪談 Word 附件。
-- 課程進度等瀏覽器本機狀態。
+2026-07-24 起，表單草稿、案件流程與訪談 Word 均已跨裝置同步；IndexedDB 只作 Word 本機下載備援。尚未遷移的只剩課程進度等非正式個人瀏覽器狀態。
 
 每週點名已完成 Supabase 跨裝置同步；`localStorage` 只保留連線失敗時的草稿備援與一次性舊歷史搬移來源，不再是正式週次來源。
 
@@ -181,6 +177,19 @@ Supabase PostgreSQL／Private Storage／Edge Functions
   - 三角色均讀到 44 位會員、7 筆現任委員任期及 2026-01～06 已發布快照
   - Admin／副主席可讀 Private `raw-reports`，會員委員讀不到
 
+## 2026-07-25 多人登入與案件參與並行修正
+
+- 新增 migration：`20260725103000_normalize_case_participation.sql`。
+- migration 已正式套用至專案 `fahrblkukuhgveiptufn`；本機與遠端 migration 版本一致。
+- `app-api` 已部署為 version 10、狀態 `ACTIVE`、`verify_jwt = true`。
+- Auth 登出與首次選姓名流程改為只撤銷目前裝置；共用委員帳號的其他電腦不再被連帶登出。
+- `auth.js` 加入 refresh mutex 與登出競爭保護，前後端都依人員啟用狀態及任期起訖驗證登入姓名。
+- 工作台決議案件透過 `tasks.case_id` 對應正式 `cases`；每位委員回饋保存於 `case_feedback`，每張票保存於 `votes`，不再以 `task_case_states.revision` 競爭整包 JSON。
+- 開票由 Edge API 依當期有效副主席／委員建立不可任意改寫的資格快照，申請者本人由後端強制迴避；投票截止及單票不可修改同樣由後端驗證。
+- 前端直接存取正式案件參與表的權限已撤銷，僅 `service_role` 可由受 JWT 保護的 `app-api` 操作。
+- 排程與案件狀態加入前景／焦點及 30 秒安全更新；偵測本機正在寫入或同步失敗時停止遠端覆蓋。
+- 本機測試增至 31 項，包含兩位委員以相同舊 revision 同時提交回饋與投票仍各自保留。
+
 ## 七、安全紀錄
 
 - 真實會員與 PALMS 未加入 GitHub 或公開前端 bucket。
@@ -194,5 +203,5 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 後續順序：
 
 1. 輪替本次工具輸出中曾顯示過的 legacy service role key。
-2. 將案件、表單、附件、任務與課程進度從瀏覽器本機狀態遷移至既有 Supabase schema，完成跨裝置同步。
-3. 完成一般使用者的實際操作驗收與換屆交接規則。
+2. 評估是否將非正式的個人課程進度從瀏覽器搬入 Supabase。
+3. 完成一般使用者的多人回饋、投票與單機登出實際操作驗收及換屆交接規則。

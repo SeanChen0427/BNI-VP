@@ -5,6 +5,10 @@
   const nativeGetItem = Storage.prototype.getItem;
   let applyingServerState = false;
   let queue = Promise.resolve();
+  let pendingWrites = 0;
+  let lastLocalWrite = 0;
+  let refreshPromise = null;
+  let syncFailed = false;
 
   function parse(value) {
     try {
@@ -57,6 +61,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || `排程同步失敗：HTTP ${response.status}`);
+    syncFailed = false;
     replaceCache(data.tasks);
     return data.tasks;
   }
@@ -69,8 +74,13 @@
   function queueUpsert(before, after) {
     const changed = changedTasks(before, after);
     if (!changed.length) return queue;
-    queue = queue.catch(() => undefined).then(() => api({ action: "upsert", tasks: changed }));
+    queue = queue.catch(() => undefined).then(async () => {
+      pendingWrites += 1;
+      try { return await api({ action: "upsert", tasks: changed }); }
+      finally { pendingWrites -= 1; }
+    });
     queue.catch(error => {
+      syncFailed = true;
       console.error("Supabase task sync failed", error);
       showError(error.message);
       window.dispatchEvent(new CustomEvent("fulian:task-sync-error", { detail: { message: error.message } }));
@@ -84,6 +94,7 @@
     }
     const before = cached();
     const result = nativeSetItem.call(this, key, value);
+    lastLocalWrite = Date.now();
     queueUpsert(before, parse(value));
     return result;
   };
@@ -112,6 +123,7 @@
   }
 
   const ready = initialize().catch(error => {
+    syncFailed = true;
     console.error("Supabase task bootstrap failed", error);
     showError(error.message);
     window.dispatchEvent(new CustomEvent("fulian:task-sync-error", { detail: { message: error.message } }));
@@ -122,9 +134,16 @@
     ready,
     all: cached,
     refresh: async function () {
-      const tasks = await fetchAll();
-      replaceCache(tasks);
-      return tasks;
+      if (syncFailed || pendingWrites || Date.now() - lastLocalWrite < 1500) return cached();
+      if (refreshPromise) return refreshPromise;
+      refreshPromise = (async () => {
+        const tasks = await fetchAll();
+        if (pendingWrites || Date.now() - lastLocalWrite < 1500) return cached();
+        replaceCache(tasks);
+        return tasks;
+      })();
+      try { return await refreshPromise; }
+      finally { refreshPromise = null; }
     },
     remove: async function (id) {
       await queue.catch(() => undefined);
@@ -142,4 +161,17 @@
       return queue;
     },
   };
+
+  window.addEventListener?.("focus", () => window.FulianTaskStore.refresh().catch(() => undefined));
+  document.addEventListener?.("visibilitychange", () => {
+    if (!document.hidden) window.FulianTaskStore.refresh().catch(() => undefined);
+  });
+  window.addEventListener?.("storage", event => {
+    if (event.storageArea === localStorage && event.key === KEY) window.FulianTaskStore.refresh().catch(() => undefined);
+  });
+  if (typeof setInterval === "function") {
+    setInterval(() => {
+      if (!document.hidden) window.FulianTaskStore.refresh().catch(() => undefined);
+    }, 30000);
+  }
 })();

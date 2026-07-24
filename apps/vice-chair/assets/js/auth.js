@@ -18,7 +18,7 @@
     updatedAt:"2026-07-20T00:00:00+08:00"
   };
   const supabase=window.FulianSupabaseConfig||{};
-  let refreshTimer=0,lastActivityWrite=0;
+  let refreshTimer=0,lastActivityWrite=0,refreshPromise=null,sessionEpoch=0;
 
   function clone(value){return JSON.parse(JSON.stringify(value));}
   function sanitizedAccounts(){return clone(defaults.accounts);}
@@ -55,7 +55,7 @@
     catch{return null;}
   }
   function setSession(session){sessionStorage.setItem(SESSION_KEY,JSON.stringify(session));}
-  function clearSession(){clearTimeout(refreshTimer);sessionStorage.removeItem(SESSION_KEY);}
+  function clearSession(){sessionEpoch+=1;clearTimeout(refreshTimer);sessionStorage.removeItem(SESSION_KEY);}
   function apiHeaders(accessToken){
     const headers={apikey:supabase.publishableKey,"Content-Type":"application/json"};
     if(accessToken)headers.Authorization=`Bearer ${accessToken}`;
@@ -81,7 +81,8 @@
     return account;
   }
   async function loadCommitteeRoster(accessToken){
-    const rows=await jsonRequest("/rest/v1/committee_terms?status=eq.active&select=role,people!inner(display_name)&order=created_at.asc",{
+    const today=new Date().toISOString().slice(0,10);
+    const rows=await jsonRequest(`/rest/v1/committee_terms?status=eq.active&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&people.status=eq.active&select=role,people!inner(display_name,status)&order=created_at.asc`,{
       headers:apiHeaders(accessToken)
     });
     const active=Array.isArray(rows)?rows:[];
@@ -118,7 +119,7 @@
       const name=sessionName(expected.role,committeeName);
       if(expected.role==="vp"&&!name)throw new Error("Supabase 尚未設定現任副主席");
       if(expected.role==="committee"&&!name){
-        try{await fetch(`${supabase.url}/auth/v1/logout`,{method:"POST",headers:apiHeaders(token.access_token)});}catch{}
+        try{await fetch(`${supabase.url}/auth/v1/logout?scope=local`,{method:"POST",headers:apiHeaders(token.access_token)});}catch{}
         return{ok:false,needsMember:true,committee:roster.committee,message:"請選擇你的會員委員姓名"};
       }
       const now=Date.now();
@@ -142,7 +143,7 @@
   function validate(session=getSession()){
     if(!session||!session.accessToken||!session.refreshToken||!session.userId)return false;
     const now=Date.now(),lastActive=Number(session.lastActiveAt||0);
-    if(!lastActive||now-lastActive>INACTIVITY_MS||Number(session.expiresAt||0)<=now)return false;
+    if(!lastActive||now-lastActive>INACTIVITY_MS)return false;
     const name=sessionName(session.role,session.name);
     if(!name)return false;
     if(name!==session.name){session.name=name;setSession(session);}
@@ -153,26 +154,35 @@
     const map={manageCredentials:["admin"],setVicePresident:["admin"],manageCommittee:["admin","vp"],finalConfirm:["vp"],feedback:["vp","committee"],vote:["vp","committee"],view:["admin","vp","committee"]};
     return(map[permission]||[]).includes(session.role);
   }
-  async function refreshSession(){
-    const current=getSession();
-    if(!current||!current.refreshToken)throw new Error("登入已逾時");
-    if(Date.now()-Number(current.lastActiveAt||0)>INACTIVITY_MS)throw new Error("登入已逾時");
-    const token=await jsonRequest("/auth/v1/token?grant_type=refresh_token",{
-      method:"POST",
-      headers:apiHeaders(),
-      body:JSON.stringify({refresh_token:current.refreshToken})
-    });
-    const account=await loadAccount(token.access_token,current.userId);
-    if(account.role!==current.role)throw new Error("帳號權限已變更，請重新登入");
-    const updated={
-      ...current,
-      accessToken:token.access_token,
-      refreshToken:token.refresh_token||current.refreshToken,
-      expiresAt:Date.now()+Number(token.expires_in||3600)*1000
-    };
-    setSession(updated);
-    scheduleRefresh(updated);
-    return updated;
+  async function refreshSession(expectedAccessToken=""){
+    const latest=getSession();
+    if(expectedAccessToken&&latest?.accessToken&&latest.accessToken!==expectedAccessToken)return latest;
+    if(refreshPromise)return refreshPromise;
+    refreshPromise=(async()=>{
+      const current=getSession();
+      const refreshEpoch=sessionEpoch;
+      if(!current||!current.refreshToken)throw new Error("登入已逾時");
+      if(Date.now()-Number(current.lastActiveAt||0)>INACTIVITY_MS)throw new Error("登入已逾時");
+      const token=await jsonRequest("/auth/v1/token?grant_type=refresh_token",{
+        method:"POST",
+        headers:apiHeaders(),
+        body:JSON.stringify({refresh_token:current.refreshToken})
+      });
+      const account=await loadAccount(token.access_token,current.userId);
+      if(account.role!==current.role)throw new Error("帳號權限已變更，請重新登入");
+      if(refreshEpoch!==sessionEpoch||!getSession())throw new Error("登入已登出");
+      const updated={
+        ...current,
+        accessToken:token.access_token,
+        refreshToken:token.refresh_token||current.refreshToken,
+        expiresAt:Date.now()+Number(token.expires_in||3600)*1000
+      };
+      setSession(updated);
+      scheduleRefresh(updated);
+      return updated;
+    })();
+    try{return await refreshPromise;}
+    finally{refreshPromise=null;}
   }
   function expireSession(){
     clearSession();
@@ -200,7 +210,7 @@
     const session=getSession();
     clearSession();
     if(session?.accessToken&&authReady()){
-      try{await fetch(`${supabase.url}/auth/v1/logout`,{method:"POST",headers:apiHeaders(session.accessToken)});}catch{}
+      try{await fetch(`${supabase.url}/auth/v1/logout?scope=local`,{method:"POST",headers:apiHeaders(session.accessToken)});}catch{}
     }
     location.href="login.html";
   }
@@ -217,14 +227,14 @@
   async function authorizedFetch(path,options={}){
     let session=getSession();
     if(!validate(session))throw new Error("登入已逾時");
-    if(Number(session.expiresAt)-Date.now()<30000)session=await refreshSession();
+    if(Number(session.expiresAt)-Date.now()<30000)session=await refreshSession(session.accessToken);
     const request=()=>fetch(`${supabase.url}${path}`,{
       ...options,
       headers:{...apiHeaders(session.accessToken),...(options.headers||{})}
     });
     let response=await request();
     if(response.status===401){
-      session=await refreshSession();
+      session=await refreshSession(session.accessToken);
       response=await fetch(`${supabase.url}${path}`,{
         ...options,
         headers:{...apiHeaders(session.accessToken),...(options.headers||{})}

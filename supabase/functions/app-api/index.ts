@@ -112,7 +112,8 @@ async function authenticate(request: Request, identity: string): Promise<Context
     const people = await db(`people?display_name=eq.${encodeURIComponent(name)}&status=eq.active&select=id,display_name&limit=1`);
     person = people?.[0];
     if (!person) throw Object.assign(new Error("登入姓名不在有效名單"), { status: 403 });
-    const terms = await db(`committee_terms?person_id=eq.${person.id}&role=eq.${role}&status=eq.active&select=id&limit=1`);
+    const today = new Date().toISOString().slice(0, 10);
+    const terms = await db(`committee_terms?person_id=eq.${person.id}&role=eq.${role}&status=eq.active&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&select=id&limit=1`);
     if (!terms?.length) throw Object.assign(new Error("登入姓名不具當期角色"), { status: 403 });
   }
   return { authorization, userId: user.id, role, identity, name, personId: person.id };
@@ -1192,6 +1193,17 @@ async function completeAssignedTask(input: any, context: Context) {
   if (!updated?.length) throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
 }
 
+async function deleteFormalTaskCase(caseId: string | null) {
+  if (!caseId) return;
+  const snapshots = await db(`vote_snapshots?case_id=eq.${caseId}&select=id`);
+  for (const snapshot of snapshots || []) {
+    await db(`votes?snapshot_id=eq.${snapshot.id}`, { method: "DELETE" });
+    await db(`vote_snapshot_voters?snapshot_id=eq.${snapshot.id}`, { method: "DELETE" });
+    await db(`vote_snapshots?id=eq.${snapshot.id}`, { method: "DELETE" });
+  }
+  await db(`cases?id=eq.${caseId}`, { method: "DELETE" });
+}
+
 async function tasksApi(request: Request, context: Context) {
   if (request.method === "GET") return taskResponse(context);
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
@@ -1201,7 +1213,7 @@ async function tasksApi(request: Request, context: Context) {
     leadership(context);
     const id = String(body.id || "").trim();
     if (!id) throw new Error("缺少要刪除的案件編號");
-    const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,revision&limit=1`);
+    const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,case_id,revision&limit=1`);
     const row = rows?.[0];
     if (!row) return taskResponse(context);
     const files = await db(`task_case_files?task_id=eq.${row.id}&select=object_path`);
@@ -1217,6 +1229,7 @@ async function tasksApi(request: Request, context: Context) {
       }
       throw error;
     }
+    await deleteFormalTaskCase(row.case_id);
     for (const file of files || []) {
       await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
     }
@@ -1244,7 +1257,7 @@ async function tasksApi(request: Request, context: Context) {
 }
 
 async function taskAccess(sourceReference: string, context: Context) {
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,source_reference,category,lead_person_id,revision&limit=1`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,case_id,member_id,title,source_reference,category,lead_person_id,revision&limit=1`);
   const task = rows?.[0];
   if (!task) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
   const assignments = await db(`task_assignments?task_id=eq.${task.id}&select=person_id`);
@@ -1252,15 +1265,93 @@ async function taskAccess(sourceReference: string, context: Context) {
   return { task, assigned, leadership: ["admin", "vp"].includes(context.role) };
 }
 
-function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole: boolean) {
+async function ensureTaskCase(access: any, context: Context) {
+  if (access.task.case_id) return access.task.case_id;
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員回饋與投票"), { status: 409 });
+  }
+  const caseId = await db("rpc/edge_ensure_task_case", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_task_id: access.task.id, p_actor: context.personId }),
+  });
+  access.task.case_id = String(caseId || "");
+  if (!access.task.case_id) throw new Error("正式案件對照建立失敗");
+  return access.task.case_id;
+}
+
+async function caseParticipationForCases(caseIds: string[]) {
+  const ids = [...new Set(caseIds.filter(Boolean))];
+  const result = new Map<string, any>();
+  if (!ids.length) return result;
+  const filter = `in.(${ids.join(",")})`;
+  const [people, feedback, snapshots] = await Promise.all([
+    db("people?select=id,display_name"),
+    db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,body,submitted_at,updated_at`),
+    db(`vote_snapshots?case_id=${filter}&select=id,case_id,status,opened_at,deadline_at,closed_at,original_base,eligible_base,majority_threshold,result,approve_count,reject_count`),
+  ]);
+  const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
+  const snapshotIds = (snapshots || []).map((snapshot: any) => snapshot.id);
+  const snapshotFilter = snapshotIds.length ? `in.(${snapshotIds.join(",")})` : "";
+  const [voters, votes] = snapshotIds.length
+    ? await Promise.all([
+      db(`vote_snapshot_voters?snapshot_id=${snapshotFilter}&select=snapshot_id,person_id,is_recused`),
+      db(`votes?snapshot_id=${snapshotFilter}&select=snapshot_id,voter_person_id,choice,cast_at`),
+    ])
+    : [[], []];
+  const snapshotByCase = new Map((snapshots || []).map((snapshot: any) => [snapshot.case_id, snapshot]));
+  for (const caseId of ids) {
+    const snapshot: any = snapshotByCase.get(caseId) || null;
+    const snapshotVoters = snapshot
+      ? (voters || []).filter((voter: any) => voter.snapshot_id === snapshot.id)
+      : [];
+    const snapshotVotes = snapshot
+      ? (votes || []).filter((vote: any) => vote.snapshot_id === snapshot.id)
+      : [];
+    result.set(caseId, {
+      feedback: Object.fromEntries((feedback || [])
+        .filter((item: any) => item.case_id === caseId)
+        .map((item: any) => [names.get(item.author_person_id), item.body])
+        .filter(([name]: any) => Boolean(name))),
+      voterSnapshot: snapshotVoters
+        .filter((voter: any) => !voter.is_recused)
+        .map((voter: any) => names.get(voter.person_id))
+        .filter(Boolean),
+      votes: Object.fromEntries(snapshotVotes
+        .map((vote: any) => [names.get(vote.voter_person_id), vote.choice])
+        .filter(([name]: any) => Boolean(name))),
+      snapshot,
+    });
+  }
+  return result;
+}
+
+function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole: boolean, participation: any = null, viewerName = "") {
   const decisionCase = ["renewal", "new", "industry"].includes(task.category);
+  const recusedApplicant = decisionCase
+    && Boolean(viewerName)
+    && String(task.title || "").trim() === String(viewerName).trim();
   const fullWorkflow = row?.workflow || {};
+  const participationWorkflow = decisionCase
+    ? {
+      ...fullWorkflow,
+      feedback: recusedApplicant
+        ? {}
+        : { ...(fullWorkflow.feedback || {}), ...(participation?.feedback || {}) },
+      voterSnapshot: participation?.snapshot
+        ? participation.voterSnapshot
+        : (Array.isArray(fullWorkflow.voterSnapshot) ? fullWorkflow.voterSnapshot : []),
+      votes: recusedApplicant
+        ? {}
+        : { ...(fullWorkflow.votes || {}), ...(participation?.votes || {}) },
+    }
+    : fullWorkflow;
   const workflow = leadershipRole || assigned || decisionCase
-    ? fullWorkflow
+    ? participationWorkflow
     : {
-      wordSaved: Boolean(fullWorkflow.wordSaved),
-      closed: Boolean(fullWorkflow.closed),
-      interviewCompletedAt: fullWorkflow.interviewCompletedAt || "",
+      wordSaved: Boolean(participationWorkflow.wordSaved),
+      closed: Boolean(participationWorkflow.closed),
+      interviewCompletedAt: participationWorkflow.interviewCompletedAt || "",
     };
   return {
     taskId: task.source_reference,
@@ -1271,10 +1362,119 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
   };
 }
 
+async function saveCaseStateRecord(access: any, existing: any, workflow: any, draft: any, context: Context) {
+  if (existing) {
+    const saved = await db(`task_case_states?task_id=eq.${access.task.id}&revision=eq.${existing.revision}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({ workflow, draft, revision: Number(existing.revision) + 1, updated_by: context.personId }),
+    });
+    if (!saved?.length) throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再操作"), { status: 409 });
+    return saved[0];
+  }
+  const saved = await db("task_case_states", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ task_id: access.task.id, workflow, draft, revision: 1, updated_by: context.personId }),
+  });
+  return saved[0];
+}
+
+async function caseStateResponse(access: any, row: any, context: Context) {
+  const participation = access.task.case_id
+    ? (await caseParticipationForCases([access.task.case_id])).get(access.task.case_id)
+    : null;
+  return visibleCaseState(row, access.task, access.assigned, access.leadership, participation, context.name);
+}
+
+function normalizedDeadline(value: unknown) {
+  const raw = String(value || "").trim();
+  if (!raw) throw new Error("請先設定投票截止時間");
+  const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?$/.test(raw)
+    ? `${raw}${raw.length === 16 ? ":00" : ""}+08:00`
+    : raw;
+  const deadline = new Date(normalized);
+  if (!Number.isFinite(deadline.getTime())) throw new Error("投票截止時間格式不正確");
+  if (deadline.getTime() <= Date.now()) throw new Error("投票期限已截止，請先更新截止時間");
+  return deadline.toISOString();
+}
+
+async function activeVotingRoster() {
+  const today = new Date().toISOString().slice(0, 10);
+  return db(`committee_terms?status=eq.active&has_voting_right=eq.true&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&people.status=eq.active&select=id,person_id,role,people!inner(display_name,status)&order=created_at.asc`);
+}
+
+async function openVoteSnapshot(access: any, existing: any, workflow: any, context: Context, materializeLegacy = false) {
+  if (context.role !== "vp" && !materializeLegacy) throw Object.assign(new Error("只有副主席可以開啟投票"), { status: 403 });
+  if (materializeLegacy && !existing?.workflow?.votingOpen) {
+    throw Object.assign(new Error("投票尚未由副主席開啟"), { status: 409 });
+  }
+  const caseId = await ensureTaskCase(access, context);
+  const current = await db(`vote_snapshots?case_id=eq.${caseId}&select=*&limit=1`);
+  if (current?.[0]) return current[0];
+  const roster = await activeVotingRoster();
+  const applicant = String(access.task.title || "").trim();
+  const eligible = (roster || []).filter((term: any) => String(term.people?.display_name || "").trim() !== applicant);
+  const participation = (await caseParticipationForCases([caseId])).get(caseId);
+  const feedback = { ...(existing?.workflow?.feedback || {}), ...(participation?.feedback || {}) };
+  const feedbackCount = eligible.filter((term: any) => String(feedback[term.people.display_name] || "").trim()).length;
+  const threshold = Math.floor(eligible.length / 2) + 1;
+  if (feedbackCount < threshold) {
+    throw Object.assign(new Error(`回饋尚未達門檻，目前 ${feedbackCount} 份、至少需要 ${threshold} 份`), { status: 409 });
+  }
+  const deadlineAt = normalizedDeadline(workflow?.form?.voteDeadline);
+  const created = await db("vote_snapshots", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      case_id: caseId,
+      status: "draft",
+      deadline_at: deadlineAt,
+      original_base: (roster || []).length,
+      eligible_base: eligible.length,
+    }),
+  });
+  const snapshot = created[0];
+  const voterRows = (roster || []).map((term: any) => {
+    const isRecused = String(term.people?.display_name || "").trim() === applicant;
+    return {
+      snapshot_id: snapshot.id,
+      person_id: term.person_id,
+      role: term.role,
+      term_id: term.id,
+      is_recused: isRecused,
+      recusal_reason: isRecused ? "申請者本人強制迴避" : null,
+    };
+  });
+  if (voterRows.length) {
+    await db("vote_snapshot_voters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(voterRows),
+    });
+  }
+  const opened = await db(`vote_snapshots?id=eq.${snapshot.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ status: "open", opened_at: new Date().toISOString() }),
+  });
+  await db(`cases?id=eq.${caseId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ stage: "vote", updated_by: context.personId }),
+  });
+  await db("case_events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ case_id: caseId, event_type: "vote.opened", actor_person_id: context.personId, details: { eligibleBase: eligible.length, deadlineAt } }),
+  });
+  return opened[0];
+}
+
 async function caseStatesApi(request: Request, context: Context) {
   if (request.method === "GET") {
     const [tasks, assignments, states] = await Promise.all([
-      db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,category`),
+      db(`tasks?source=eq.${TASK_SOURCE}&select=id,case_id,member_id,title,source_reference,category`),
       db("task_assignments?select=task_id,person_id"),
       db("task_case_states?select=task_id,workflow,draft,revision"),
     ]);
@@ -1283,9 +1483,10 @@ async function caseStatesApi(request: Request, context: Context) {
       .filter((row: any) => row.person_id === context.personId)
       .map((row: any) => row.task_id));
     const leadershipRole = ["admin", "vp"].includes(context.role);
+    const participation = await caseParticipationForCases((tasks || []).map((task: any) => task.case_id).filter(Boolean));
     return {
       states: (tasks || []).map((task: any) =>
-        visibleCaseState(stateByTask.get(task.id), task, assignedIds.has(task.id), leadershipRole)
+        visibleCaseState(stateByTask.get(task.id), task, assignedIds.has(task.id), leadershipRole, participation.get(task.case_id), context.name)
       ),
     };
   }
@@ -1295,12 +1496,102 @@ async function caseStatesApi(request: Request, context: Context) {
   const rows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
   const existing = rows?.[0] || null;
   const expectedRevision = Number(body.revision || 0);
+  const currentWorkflow = existing?.workflow || {};
+  const currentDraft = existing?.draft || {};
+
+  if (body.kind === "feedback") {
+    if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能提交委員回饋"), { status: 403 });
+    if (currentWorkflow.closed) throw Object.assign(new Error("案件已結案，無法修改回饋"), { status: 409 });
+    const value = String(body.value || "").trim().slice(0, 10000);
+    if (!value) throw new Error("請先填寫回饋內容");
+    const caseId = await ensureTaskCase(access, context);
+    await db("case_feedback?on_conflict=case_id,author_person_id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ case_id: caseId, author_person_id: context.personId, body: value, updated_at: new Date().toISOString() }),
+    });
+    await db("case_events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ case_id: caseId, event_type: "feedback.saved", actor_person_id: context.personId, details: { source: "app-api" } }),
+    });
+    return caseStateResponse(access, existing, context);
+  }
+
+  if (body.kind === "vote") {
+    if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能參與投票"), { status: 403 });
+    if (currentWorkflow.closed) throw Object.assign(new Error("案件已結案，無法投票"), { status: 409 });
+    if (!currentWorkflow.votingOpen || !currentWorkflow.voteNoticeSent) {
+      throw Object.assign(new Error("投票尚未開放或尚未通知"), { status: 409 });
+    }
+    const choice = String(body.value || "");
+    if (!["approve", "reject"].includes(choice)) throw new Error("投票選項不正確");
+    const caseId = await ensureTaskCase(access, context);
+    let snapshots = await db(`vote_snapshots?case_id=eq.${caseId}&select=*&limit=1`);
+    if (!snapshots?.[0]) {
+      await openVoteSnapshot(access, existing, currentWorkflow, context, true);
+      snapshots = await db(`vote_snapshots?case_id=eq.${caseId}&select=*&limit=1`);
+    }
+    const snapshot = snapshots[0];
+    const voterRows = await db(`vote_snapshot_voters?snapshot_id=eq.${snapshot.id}&person_id=eq.${context.personId}&is_recused=eq.false&select=person_id&limit=1`);
+    if (!voterRows?.length) throw Object.assign(new Error("你不在本案投票資格快照中"), { status: 403 });
+    const legacyChoice = currentWorkflow.votes?.[context.name];
+    const prior = await db(`votes?snapshot_id=eq.${snapshot.id}&voter_person_id=eq.${context.personId}&select=choice&limit=1`);
+    const existingChoice = prior?.[0]?.choice || legacyChoice;
+    if (existingChoice) {
+      if (existingChoice !== choice) {
+        throw Object.assign(new Error("你已完成投票；既有票不得修改，如需更正請由 Admin 留存原因處理"), { status: 409 });
+      }
+      return caseStateResponse(access, existing, context);
+    }
+    await db("votes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ snapshot_id: snapshot.id, voter_person_id: context.personId, choice, actor_auth_user_id: context.userId }),
+    });
+    await db("case_events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ case_id: caseId, event_type: "vote.cast", actor_person_id: context.personId, details: { source: "app-api" } }),
+    });
+    return caseStateResponse(access, existing, context);
+  }
+
   if (existing && expectedRevision !== Number(existing.revision)) {
     throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再操作"), { status: 409 });
   }
-  let workflow = existing?.workflow || {};
-  let draft = existing?.draft || {};
-  if (body.kind === "draft") {
+  let workflow = currentWorkflow;
+  let draft = currentDraft;
+  let voteDeadlineUpdate = "";
+
+  if (body.kind === "open-vote") {
+    const proposed = body.value && typeof body.value === "object" ? body.value : {};
+    await openVoteSnapshot(access, existing, proposed, context);
+    workflow = {
+      ...proposed,
+      votingOpen: true,
+      feedback: currentWorkflow.feedback || {},
+      votes: currentWorkflow.votes || {},
+      voterSnapshot: currentWorkflow.voterSnapshot || [],
+    };
+  } else if (body.kind === "reset") {
+    leadership(context);
+    if (access.task.case_id) {
+      const snapshots = await db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=id`);
+      for (const snapshot of snapshots || []) {
+        await db(`votes?snapshot_id=eq.${snapshot.id}`, { method: "DELETE" });
+        await db(`vote_snapshot_voters?snapshot_id=eq.${snapshot.id}`, { method: "DELETE" });
+        await db(`vote_snapshots?id=eq.${snapshot.id}`, { method: "DELETE" });
+      }
+      await db(`case_feedback?case_id=eq.${access.task.case_id}`, { method: "DELETE" });
+      await db(`cases?id=eq.${access.task.case_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ stage: "feedback", completed_at: null, updated_by: context.personId }),
+      });
+    }
+    workflow = {};
+  } else if (body.kind === "draft") {
     if (!access.leadership && !access.assigned) {
       throw Object.assign(new Error("只有副主席或本案受指派人員可以保存訪談草稿"), { status: 403 });
     }
@@ -1308,22 +1599,20 @@ async function caseStatesApi(request: Request, context: Context) {
   } else if (body.kind === "workflow") {
     const proposed = body.value && typeof body.value === "object" ? body.value : {};
     if (access.leadership) {
-      workflow = proposed;
-    } else {
-      const feedback = { ...(workflow.feedback || {}) };
-      const votes = { ...(workflow.votes || {}) };
-      if (Object.prototype.hasOwnProperty.call(proposed.feedback || {}, context.name)) {
-        feedback[context.name] = String(proposed.feedback[context.name] || "").slice(0, 10000);
-      }
+      workflow = {
+        ...proposed,
+        feedback: currentWorkflow.feedback || {},
+        votes: currentWorkflow.votes || {},
+        voterSnapshot: currentWorkflow.voterSnapshot || [],
+      };
       if (
-        workflow.votingOpen
-        && workflow.voteNoticeSent
-        && Array.isArray(workflow.voterSnapshot)
-        && workflow.voterSnapshot.includes(context.name)
-        && ["approve", "reject"].includes(proposed.votes?.[context.name])
+        currentWorkflow.votingOpen
+        && proposed.form?.voteDeadline
+        && proposed.form.voteDeadline !== currentWorkflow.form?.voteDeadline
       ) {
-        votes[context.name] = proposed.votes[context.name];
+        voteDeadlineUpdate = normalizedDeadline(proposed.form.voteDeadline);
       }
+    } else {
       if (access.assigned) {
         const protectedKeys = new Set([
           "votingOpen", "voteNoticeSent", "voterSnapshot", "leadersSent",
@@ -1335,28 +1624,39 @@ async function caseStatesApi(request: Request, context: Context) {
         }
         if (["midterm", "departure"].includes(access.task.category) && proposed.wordSaved) workflow.closed = true;
       }
-      workflow.feedback = feedback;
-      workflow.votes = votes;
     }
   } else {
     throw new Error("不支援的案件同步類型");
   }
-  let saved;
-  if (existing) {
-    saved = await db(`task_case_states?task_id=eq.${access.task.id}&revision=eq.${existing.revision}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ workflow, draft, revision: Number(existing.revision) + 1, updated_by: context.personId }),
-    });
-    if (!saved?.length) throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再操作"), { status: 409 });
-  } else {
-    saved = await db("task_case_states", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
-      body: JSON.stringify({ task_id: access.task.id, workflow, draft, revision: 1, updated_by: context.personId }),
-    });
+
+  const saved = await saveCaseStateRecord(access, existing, workflow, draft, context);
+  if (access.task.case_id && body.kind === "workflow") {
+    if (voteDeadlineUpdate) {
+      await db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ deadline_at: voteDeadlineUpdate }),
+      });
+    }
+    if (workflow.closed) {
+      await db(`cases?id=eq.${access.task.case_id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ stage: "closed", completed_at: new Date().toISOString(), updated_by: context.personId }),
+      });
+      await db(`case_feedback?case_id=eq.${access.task.case_id}&locked_at=is.null`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ locked_at: new Date().toISOString() }),
+      });
+      await db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "closed", closed_at: new Date().toISOString() }),
+      });
+    }
   }
-  return visibleCaseState(saved[0], access.task, access.assigned, access.leadership);
+  return caseStateResponse(access, saved, context);
 }
 
 function decodeBase64(value: string) {
@@ -1445,7 +1745,7 @@ async function testResetApi(request: Request, context: Context) {
   leadership(context);
   const [meetings, tasks, files] = await Promise.all([
     db("committee_meetings?select=id"),
-    db(`tasks?source=eq.${TASK_SOURCE}&select=id`),
+    db(`tasks?source=eq.${TASK_SOURCE}&select=id,case_id`),
     db("task_case_files?select=object_path"),
   ]);
   if (request.method === "GET") return { meetings: meetings.length, tasks: tasks.length, files: files.length };
@@ -1454,6 +1754,9 @@ async function testResetApi(request: Request, context: Context) {
   if (body.confirmation !== "RESET_FULIAN_TEST_DATA") throw new Error("缺少測試資料清除確認");
   await db("committee_meetings?id=not.is.null", { method: "DELETE" });
   await db(`tasks?source=eq.${TASK_SOURCE}`, { method: "DELETE" });
+  for (const caseId of [...new Set((tasks || []).map((task: any) => task.case_id).filter(Boolean))]) {
+    await deleteFormalTaskCase(String(caseId));
+  }
   for (const file of files || []) {
     await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
   }

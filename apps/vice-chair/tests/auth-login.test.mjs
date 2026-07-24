@@ -50,7 +50,7 @@ assert.match(edgeFunction,/passwords\[role\]\.length<12/);
 
 for(const file of readdirSync(appUrl).filter(name=>name.endsWith(".html"))){
   const page=readFileSync(new URL(file,appUrl),"utf8");
-  const authIndex=page.indexOf("assets/js/auth.js?v=5");
+  const authIndex=page.indexOf("assets/js/auth.js?v=6");
   if(authIndex<0)continue;
   const configIndex=page.indexOf("assets/js/supabase-config.js?v=1");
   assert.ok(configIndex>=0&&configIndex<authIndex,`${file} 必須先載入 Supabase 公開設定`);
@@ -134,5 +134,61 @@ assert.equal(committeeResult.ok,false);
 assert.equal(committeeResult.needsMember,true);
 assert.deepEqual(Array.from(committeeResult.committee),["測試委員甲","測試委員乙"]);
 assert.equal(committeeSandbox.FulianAuth.getConfig().vpName,"測試副主席");
+
+const logoutUrls=[];
+const logoutSandbox=authSandbox(async url=>{
+  logoutUrls.push(String(url));
+  if(url.includes("/auth/v1/token"))return response(200,{
+    access_token:"logout-access",
+    refresh_token:"logout-refresh",
+    expires_in:3600,
+    user:{id:"admin-user"}
+  });
+  if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"admin",enabled:true}]);
+  if(url.includes("/rest/v1/committee_terms"))return response(200,[]);
+  if(url.includes("/auth/v1/logout"))return response(204,{});
+  throw new Error(`unexpected URL ${url}`);
+});
+assert.equal((await logoutSandbox.FulianAuth.login("admin","anything","")).ok,true);
+await logoutSandbox.FulianAuth.logout();
+assert.ok(logoutUrls.some(url=>url.includes("/auth/v1/logout?scope=local")),"登出只能撤銷目前裝置的工作階段");
+
+let refreshCalls=0;
+let releaseRefresh;
+const refreshGate=new Promise(resolve=>{releaseRefresh=resolve});
+const refreshSandbox=authSandbox(async url=>{
+  if(url.includes("grant_type=password"))return response(200,{
+    access_token:"old-access",
+    refresh_token:"old-refresh",
+    expires_in:3600,
+    user:{id:"admin-user"}
+  });
+  if(url.includes("grant_type=refresh_token")){
+    refreshCalls+=1;
+    await refreshGate;
+    return response(200,{
+      access_token:"new-access",
+      refresh_token:"new-refresh",
+      expires_in:3600,
+      user:{id:"admin-user"}
+    });
+  }
+  if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"admin",enabled:true}]);
+  if(url.includes("/rest/v1/committee_terms"))return response(200,[]);
+  if(url.includes("/rest/v1/test"))return response(200,{ok:true});
+  throw new Error(`unexpected URL ${url}`);
+});
+assert.equal((await refreshSandbox.FulianAuth.login("admin","anything","")).ok,true);
+const expiring=refreshSandbox.FulianAuth.getSession();
+expiring.expiresAt=Date.now()-1;
+refreshSandbox.sessionStorage.setItem("fulian-auth-session-v1",JSON.stringify(expiring));
+const concurrentRequests=[
+  refreshSandbox.FulianAuth.authorizedFetch("/rest/v1/test"),
+  refreshSandbox.FulianAuth.authorizedFetch("/rest/v1/test"),
+  refreshSandbox.FulianAuth.authorizedFetch("/rest/v1/test")
+];
+releaseRefresh();
+await Promise.all(concurrentRequests);
+assert.equal(refreshCalls,1,"同一分頁的並行請求只能共用一次 refresh token 更新");
 
 console.log("auth login tests passed");

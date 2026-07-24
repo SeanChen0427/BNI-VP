@@ -62,6 +62,8 @@ BNI 分析工具
 - 登入後以 `app_accounts` RLS 資料再次驗證 Admin／副主席／會員委員角色；停用或角色不一致即拒絕登入。
 - 現任角色姓名由登入後的 `committee_terms` 查詢載入，不嵌入 GitHub Pages。
 - token 只保存於分頁 `sessionStorage`，接近到期時自動更新；關閉分頁即移除，8 小時未操作要求重新登入。
+- 登出固定使用 Supabase Auth `scope=local`，只撤銷目前裝置的 refresh token；首次登入尚未選姓名時亦不得讓共用帳號的其他裝置失效。
+- 同分頁的並行請求共用一次 token refresh，並在後端驗證人員狀態與任期起訖。
 - Admin 透過 `manage-shared-credentials` Edge Function 一次更新三組密碼；函式再次檢查 Supabase 使用者與 `app_accounts.role = admin`，service role key 只存在函式環境。
 
 ## 四、BNI 分析橋接層
@@ -135,7 +137,7 @@ BNI 分析工具
 1. 已建立第一版橋接格式、解析器與自動測試。
 2. 已在副主席系統加入「會員關懷儀表板」，本機唯讀目前 BNI 分析成果。
 3. 已建立 Supabase 專案、Auth、資料表、私人 buckets 與 RLS。
-4. 已遷移 44 位會員、12 份原始報表與第一版已發布分析快照；案件、附件、回饋、投票及現場點名仍待改存後端。
+4. 已遷移 44 位會員、12 份原始報表與第一版已發布分析快照；排程、案件草稿、附件、回饋、投票與現場點名均已接上 Supabase，課程進度等非正式個人狀態仍保留瀏覽器端。
 5. 已讓前台讀取正式分析快照，並完成月度上傳、月會、草稿審閱、確認發佈、離會、公司查詢、任務、訪談草稿、案件流程與 Word 附件的 Edge API 跨裝置同步。
 6. 已建立個人 AI API Key 的 Supabase Edge AES-GCM 加密綁定與三家官方申請教學。
 7. 串接只依系統資料回答的制度查詢 AI、LINE Bot 與備份／還原流程。

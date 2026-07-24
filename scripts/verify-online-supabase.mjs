@@ -89,7 +89,7 @@ const loginHtml = await loginResponse.text();
 if (
   !loginResponse.ok
   || !loginResponse.headers.get('content-type')?.includes('text/html')
-  || !loginHtml.includes('assets/js/auth.js?v=5')
+  || !loginHtml.includes('assets/js/auth.js?v=6')
   || !loginHtml.includes('id="loginForm"')
 ) {
   throw new Error(`正式登入頁驗證失敗：${loginResponse.status}`);

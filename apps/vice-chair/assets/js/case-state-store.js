@@ -14,6 +14,10 @@
   const revisions = new Map();
   let applyingServerState = false;
   let queue = Promise.resolve();
+  let pendingWrites = 0;
+  let lastEditingAt = 0;
+  let refreshPromise = null;
+  let syncFailed = false;
 
   function parse(value) {
     try {
@@ -64,7 +68,7 @@
     applyingServerState = false;
     revisions.set(state.taskId, Number(state.revision || 0));
     document.getElementById("caseSyncAlert")?.remove();
-    window.dispatchEvent(new CustomEvent("fulian:data-changed", { detail: { source: "supabase-case-state" } }));
+    window.dispatchEvent(new CustomEvent("fulian:data-changed", { detail: { source: "supabase-case-state", taskId: state.taskId } }));
   }
 
   async function save(info, value) {
@@ -81,6 +85,7 @@
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(data.message || `案件同步失敗：HTTP ${response.status}`);
+    syncFailed = false;
     applyState(data);
     return data;
   }
@@ -88,8 +93,13 @@
   function queueSave(key, value) {
     const info = infoForKey(key);
     if (!info) return queue;
-    queue = queue.catch(() => undefined).then(() => save(info, parse(value)));
+    queue = queue.catch(() => undefined).then(async () => {
+      pendingWrites += 1;
+      try { return await save(info, parse(value)); }
+      finally { pendingWrites -= 1; }
+    });
     queue.catch(error => {
+      syncFailed = true;
       console.error("Supabase case state sync failed", error);
       showError(error.message);
       window.dispatchEvent(new CustomEvent("fulian:case-sync-error", { detail: { message: error.message } }));
@@ -115,7 +125,33 @@
     return result;
   };
 
-  async function initialize() {
+  async function postAction(taskId, kind, value) {
+    if (refreshPromise) await refreshPromise.catch(() => undefined);
+    pendingWrites += 1;
+    try {
+      await queue.catch(() => undefined);
+      const response = await fetch("/api/case-states", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          taskId,
+          kind,
+          value,
+          revision: revisions.get(taskId) || 0,
+        }),
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || `案件操作失敗：HTTP ${response.status}`);
+      syncFailed = false;
+      applyState(data);
+      return data;
+    } finally {
+      pendingWrites -= 1;
+    }
+  }
+
+  async function initialize({ migrate = true } = {}) {
     await window.FulianTaskStore.ready;
     const localByTask = new Map(window.FulianTaskStore.all().map(task => [task.id, {
       workflow: parse(nativeGetItem.call(localStorage, domain.workflowStorageKey(task.id))),
@@ -126,13 +162,14 @@
     if (!response.ok || !Array.isArray(data.states)) {
       throw new Error(data.message || `案件資料載入失敗：HTTP ${response.status}`);
     }
+    if (!migrate && (pendingWrites || Date.now() - lastEditingAt < 1500)) return [];
     const serverIds = new Set();
     for (const state of data.states) {
       serverIds.add(state.taskId);
       const local = localByTask.get(state.taskId);
       const serverEmpty = Number(state.revision || 0) === 0;
       applyState(state);
-      if (serverEmpty && local) {
+      if (migrate && serverEmpty && local) {
         if (Object.keys(local.workflow).length) await save({ taskId: state.taskId, kind: "workflow" }, local.workflow);
         if (state.draft !== null && Object.keys(local.draft).length) {
           await save({ taskId: state.taskId, kind: "draft" }, local.draft);
@@ -142,7 +179,18 @@
     return data.states;
   }
 
-  const ready = initialize().catch(error => {
+  async function refresh() {
+    if (syncFailed || pendingWrites || Date.now() - lastEditingAt < 1500) return [];
+    if (refreshPromise) return refreshPromise;
+    refreshPromise = (async () => {
+      await window.FulianTaskStore.refresh().catch(() => undefined);
+      return initialize({ migrate: false });
+    })();
+    try { return await refreshPromise; }
+    finally { refreshPromise = null; }
+  }
+
+  const ready = initialize({ migrate: true }).catch(error => {
     console.error("Supabase case state bootstrap failed", error);
     showError(error.message);
     return [];
@@ -151,6 +199,26 @@
   window.FulianCaseStateStore = {
     ready,
     flush: () => queue,
-    refresh: initialize,
+    refresh,
+    saveFeedback: (taskId, value) => postAction(taskId, "feedback", value),
+    saveVote: (taskId, value) => postAction(taskId, "vote", value),
+    openVote: (taskId, workflow) => postAction(taskId, "open-vote", workflow),
+    reset: (taskId) => postAction(taskId, "reset", {}),
   };
+
+  document.addEventListener?.("input", event => {
+    if (event.target?.closest?.("[data-save], #myFeedback")) lastEditingAt = Date.now();
+  });
+  window.addEventListener?.("focus", () => refresh().catch(() => undefined));
+  document.addEventListener?.("visibilitychange", () => {
+    if (!document.hidden) refresh().catch(() => undefined);
+  });
+  window.addEventListener?.("storage", event => {
+    if (event.storageArea === localStorage && isCaseKey(event.key || "")) refresh().catch(() => undefined);
+  });
+  if (typeof setInterval === "function") {
+    setInterval(() => {
+      if (!document.hidden) refresh().catch(() => undefined);
+    }, 30000);
+  }
 })();

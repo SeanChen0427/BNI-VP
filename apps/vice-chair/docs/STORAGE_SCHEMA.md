@@ -47,8 +47,12 @@
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
-- `task_case_states`：既有工作台案件流程及五種訪談草稿的跨裝置狀態。
+- `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
+- `cases`＋`tasks.case_id`：工作台決議案件與正式案件主檔的對照。
+- `case_feedback`：每位副主席／委員在每案各自一筆回饋，案件＋回饋者唯一。
+- `vote_snapshots`／`vote_snapshot_voters`／`votes`：開票當下資格快照、申請者迴避與每人唯一且不可任意改寫的票。
+- `case_events`：回饋保存、開票及投票等後端確認事件。
 
 上述資料不得複製進 GitHub、公開備份範例或截圖。
 

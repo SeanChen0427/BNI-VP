@@ -21,7 +21,7 @@ test("所有排程頁面都載入最新版 Supabase task store", () => {
     "apps/vice-chair/departure-form.html",
   ];
   for (const page of pages) {
-    assert.match(read(page), /assets\/js\/task-store\.js\?v=2/, `${page} 未載入 task-store v2`);
+    assert.match(read(page), /assets\/js\/task-store\.js\?v=3/, `${page} 未載入 task-store v3`);
   }
 });
 
@@ -118,4 +118,97 @@ test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {
   assert.match(edge, /path === "\/api\/case-states"/);
   assert.match(edge, /path === "\/api\/task-file"/);
   assert.match(edge, /只有副主席或本案受指派人員可以保存訪談草稿/);
+});
+
+test("兩位委員同時提交回饋與投票時，各自資料不共用案件 revision", async () => {
+  const source = read("apps/vice-chair/assets/js/case-state-store.js");
+  const shared = { feedback: {}, votes: {} };
+
+  function client(identity) {
+    class FakeStorage {
+      constructor() { this.values = new Map(); }
+      getItem(key) { return this.values.has(key) ? this.values.get(key) : null; }
+      setItem(key, value) { this.values.set(key, String(value)); }
+      removeItem(key) { this.values.delete(key); }
+    }
+    const localStorage = new FakeStorage();
+    const document = {
+      hidden: false,
+      body: { append() {} },
+      getElementById() { return null; },
+      createElement() { return { style: {}, setAttribute() {} }; },
+      addEventListener() {},
+    };
+    const state = () => ({
+      taskId: "task-1",
+      workflow: {
+        feedback: { ...shared.feedback },
+        votes: { ...shared.votes },
+        votingOpen: true,
+        voteNoticeSent: true,
+        voterSnapshot: ["委員甲", "委員乙"],
+      },
+      draft: {},
+      revision: 7,
+    });
+    const context = {
+      console,
+      document,
+      localStorage,
+      Storage: FakeStorage,
+      CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
+      setInterval() { return 1; },
+      fetch: async (_url, options = {}) => {
+        if (!options.method) return { ok: true, status: 200, json: async () => ({ states: [state()] }) };
+        const body = JSON.parse(options.body);
+        if (body.kind === "feedback") shared.feedback[identity] = body.value;
+        if (body.kind === "vote") shared.votes[identity] = body.value;
+        return { ok: true, status: 200, json: async () => state() };
+      },
+    };
+    context.window = context;
+    context.window.addEventListener = () => {};
+    context.window.dispatchEvent = () => {};
+    context.window.FulianCaseDomain = {
+      DRAFT_PREFIX_BY_TYPE: {},
+      workflowStorageKey: id => `fulian-case-workflow-v2-${id}`,
+      draftStorageKey: () => "",
+    };
+    context.window.FulianTaskStore = {
+      ready: Promise.resolve(),
+      all: () => [{ id: "task-1" }],
+      refresh: async () => [],
+    };
+    vm.runInNewContext(source, context);
+    return context.window.FulianCaseStateStore;
+  }
+
+  const clientA = client("委員甲");
+  const clientB = client("委員乙");
+  await Promise.all([clientA.ready, clientB.ready]);
+  await Promise.all([
+    clientA.saveFeedback("task-1", "甲的獨立回饋"),
+    clientB.saveFeedback("task-1", "乙的獨立回饋"),
+  ]);
+  await Promise.all([
+    clientA.saveVote("task-1", "approve"),
+    clientB.saveVote("task-1", "reject"),
+  ]);
+
+  assert.deepEqual(shared.feedback, { 委員甲: "甲的獨立回饋", 委員乙: "乙的獨立回饋" });
+  assert.deepEqual(shared.votes, { 委員甲: "approve", 委員乙: "reject" });
+});
+
+test("正式案件參與資料由 Edge 驗證姓名、迴避、期限與單票不可改寫", () => {
+  const edge = read("supabase/functions/app-api/index.ts");
+  const migration = read("supabase/migrations/20260725103000_normalize_case_participation.sql");
+  assert.match(edge, /body\.kind === "feedback"/);
+  assert.match(edge, /body\.kind === "vote"/);
+  assert.match(edge, /body\.kind === "open-vote"/);
+  assert.match(edge, /既有票不得修改/);
+  assert.match(edge, /case_feedback\?on_conflict=case_id,author_person_id/);
+  assert.match(edge, /vote_snapshot_voters/);
+  assert.match(edge, /申請者本人強制迴避/);
+  assert.match(migration, /edge_ensure_task_case/);
+  assert.match(migration, /revoke all on public\.cases, public\.case_feedback/);
 });
