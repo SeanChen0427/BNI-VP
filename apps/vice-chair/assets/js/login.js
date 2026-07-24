@@ -13,10 +13,10 @@ function renderCommittee(names){
     committeeName.append(option);
   });
 }
-renderCommittee(config.committee);
+renderCommittee([]);
 function refreshCommittee(){committeeField.hidden=username.value.trim()!==config.accounts.committee.username;}
 username.addEventListener("input",refreshCommittee);
-const allowedPages=new Set(["index.html","case-board.html","case-workflow.html","case-archive.html","member-care.html","attendance.html","terminal-form.html","midterm-form.html","new-member-form.html","industry-change-form.html","departure-form.html","course.html","settings.html"]);
+const allowedPages=new Set(["index.html","case-board.html","case-workflow.html","case-archive.html","member-care.html","attendance.html","terminal-form.html","midterm-form.html","new-member-form.html","industry-change-form.html","departure-form.html","course.html","settings.html","analysis-review.html","monthly-meeting.html","useful-links.html"]);
 function safeNext(value){if(!value)return"index.html";try{const target=new URL(value,location.href),page=target.pathname.split("/").pop();return target.origin===location.origin&&allowedPages.has(page)?`${page}${target.search}${target.hash}`:"index.html"}catch{return"index.html"}}
 form.addEventListener("submit",async event=>{
   event.preventDefault();

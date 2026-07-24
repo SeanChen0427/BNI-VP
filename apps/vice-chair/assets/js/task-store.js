@@ -9,6 +9,8 @@
   let lastLocalWrite = 0;
   let refreshPromise = null;
   let syncFailed = false;
+  let conflictBlocked = false;
+  const retryTasks = new Map();
 
   function parse(value) {
     try {
@@ -60,8 +62,11 @@
       cache: "no-store",
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || `排程同步失敗：HTTP ${response.status}`);
-    syncFailed = false;
+    if (!response.ok) {
+      const error = new Error(data.message || `排程同步失敗：HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
     replaceCache(data.tasks);
     return data.tasks;
   }
@@ -74,18 +79,49 @@
   function queueUpsert(before, after) {
     const changed = changedTasks(before, after);
     if (!changed.length) return queue;
+    changed.forEach(task => retryTasks.set(task.id, task));
     queue = queue.catch(() => undefined).then(async () => {
       pendingWrites += 1;
-      try { return await api({ action: "upsert", tasks: changed }); }
+      try {
+        const batch = [...retryTasks.values()];
+        const tasks = await api({ action: "upsert", tasks: batch });
+        batch.forEach(task => {
+          if (retryTasks.get(task.id) === task) retryTasks.delete(task.id);
+        });
+        syncFailed = retryTasks.size > 0;
+        return tasks;
+      }
       finally { pendingWrites -= 1; }
     });
     queue.catch(error => {
       syncFailed = true;
+      if (error.status === 409) conflictBlocked = true;
       console.error("Supabase task sync failed", error);
       showError(error.message);
       window.dispatchEvent(new CustomEvent("fulian:task-sync-error", { detail: { message: error.message } }));
     });
     return queue;
+  }
+
+  async function retryPending() {
+    if (!retryTasks.size) return cached();
+    const batch = [...retryTasks.values()];
+    pendingWrites += 1;
+    try {
+      const tasks = await api({ action: "upsert", tasks: batch });
+      batch.forEach(task => {
+        if (retryTasks.get(task.id) === task) retryTasks.delete(task.id);
+      });
+      syncFailed = retryTasks.size > 0;
+      if (!syncFailed) queue = Promise.resolve(tasks);
+      return tasks;
+    } catch (error) {
+      syncFailed = true;
+      showError(error.message);
+      throw error;
+    } finally {
+      pendingWrites -= 1;
+    }
   }
 
   Storage.prototype.setItem = function (key, value) {
@@ -134,11 +170,13 @@
     ready,
     all: cached,
     refresh: async function () {
-      if (syncFailed || pendingWrites || Date.now() - lastLocalWrite < 1500) return cached();
+      if (conflictBlocked || pendingWrites || Date.now() - lastLocalWrite < 1500) return cached();
       if (refreshPromise) return refreshPromise;
       refreshPromise = (async () => {
+        if (retryTasks.size) return retryPending();
         const tasks = await fetchAll();
         if (pendingWrites || Date.now() - lastLocalWrite < 1500) return cached();
+        syncFailed = false;
         replaceCache(tasks);
         return tasks;
       })();
@@ -150,7 +188,9 @@
       const task = cached().find(item => item.id === id);
       if (!task) return cached();
       try {
-        return await api({ action: "delete", id, revision: task._revision });
+        const tasks = await api({ action: "delete", id, revision: task._revision });
+        syncFailed = false;
+        return tasks;
       } catch (error) {
         showError(error.message);
         await this.refresh().catch(() => undefined);

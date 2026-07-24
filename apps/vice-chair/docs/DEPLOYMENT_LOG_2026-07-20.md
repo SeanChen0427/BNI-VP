@@ -4,6 +4,14 @@
 
 本文件如實記錄 2026-07-20 的實際操作、驗證結果、錯誤繞路與後續清理事項。不得把暫時網址或未完成項目描述為正式上架完成。
 
+## 2026-07-25 後續修正部署
+
+- 已套用 `20260725150000_transactional_case_operations.sql`：開票、案件狀態、正式結案、任務完成、回饋、投票、重設與刪除改為 service-role-only 交易 RPC。
+- migration 已補搬具正式資格快照的舊版 JSON 票，並以 `LEGACY_MIGRATION` 保留來源；沒有正式快照的舊案會在首次開票／投票時交易式補搬。
+- `app-api` 已部署為 version 12、狀態 `ACTIVE`、`verify_jwt = true`。
+- 前台資產版本更新為 `auth v7`、`task-store v4`、`case-state-store v3`、`login v4`、`case-workflow v15`，避免 GitHub Pages／瀏覽器沿用舊快取。
+- 完整驗證：32／32 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
+
 ## 一、已確認的最終架構
 
 Sean 再次確認正式架構維持：

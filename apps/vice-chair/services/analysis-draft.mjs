@@ -16,6 +16,9 @@ const PUBLISHED_FILE = path.join(STORE_DIR, "analysis-published.json");
 
 const REVIEW_MODELS = { openai: "gpt-5.6-luna", gemini: "gemini-3.5-flash", anthropic: "claude-sonnet-5" };
 const REVIEW_MAX_TOKENS = 6000;
+const taipeiDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(date);
 
 async function ensureStoreDir() {
   await mkdir(STORE_DIR, { recursive: true, mode: 0o700 });
@@ -38,7 +41,7 @@ export async function readPublished() { return readJsonFile(PUBLISHED_FILE, { ve
 
 async function runEngine() {
   const { buildAnalysis } = await import(path.join(ANALYSIS_ROOT, "engine", "analyze.mjs"));
-  return buildAnalysis({ asOf: new Date().toISOString().slice(0, 10) });
+  return buildAnalysis({ asOf: taipeiDay() });
 }
 
 // 發佈時以快照重產會員關懷儀表板（index.html）；舊版依計分期間歸檔至 data/archive/，不覆蓋既有歸檔。

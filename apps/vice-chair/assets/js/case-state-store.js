@@ -18,6 +18,8 @@
   let lastEditingAt = 0;
   let refreshPromise = null;
   let syncFailed = false;
+  let conflictBlocked = false;
+  const failedSaves = new Map();
 
   function parse(value) {
     try {
@@ -57,8 +59,51 @@
     node.textContent = `案件資料同步失敗：${message}。本機草稿仍保留，請重新整理後再試。`;
   }
 
-  function applyState(state) {
+  function showExternalUpdate() {
+    let node = document.getElementById("caseExternalUpdateAlert");
+    if (node) return;
+    node = document.createElement("div");
+    node.id = "caseExternalUpdateAlert";
+    node.setAttribute("role", "alert");
+    Object.assign(node.style, {
+      position: "fixed", left: "16px", right: "16px", bottom: "76px", zIndex: "100000",
+      padding: "12px 16px", borderRadius: "10px", color: "#fff", background: "#7a4b00",
+      boxShadow: "0 8px 30px #0004", fontWeight: "700",
+    });
+    const message = document.createElement("span");
+    message.textContent = "這份訪談已由另一個裝置更新。系統已停止覆寫，請先確認畫面內容，再載入最新版本。";
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "載入最新版本";
+    Object.assign(button.style, {
+      marginLeft: "12px", padding: "6px 10px", border: "0", borderRadius: "7px", cursor: "pointer",
+    });
+    button.addEventListener("click", () => location.reload());
+    node.append(message, button);
+    document.body.append(node);
+  }
+
+  function applyState(state, { detectDraftConflict = false } = {}) {
     const task = window.FulianTaskStore.all().find(item => item.id === state.taskId);
+    const activeTaskId = typeof URLSearchParams === "function"
+      ? new URLSearchParams(location.search).get("task")
+      : null;
+    const knownRevision = revisions.get(state.taskId);
+    if (
+      detectDraftConflict
+      && task
+      && activeTaskId === state.taskId
+      && state.draft !== null
+      && knownRevision !== undefined
+      && Number(state.revision || 0) > knownRevision
+    ) {
+      const localDraft = parse(nativeGetItem.call(localStorage, domain.draftStorageKey(task)));
+      if (JSON.stringify(localDraft) !== JSON.stringify(state.draft || {})) {
+        showExternalUpdate();
+        window.dispatchEvent(new CustomEvent("fulian:case-external-update", { detail: { taskId: state.taskId } }));
+        return false;
+      }
+    }
     applyingServerState = true;
     nativeSetItem.call(localStorage, domain.workflowStorageKey(state.taskId), JSON.stringify(state.workflow || {}));
     if (task && state.draft !== null) {
@@ -69,6 +114,7 @@
     revisions.set(state.taskId, Number(state.revision || 0));
     document.getElementById("caseSyncAlert")?.remove();
     window.dispatchEvent(new CustomEvent("fulian:data-changed", { detail: { source: "supabase-case-state", taskId: state.taskId } }));
+    return true;
   }
 
   async function save(info, value) {
@@ -84,7 +130,11 @@
       cache: "no-store",
     });
     const data = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(data.message || `案件同步失敗：HTTP ${response.status}`);
+    if (!response.ok) {
+      const error = new Error(data.message || `案件同步失敗：HTTP ${response.status}`);
+      error.status = response.status;
+      throw error;
+    }
     syncFailed = false;
     applyState(data);
     return data;
@@ -93,18 +143,49 @@
   function queueSave(key, value) {
     const info = infoForKey(key);
     if (!info) return queue;
+    failedSaves.set(key, { info, value });
     queue = queue.catch(() => undefined).then(async () => {
       pendingWrites += 1;
-      try { return await save(info, parse(value)); }
+      try {
+        const result = await save(info, parse(value));
+        if (failedSaves.get(key)?.value === value) failedSaves.delete(key);
+        return result;
+      }
       finally { pendingWrites -= 1; }
     });
     queue.catch(error => {
       syncFailed = true;
+      if (error.status === 409) {
+        conflictBlocked = true;
+        showExternalUpdate();
+      }
       console.error("Supabase case state sync failed", error);
       showError(error.message);
       window.dispatchEvent(new CustomEvent("fulian:case-sync-error", { detail: { message: error.message } }));
     });
     return queue;
+  }
+
+  async function retryFailed() {
+    const entries = [...failedSaves.entries()];
+    if (!entries.length) return [];
+    pendingWrites += 1;
+    try {
+      const saved = [];
+      for (const [key, pending] of entries) {
+        saved.push(await save(pending.info, parse(pending.value)));
+        if (failedSaves.get(key)?.value === pending.value) failedSaves.delete(key);
+      }
+      syncFailed = failedSaves.size > 0;
+      if (!syncFailed) queue = Promise.resolve(saved.at(-1));
+      return saved;
+    } catch (error) {
+      syncFailed = true;
+      showError(error.message);
+      throw error;
+    } finally {
+      pendingWrites -= 1;
+    }
   }
 
   Storage.prototype.setItem = function (key, value) {
@@ -168,7 +249,7 @@
       serverIds.add(state.taskId);
       const local = localByTask.get(state.taskId);
       const serverEmpty = Number(state.revision || 0) === 0;
-      applyState(state);
+      applyState(state, { detectDraftConflict: !migrate });
       if (migrate && serverEmpty && local) {
         if (Object.keys(local.workflow).length) await save({ taskId: state.taskId, kind: "workflow" }, local.workflow);
         if (state.draft !== null && Object.keys(local.draft).length) {
@@ -176,13 +257,15 @@
         }
       }
     }
+    syncFailed = false;
     return data.states;
   }
 
   async function refresh() {
-    if (syncFailed || pendingWrites || Date.now() - lastEditingAt < 1500) return [];
+    if (conflictBlocked || pendingWrites || Date.now() - lastEditingAt < 1500) return [];
     if (refreshPromise) return refreshPromise;
     refreshPromise = (async () => {
+      if (failedSaves.size) return retryFailed();
       await window.FulianTaskStore.refresh().catch(() => undefined);
       return initialize({ migrate: false });
     })();

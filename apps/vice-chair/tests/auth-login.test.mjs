@@ -23,6 +23,11 @@ assert.match(source,/grant_type=password/);
 assert.match(source,/\/rest\/v1\/app_accounts/);
 assert.match(source,/INACTIVITY_MS=8\*60\*60\*1000/);
 assert.match(loginSource,/await FulianAuth\.login/);
+assert.match(loginSource,/renderCommittee\(\[\]\)/,"登入前不得顯示上一位使用者快取的委員名單");
+for(const page of ["analysis-review.html","monthly-meeting.html","useful-links.html"]){
+  assert.match(loginSource,new RegExp(page.replace(".","\\.")),`${page} 必須可在重新登入後返回`);
+}
+assert.match(source,/timeZone:"Asia\/Taipei"/);
 assert.doesNotMatch(settingsSource,/config\.accounts\[key\]\.password/);
 assert.match(settingsSource,/FulianAuth\.updateSharedPasswords/);
 assert.match(settingsSource,/type="password"[^>]+autocomplete="new-password"/);
@@ -50,7 +55,7 @@ assert.match(edgeFunction,/passwords\[role\]\.length<12/);
 
 for(const file of readdirSync(appUrl).filter(name=>name.endsWith(".html"))){
   const page=readFileSync(new URL(file,appUrl),"utf8");
-  const authIndex=page.indexOf("assets/js/auth.js?v=6");
+  const authIndex=page.indexOf("assets/js/auth.js?v=7");
   if(authIndex<0)continue;
   const configIndex=page.indexOf("assets/js/supabase-config.js?v=1");
   assert.ok(configIndex>=0&&configIndex<authIndex,`${file} 必須先載入 Supabase 公開設定`);

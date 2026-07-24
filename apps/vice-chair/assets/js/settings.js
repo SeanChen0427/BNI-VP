@@ -1,6 +1,7 @@
 (async function(){
 await window.FulianMemberDirectory.ready;
 const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1",memberDirectory=window.FulianMemberDirectory?.members||[];let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s);
+const taipeiDay=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 function toast(message){const t=$("#toast");t.textContent=message;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),1800)}
 function log(text){audit.unshift({text,time:new Date().toLocaleString("zh-TW")});audit=audit.slice(0,20);localStorage.setItem(AUDIT_KEY,JSON.stringify(audit));}
 function memberOptions(excluded=[]){const blocked=new Set(excluded);return memberDirectory.filter(name=>!blocked.has(name)).map(name=>`<option value="${name}"></option>`).join("")}
@@ -157,7 +158,7 @@ async function undoDepartureFlow(name){
 function initDeparture(){
   if(!canManageDeparture)return;
   $("#departureCard").hidden=false;
-  $("#departureDate").value=new Date().toISOString().slice(0,10);
+  $("#departureDate").value=taipeiDay();
   ["departureName","departureConfirmName","departureDate"].forEach(id=>{$("#"+id).addEventListener("input",refreshDepartureForm)});
   $("#registerDeparture").onclick=registerDepartureFlow;
   loadDepartureState();

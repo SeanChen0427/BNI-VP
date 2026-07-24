@@ -21,7 +21,7 @@ test("所有排程頁面都載入最新版 Supabase task store", () => {
     "apps/vice-chair/departure-form.html",
   ];
   for (const page of pages) {
-    assert.match(read(page), /assets\/js\/task-store\.js\?v=3/, `${page} 未載入 task-store v3`);
+    assert.match(read(page), /assets\/js\/task-store\.js\?v=4/, `${page} 未載入 task-store v4`);
   }
 });
 
@@ -98,13 +98,20 @@ test("舊裝置更新單筆工作不會推斷刪除另一台的新工作", async
 test("Edge API 使用版本衝突、交易 RPC 與明確刪除保護", () => {
   const source = read("supabase/functions/app-api/index.ts");
   const migration = read("supabase/migrations/20260724170000_case_cloud_sync_and_task_hardening.sql");
+  const transactionMigration = read("supabase/migrations/20260725150000_transactional_case_operations.sql");
   assert.match(source, /path === "\/api\/tasks"/);
   assert.match(source, /body\.action === "delete"/);
   assert.match(source, /row\.lead_person_id !== context\.personId/);
   assert.match(source, /TASK_CONFLICT/);
   assert.match(source, /rpc\/edge_save_task/);
+  assert.match(source, /rpc\/edge_delete_task/);
+  assert.match(source, /rpc\/edge_save_case_state/);
+  assert.match(source, /rpc\/edge_open_task_vote/);
   assert.match(migration, /for update/);
   assert.match(migration, /revoke all on public\.tasks/);
+  assert.match(transactionMigration, /create or replace function public\.edge_delete_task/);
+  assert.match(transactionMigration, /delete from public\.vote_snapshots/);
+  assert.match(transactionMigration, /delete from public\.cases/);
 });
 
 test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {
@@ -202,13 +209,28 @@ test("兩位委員同時提交回饋與投票時，各自資料不共用案件 r
 test("正式案件參與資料由 Edge 驗證姓名、迴避、期限與單票不可改寫", () => {
   const edge = read("supabase/functions/app-api/index.ts");
   const migration = read("supabase/migrations/20260725103000_normalize_case_participation.sql");
+  const transactionMigration = read("supabase/migrations/20260725150000_transactional_case_operations.sql");
   assert.match(edge, /body\.kind === "feedback"/);
   assert.match(edge, /body\.kind === "vote"/);
   assert.match(edge, /body\.kind === "open-vote"/);
-  assert.match(edge, /既有票不得修改/);
-  assert.match(edge, /case_feedback\?on_conflict=case_id,author_person_id/);
-  assert.match(edge, /vote_snapshot_voters/);
-  assert.match(edge, /申請者本人強制迴避/);
+  assert.match(edge, /rpc\/edge_save_case_feedback/);
+  assert.match(edge, /rpc\/edge_cast_case_vote/);
+  assert.match(transactionMigration, /既有票不得修改/);
+  assert.match(transactionMigration, /on conflict \(case_id, author_person_id\) do update/);
+  assert.match(transactionMigration, /vote_snapshot_voters/);
+  assert.match(transactionMigration, /申請者本人強制迴避/);
+  assert.match(transactionMigration, /LEGACY_MIGRATION/);
   assert.match(migration, /edge_ensure_task_case/);
   assert.match(migration, /revoke all on public\.cases, public\.case_feedback/);
+});
+
+test("共同編輯衝突會停止覆寫，暫時斷線會自動重試", () => {
+  const caseStore = read("apps/vice-chair/assets/js/case-state-store.js");
+  const taskStore = read("apps/vice-chair/assets/js/task-store.js");
+  assert.match(caseStore, /caseExternalUpdateAlert/);
+  assert.match(caseStore, /detectDraftConflict/);
+  assert.match(caseStore, /failedSaves/);
+  assert.match(caseStore, /retryFailed/);
+  assert.match(taskStore, /retryTasks/);
+  assert.match(taskStore, /retryPending/);
 });

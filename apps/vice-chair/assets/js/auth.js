@@ -62,6 +62,9 @@
     return headers;
   }
   function authReady(){return /^https:\/\//.test(supabase.url||"")&&/^sb_publishable_/.test(supabase.publishableKey||"");}
+  function taipeiDay(date=new Date()){
+    return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(date);
+  }
   async function jsonRequest(path,options={}){
     const response=await fetch(`${supabase.url}${path}`,options);
     const data=await response.json().catch(()=>({}));
@@ -81,7 +84,7 @@
     return account;
   }
   async function loadCommitteeRoster(accessToken){
-    const today=new Date().toISOString().slice(0,10);
+    const today=taipeiDay();
     const rows=await jsonRequest(`/rest/v1/committee_terms?status=eq.active&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&people.status=eq.active&select=role,people!inner(display_name,status)&order=created_at.asc`,{
       headers:apiHeaders(accessToken)
     });

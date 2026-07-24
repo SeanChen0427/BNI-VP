@@ -9,6 +9,10 @@ import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
 
+const taipeiDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(date);
+
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
 export function defaultPaths() {
@@ -107,7 +111,7 @@ export function renderCurrentMembers(master) {
 }
 
 async function syncFiles(paths, { departedText, master }) {
-  master.asOf = new Date().toISOString().slice(0, 10);
+  master.asOf = taipeiDay();
   await writeFile(paths.departedMd, departedText);
   await writeFile(paths.currentMembers, renderCurrentMembers(master));
   await writeFile(paths.memberDirectory, renderMemberDirectory(master.members.map((m) => m.name)));
@@ -118,7 +122,7 @@ export async function registerDeparture({ name, confirmName, confirmedAt, note, 
   if (!target) throw new Error("缺少離會會員姓名");
   if (normalizeName(confirmName) !== target) throw new Error("確認姓名不一致：請重新輸入該會員完整姓名以確認登記");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(String(confirmedAt || ""))) throw new Error("離會確認日格式必須為 YYYY-MM-DD");
-  if (confirmedAt > new Date().toISOString().slice(0, 10)) throw new Error("離會確認日不可為未來日期");
+  if (confirmedAt > taipeiDay()) throw new Error("離會確認日不可為未來日期");
 
   const [departedText, masterText] = await Promise.all([
     readFile(paths.departedMd, "utf8"),
