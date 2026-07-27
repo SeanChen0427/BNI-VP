@@ -225,7 +225,9 @@ function renderSummary(){
   $("#wordName").textContent=state.wordName||"尚未保存 Word";
   $("#wordStatus").textContent=state.wordReal?"檔案已保存於此瀏覽器，可下載確認":"尚未保存訪談 Word";
   $("#downloadWord").disabled=!state.wordReal;
-  ["caseType","applicant","profession"].forEach(id=>$("#"+id).disabled=state.votingOpen);
+  $("#caseType").disabled=true;
+  $("#applicant").readOnly=true;
+  $("#profession").readOnly=true;
   $("#feedbackNoticePreview").textContent=feedbackNotice();
   $("#sendFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.feedbackNotified&&!state.closed);
   $("#sendFeedbackNotice").textContent=state.feedbackNotified?"已通知委員":"模擬 LINE Bot 通知";
@@ -243,7 +245,9 @@ function render(){
 
 function collectForm(){
   return {
-    caseType:$("#caseType").value,applicant:$("#applicant").value,profession:$("#profession").value,
+    caseType:sourceTask?.type||$("#caseType").value,
+    applicant:sourceTask?.member||$("#applicant").value,
+    profession:sourceTask?.profession||$("#profession").value,
     interviewDate:$("#interviewDate").value,leadInterviewer:$("#leadInterviewer").value,companionInterviewer:$("#companionInterviewer").value,
     voteDeadline:$("#voteDeadline").value,recusedMember:recusedApplicant(),annualTraining:$("#annualTraining").value,annualVisitors:$("#annualVisitors").value
   };
@@ -279,7 +283,8 @@ function restoreForm(){
     $("#companionInterviewer").value=sourceTask.companions?.[0]||$("#companionInterviewer").value;
   }
   const form=state.form||{};
-  Object.entries(form).forEach(([id,value])=>{if(id==="recusedMember"||id==="loginUser"||(sourceTask&&id==="caseType"))return;const node=$(`#${id}`);if(node&&value!==undefined)node.value=value;});
+  const taskBoundFields=new Set(["caseType","applicant","profession"]);
+  Object.entries(form).forEach(([id,value])=>{if(id==="recusedMember"||id==="loginUser"||(sourceTask&&taskBoundFields.has(id)))return;const node=$(`#${id}`);if(node&&value!==undefined)node.value=value;});
   $("#recusedMember").value=recusedApplicant()||"無須迴避";
   if(state.votingOpen&&!Object.keys(state.votes||{}).length){
     const corrected=eligibleMembers();
@@ -330,6 +335,12 @@ async function init(){
   await window.FulianCaseStateStore.ready;
   state=loadState();
   try{sourceTask=(JSON.parse(localStorage.getItem(caseDomain.TASK_STORAGE_KEY)||"[]")||[]).find(item=>item.id===CASE_ID)||null}catch{}
+  if(!sourceTask||!caseDomain.requiresDecisionWorkflow(sourceTask)){
+    document.querySelector("main").hidden=true;
+    alert("找不到適用的正式決議案件，請由進行中案件重新開啟。");
+    location.replace("case-board.html");
+    return;
+  }
   configureIdentity();
   populateSelects();
   restoreForm();

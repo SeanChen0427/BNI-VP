@@ -9,7 +9,7 @@
   <script src="assets/js/auth.js?v=7"></script>
   <script src="assets/js/supabase-data.js?v=2"></script>
   <script src="core/calendar-domain.js?v=1"></script>
-  <script src="core/case-domain.js?v=4"></script>
+  <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=4"></script>
   <script src="assets/js/case-state-store.js?v=4"></script>
   <script src="services/case-files.js?v=4"></script>
@@ -41,9 +41,9 @@
     <section class="case-head card">
       <div class="section-title"><span>01</span><div><h2>案件基本資料</h2><p>依訪談類型接續委員回饋、投票與結案流程</p></div></div>
       <div class="fields four">
-        <label>案件類型<select id="caseType" data-save><option value="renewal">續約</option><option value="new">新會員</option><option value="midterm">期中輔導</option><option value="industry">轉換行業別</option><option value="departure">離會訪談</option></select></label>
-        <label>申請者姓名<input id="applicant" data-save></label>
-        <label>專業類別<input id="profession" data-save></label>
+        <label>案件類型<select id="caseType" disabled><option value="renewal">續約</option><option value="new">新會員</option><option value="midterm">期中輔導</option><option value="industry">轉換行業別</option><option value="departure">離會訪談</option></select></label>
+        <label>申請者姓名<input id="applicant" readonly></label>
+        <label>專業類別<input id="profession" readonly></label>
         <label>訪談日期<input id="interviewDate" type="date" data-save></label>
         <label>主訪委員<select id="leadInterviewer" data-save></select></label>
         <label>陪訪委員<select id="companionInterviewer" data-save></select></label>
@@ -140,7 +140,7 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=15"></script>
+  <script src="assets/js/case-workflow.js?v=16"></script>
   <script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>

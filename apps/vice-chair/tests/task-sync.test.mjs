@@ -262,3 +262,26 @@ test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", (
   assert.match(rpcVariableFix, /returning public\.tasks\.id, public\.tasks\.revision/);
   assert.doesNotMatch(rpcVariableFix, /^\s{2}(task_status|completed_at|due_at|companion_id)\s/m);
 });
+
+test("案件身份建立後不可換人換類型，月會錯誤 taskId 不得沿用", () => {
+  const edge = read("supabase/functions/app-api/index.ts");
+  const monthly = read("apps/vice-chair/assets/js/monthly-meeting.js");
+  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
+  const migration = read("supabase/migrations/20260727223000_protect_task_identity.sql");
+  assert.match(migration, /TASK_IDENTITY_IMMUTABLE/);
+  assert.match(migration, /before update of source, source_reference, title, category/);
+  assert.doesNotMatch(migration, /\b(update|delete)\s+public\.(tasks|task_case_states|task_case_files|cases)\b/i);
+  assert.match(edge, /existing\.category !== item\.taskType \|\| existing\.title !== item\.member/);
+  assert.match(monthly, /referenced&&!FulianCaseDomain\.sameTaskIdentity\(referenced,item\)/);
+  assert.match(workflow, /taskBoundFields=new Set\(\["caseType","applicant","profession"\]\)/);
+  assert.match(edge, /caseType: task\.category,\s+applicant: task\.title/s);
+});
+
+test("已完成工作再次送出視為成功，不因舊 revision 誤報失敗", () => {
+  const edge = read("supabase/functions/app-api/index.ts");
+  const completedCheck = edge.indexOf('if (row.status === "completed") return;');
+  const revisionCheck = edge.indexOf("if (task.revision !== Number(row.revision))", completedCheck);
+  assert.ok(completedCheck >= 0, "後端必須辨識已完成工作");
+  assert.ok(revisionCheck > completedCheck, "已完成判斷必須早於 revision 衝突檢查");
+  assert.match(edge, /row\.title !== task\.member \|\| row\.category !== task\.type/);
+});

@@ -26,5 +26,6 @@
     if(task.scheduledAt)document.querySelector("#meetingDate").value=task.scheduledAt;
     document.querySelector("#memberSearch").readOnly=true;document.querySelector("#saveTime").textContent="已由優先處理案件自動帶入";
     await window.FulianCaseStateStore.reconcileDraft(task,{applicant:task.member,...(task.scheduledAt?{meetingDate:task.scheduledAt}:{}),leadInterviewer:task.lead||session.name,witness1:task.lead||session.name,companionInterviewer:companions[0]||"",secondCompanion:companions[1]||"",witness2:companions[0]||"",witness3:companions[1]||""});
+    document.querySelector("#industryChangeForm").hidden=false;
   }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#industryChangeForm").hidden=true;toast(error.message||"正式會員資料載入失敗，請重新整理")}
 })();

@@ -229,4 +229,26 @@ assert.deepEqual(
   []
 );
 
+const linkedTasks = [
+  { id: "wrong-id", type: "midterm", member: "會員乙", completed: false },
+  { id: "right-id", type: "midterm", member: "會員甲", completed: false },
+];
+assert.equal(
+  domain.sameTaskIdentity(linkedTasks[1], { taskType: "midterm", member: "會員甲" }),
+  true
+);
+assert.equal(
+  domain.sameTaskIdentity(linkedTasks[0], { taskType: "midterm", member: "會員甲" }),
+  false
+);
+assert.equal(
+  domain.linkedCareTask(linkedTasks, {
+    taskId: "wrong-id",
+    taskType: "midterm",
+    member: "會員甲",
+  })?.id,
+  "right-id",
+  "錯誤 taskId 不得蓋過會員與類型的一致性核對"
+);
+
 console.log("case-domain tests passed");

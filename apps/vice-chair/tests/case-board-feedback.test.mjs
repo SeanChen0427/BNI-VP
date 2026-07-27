@@ -37,8 +37,13 @@ assert.match(workflowSource, /midterm:\{label:"期中輔導"/);
 assert.match(workflowSource, /departure:\{label:"離會訪談"/);
 assert.match(
   workflowSource,
-  /sourceTask&&id==="caseType"/,
-  "舊流程草稿不得覆蓋工作案件的正式類型"
+  /taskBoundFields=new Set\(\["caseType","applicant","profession"\]\)/,
+  "工作案件的正式類型、會員與專業別必須受同一組身份保護"
+);
+assert.match(
+  workflowSource,
+  /sourceTask&&taskBoundFields\.has\(id\)/,
+  "舊流程草稿不得覆蓋工作案件的正式身份"
 );
 assert.match(workflowHtml, /<option value="midterm">期中輔導<\/option>/);
 assert.match(workflowHtml, /<option value="departure">離會訪談<\/option>/);

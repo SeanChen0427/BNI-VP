@@ -123,6 +123,31 @@
     return [task?.lead, ...(task?.companions || [])].filter(Boolean);
   }
 
+  function sameTaskIdentity(left, right) {
+    return Boolean(left && right)
+      && String(left.type || "").trim() === String(right.type || right.taskType || "").trim()
+      && String(left.member || "").trim() === String(right.member || "").trim();
+  }
+
+  function linkedCareTask(tasks, item, { includeCompleted = false } = {}) {
+    const list = Array.isArray(tasks) ? tasks : [];
+    const reference = String(item?.taskId || "").trim();
+    const linked = reference
+      ? list.find(task => task?.id === reference)
+      : null;
+    if (
+      linked
+      && sameTaskIdentity(linked, item)
+      && (includeCompleted || !linked.completed)
+    ) {
+      return linked;
+    }
+    return list.find(task =>
+      sameTaskIdentity(task, item)
+      && (includeCompleted || !task.completed)
+    ) || null;
+  }
+
   function isAssignedTo(task, userName) {
     const normalizedName = String(userName || "").trim();
     return Boolean(normalizedName) && assignedMembers(task).includes(normalizedName);
@@ -306,6 +331,8 @@
     feedbackCount,
     voteCount,
     assignedMembers,
+    sameTaskIdentity,
+    linkedCareTask,
     isAssignedTo,
     feedbackParticipation,
     requiresInterviewForm,

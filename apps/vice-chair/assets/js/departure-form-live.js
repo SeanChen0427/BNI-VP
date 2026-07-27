@@ -25,5 +25,6 @@
     if(task.scheduledAt)document.querySelector("#interviewDate").value=task.scheduledAt;
     document.querySelector("#memberSearch").readOnly=true;document.querySelector("#saveTime").textContent="已由優先處理案件自動帶入";
     await window.FulianCaseStateStore.reconcileDraft(task,{member:task.member,...(task.scheduledAt?{interviewDate:task.scheduledAt}:{}),interviewer:task.lead||session.name,companion:(task.companions||[]).join("、")});
+    document.querySelector("#departureForm").hidden=false;
   }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#departureForm").hidden=true;toast(error.message||"正式會員資料載入失敗，請重新整理")}
 })();

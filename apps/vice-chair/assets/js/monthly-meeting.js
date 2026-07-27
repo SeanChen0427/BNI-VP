@@ -67,7 +67,14 @@
   }
   async function syncCareTask(item){
     if(!canManage||!requiresCareAssignment(item)||!item.member||!item.taskType)return null;
-    let tasks=loadTasks(),existing=tasks.find(task=>task.id===item.taskId)||tasks.find(task=>!isClosedTask(task)&&task.member===item.member&&task.type===item.taskType);
+    let tasks=loadTasks();
+    const referenced=item.taskId?tasks.find(task=>task.id===item.taskId):null;
+    if(referenced&&!FulianCaseDomain.sameTaskIdentity(referenced,item)){
+      item.taskId="";
+      item.taskCreatedByMeeting=false;
+    }
+    let existing=(referenced&&FulianCaseDomain.sameTaskIdentity(referenced,item)&&!isClosedTask(referenced)?referenced:null)
+      ||tasks.find(task=>!isClosedTask(task)&&FulianCaseDomain.sameTaskIdentity(task,item));
     if(!item.owner||!item.dueDate){
       if(existing?.source==="monthly-meeting"&&existing.sourceCareId===item.id){
         await window.FulianTaskStore.remove(existing.id);item.taskId="";item.taskCreatedByMeeting=false;window.dispatchEvent(new CustomEvent("fulian:data-changed",{detail:{source:"monthly-meeting"}}));return"removed";

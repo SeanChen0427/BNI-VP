@@ -695,8 +695,14 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
   let linked = 0;
 
   for (const item of actionable) {
-    const preferredReference = monthlyCareTaskReference(record, item);
+    let preferredReference = monthlyCareTaskReference(record, item);
     let existing = byReference.get(preferredReference);
+    if (existing && (existing.category !== item.taskType || existing.title !== item.member)) {
+      item.taskId = "";
+      item.taskCreatedByMeeting = false;
+      preferredReference = monthlyCareTaskReference(record, item);
+      existing = byReference.get(preferredReference);
+    }
     if (!existing) {
       existing = (rows || []).find((row: any) => {
         const meta: any = parseTaskJson(row.result_summary);
@@ -704,10 +710,14 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
           || (row.status !== "completed" && row.category === item.taskType && row.title === item.member);
       });
     }
+    if (existing && (existing.category !== item.taskType || existing.title !== item.member)) {
+      existing = undefined;
+    }
     if (existing) {
       if (item.taskId !== existing.source_reference) linked += 1;
       item.taskId = existing.source_reference;
       item.taskCreatedByMeeting = parseTaskJson(existing.result_summary).localSource === "monthly-meeting";
+      if (existing.status === "completed") item.state = "done";
       continue;
     }
 
@@ -1259,6 +1269,10 @@ async function taskResponse(context: Context) {
 
 async function saveLeadershipTask(input: any, context: Context, directory: any) {
   const task = cleanTaskInput(input);
+  const memberId = directory.memberByName.get(task.member) || null;
+  if (task.type !== "new" && !memberId) {
+    throw new Error(`案件會員「${task.member}」不在正式會員名單`);
+  }
   const leadId = directory.personByName.get(task.lead);
   if (!leadId) throw new Error(`主責人「${task.lead}」不在有效委員名單`);
   const companionIds = task.companions.map((name: string) => {
@@ -1299,7 +1313,7 @@ async function saveLeadershipTask(input: any, context: Context, directory: any) 
       p_actor: context.personId,
       p_lead: leadId,
       p_companions: companionIds,
-      p_member: directory.memberByName.get(task.member) || null,
+      p_member: memberId,
       p_expected_revision: task.revision,
       p_import: Boolean(input?._legacyImport),
     }),
@@ -1311,9 +1325,13 @@ async function completeAssignedTask(input: any, context: Context) {
   if (!["special", "midterm", "departure"].includes(task.type) || !task.completed) {
     throw Object.assign(new Error("此案件必須依正式流程完成，不能直接結案"), { status: 403 });
   }
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,lead_person_id,status,revision&limit=1`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,title,category,lead_person_id,status,revision&limit=1`);
   const row = rows?.[0];
   if (!row || row.lead_person_id !== context.personId) throw Object.assign(new Error("只有此工作的主責委員可以完成"), { status: 403 });
+  if (row.title !== task.member || row.category !== task.type) {
+    throw Object.assign(new Error("案件會員或類型與正式任務不一致，請重新整理後再操作"), { status: 409 });
+  }
+  if (row.status === "completed") return;
   if (task.revision !== Number(row.revision)) {
     throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
   }
@@ -1323,7 +1341,6 @@ async function completeAssignedTask(input: any, context: Context) {
       throw Object.assign(new Error("訪談 Word 尚未成功保存，不能結案"), { status: 409 });
     }
   }
-  if (row.status === "completed") return;
   const updated = await db(`tasks?id=eq.${row.id}&revision=eq.${row.revision}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=representation" },
@@ -1377,6 +1394,9 @@ async function tasksApi(request: Request, context: Context) {
       } catch (error) {
         if (String((error as any)?.message).includes("TASK_CONFLICT")) {
           throw Object.assign(new Error("這項工作已在其他裝置更新，已重新載入最新資料，請重新操作"), { status: 409 });
+        }
+        if (String((error as any)?.message).includes("TASK_IDENTITY_IMMUTABLE")) {
+          throw Object.assign(new Error("既有案件的會員與類型不可變更；請建立新案件"), { status: 409 });
         }
         throw error;
       }
@@ -1463,7 +1483,15 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
   const recusedApplicant = decisionCase
     && Boolean(viewerName)
     && String(task.title || "").trim() === String(viewerName).trim();
-  const fullWorkflow = row?.workflow || {};
+  const storedWorkflow = row?.workflow || {};
+  const fullWorkflow = {
+    ...storedWorkflow,
+    form: {
+      ...(storedWorkflow.form || {}),
+      caseType: task.category,
+      applicant: task.title,
+    },
+  };
   const participationWorkflow = decisionCase
     ? {
       ...fullWorkflow,
@@ -1694,6 +1722,11 @@ async function caseStatesApi(request: Request, context: Context) {
     if (access.leadership) {
       workflow = {
         ...proposed,
+        form: {
+          ...(proposed.form || {}),
+          caseType: access.task.category,
+          applicant: access.task.title,
+        },
         feedback: currentWorkflow.feedback || {},
         votes: currentWorkflow.votes || {},
         voterSnapshot: currentWorkflow.voterSnapshot || [],
@@ -1715,6 +1748,11 @@ async function caseStatesApi(request: Request, context: Context) {
         for (const [key, value] of Object.entries(proposed)) {
           if (!protectedKeys.has(key) && !["feedback", "votes"].includes(key)) workflow[key] = value;
         }
+        workflow.form = {
+          ...(workflow.form || {}),
+          caseType: access.task.category,
+          applicant: access.task.title,
+        };
         if (["midterm", "departure"].includes(access.task.category) && proposed.wordSaved) workflow.closed = true;
       }
     }
