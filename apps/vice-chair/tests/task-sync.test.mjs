@@ -243,6 +243,7 @@ test("共同編輯衝突會停止覆寫，暫時斷線會自動重試", () => {
 test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", () => {
   const edge = read("supabase/functions/app-api/index.ts");
   const monthly = read("apps/vice-chair/assets/js/monthly-meeting.js");
+  const rpcFix = read("supabase/migrations/20260727131500_fix_edge_save_task_ambiguity.sql");
   assert.match(edge, /async function ensureMonthlyCareTasks/);
   assert.match(edge, /body\.action === "reconcile-care-tasks"/);
   assert.match(edge, /record = \(await ensureMonthlyCareTasks\(record, context\)\)\.record/);
@@ -250,4 +251,6 @@ test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", (
   assert.match(monthly, /action:"reconcile-care-tasks"/);
   assert.match(monthly, /await window\.FulianTaskStore\.refresh\(\)/);
   assert.match(monthly, /staleSchedule\?"pending"/);
+  assert.match(rpcFix, /on conflict on constraint task_private_details_pkey/);
+  assert.doesNotMatch(rpcFix, /on conflict \(task_id\)/);
 });
