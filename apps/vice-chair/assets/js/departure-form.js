@@ -53,4 +53,4 @@ async function downloadWord(){
   }
 }
 async function init(){await window.FulianCaseStateStore.ready;$("#memberList").innerHTML=members.map(x=>`<option value="${x.name}">${x.profession}</option>`).join("");$("#interviewDate").value=localDateTime();$("#departureDate").value=localDate();$("#signatureDate").value=localDate();$("#interviewer").value=$("#loginUser").value;$("#vicePresidentSignature").value="";selectMember(member.name);restore(JSON.parse(localStorage.getItem(KEY)||"null"));$("#memberSearch").addEventListener("change",e=>{selectMember(e.target.value);save()});$("#loginUser").addEventListener("change",()=>{$("#interviewer").value=$("#loginUser").value;save()});$("#resetDraft").onclick=()=>{if(confirm("要清除這份尚未完成的離會訪談草稿嗎？已保存的案件附件與完成紀錄不會被刪除。")){localStorage.removeItem(KEY);location.reload()}};$("#downloadWord").onclick=downloadWord;bind();progress()}
-init();
+window.FulianDepartureFormReady=init();

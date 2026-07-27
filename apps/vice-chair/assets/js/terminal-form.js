@@ -291,4 +291,4 @@ async function init() {
   $("#downloadWord").onclick=downloadWord;
   bindInputs(); updateProgress();
 }
-init();
+window.FulianTerminalFormReady=init();
