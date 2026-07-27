@@ -273,6 +273,18 @@
     finally { refreshPromise = null; }
   }
 
+  async function reconcileDraft(task, binding) {
+    const key = domain.draftStorageKey(task);
+    if (!key || !binding || typeof binding !== "object") return false;
+    const current = parse(nativeGetItem.call(localStorage, key));
+    if (!Object.keys(current).length) return false;
+    const next = { ...current, ...binding };
+    if (JSON.stringify(current) === JSON.stringify(next)) return false;
+    localStorage.setItem(key, JSON.stringify(next));
+    await queue;
+    return true;
+  }
+
   const ready = initialize({ migrate: true }).catch(error => {
     console.error("Supabase case state bootstrap failed", error);
     showError(error.message);
@@ -283,6 +295,7 @@
     ready,
     flush: () => queue,
     refresh,
+    reconcileDraft,
     saveFeedback: (taskId, value) => postAction(taskId, "feedback", value),
     saveVote: (taskId, value) => postAction(taskId, "vote", value),
     openVote: (taskId, workflow) => postAction(taskId, "open-vote", workflow),

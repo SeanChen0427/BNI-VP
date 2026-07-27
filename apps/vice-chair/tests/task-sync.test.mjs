@@ -236,6 +236,8 @@ test("共同編輯衝突會停止覆寫，暫時斷線會自動重試", () => {
   assert.match(caseStore, /detectDraftConflict/);
   assert.match(caseStore, /failedSaves/);
   assert.match(caseStore, /retryFailed/);
+  assert.match(caseStore, /async function reconcileDraft/);
+  assert.match(caseStore, /if \(!Object\.keys\(current\)\.length\) return false/);
   assert.match(taskStore, /retryTasks/);
   assert.match(taskStore, /retryPending/);
 });

@@ -26,5 +26,6 @@
     if(task.companions?.length)document.querySelector("#companionCounselor").value=task.companions.join("、");
     if(task.scheduledAt)document.querySelector("#meetingDate").value=task.scheduledAt;
     document.querySelector("#memberSearch").readOnly=true;document.querySelector("#saveTime").textContent="已由優先處理案件自動帶入";
+    await window.FulianCaseStateStore.reconcileDraft(task,{member:task.member,...(task.scheduledAt?{meetingDate:task.scheduledAt}:{}),companionCounselor:(task.companions||[]).join("、")});
   }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#midtermForm").hidden=true;toast(error.message||"正式會員資料載入失敗，請重新整理")}
 })();

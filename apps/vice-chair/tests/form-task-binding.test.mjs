@@ -17,6 +17,7 @@ for (const item of forms) {
   assert.match(live, new RegExp(`await Promise\\.all\\(\\[window\\.${item.ready},window\\.FulianTaskStore\\.ready\\]\\)`), `${item.live} 必須等基本表單完成後才帶入案件`);
   assert.match(live, new RegExp(`item\\.id===taskId&&item\\.type==="${item.type}"`), `${item.live} 必須同時核對案件 ID 與類型`);
   assert.match(live, new RegExp(`#${item.form.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`), `${item.live} 找不到案件時必須停止顯示表單`);
+  assert.match(live, /FulianCaseStateStore\.reconcileDraft\(task|FulianCaseStateStore\.reconcileDraft\(currentTask/, `${item.live} 必須把案件身份校正回既有草稿`);
   assert.doesNotMatch(live, /task\?\.member\|\|(?:members|applicants)\[0\]\.name/, `${item.live} 不得找不到案件會員時靜默改用第一位會員`);
 }
 
