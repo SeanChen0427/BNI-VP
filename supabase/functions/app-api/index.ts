@@ -479,6 +479,25 @@ async function attendanceApi(request: Request, url: URL, context: Context) {
     const session = await saveAttendanceSession(body, context, { confirm: true });
     return { message: "本週點名已由副主席確認；後續週次將納入 LINE 公告暫時累計", session };
   }
+  if (body.action === "reopen") {
+    leadership(context);
+    const meetingDate = String(body.meetingDate || "");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
+    const existingRows = await db(`attendance_sessions?meeting_date=eq.${meetingDate}&select=*&limit=1`);
+    const existing = existingRows?.[0];
+    if (!existing) throw Object.assign(new Error("找不到這一週的點名紀錄"), { status: 404 });
+    if (existing.status !== "confirmed") return { message: "本週紀錄已可編輯", session: existing };
+    const reopened = await db(`attendance_sessions?id=eq.${existing.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "draft",
+        confirmed_by: null,
+        confirmed_at: null,
+      }),
+    });
+    return { message: "本週紀錄已重新開啟，修正後請再次完成雙重確認", session: reopened[0] };
+  }
   if (body.action === "import-history") {
     leadership(context);
     const history = (Array.isArray(body.history) ? body.history : [])

@@ -1,0 +1,25 @@
+.preview-card,
+.approval-card {
+  position: static;
+  top: auto;
+}
+
+.preview-card pre {
+  max-height: none;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+
+.send-button,
+.reopen-button {
+  width: 100%;
+  justify-content: center;
+}
+
+.reopen-button {
+  margin-bottom: 10px;
+  border: 1px solid #c98d91;
+  background: #fff;
+  color: var(--red);
+}

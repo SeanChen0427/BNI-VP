@@ -103,11 +103,12 @@ ${groupedLines("缺席",absenceTotal)}
 ■中心區決議：已無病假，如確診請找代理人代理出席`;
   }
   function applyPermissions(){
-    const box=$("#vpConfirmed"),label=$("#vpConfirmLabel"),note=$("#vpPermissionNote");
+    const box=$("#vpConfirmed"),label=$("#vpConfirmLabel"),note=$("#vpPermissionNote"),reopen=$("#reopenWeek");
     if(!canFinalConfirm()&&box.checked)box.checked=false;
     box.disabled=!canFinalConfirm()||confirmed;
+    reopen.hidden=!(confirmed&&canFinalConfirm());
     label.classList.toggle("permission-locked",!canFinalConfirm());
-    note.textContent=confirmed?"本週已確認":canFinalConfirm()?"副主席權限已開啟":"僅副主席可操作";
+    note.textContent=confirmed?(canFinalConfirm()?"可重新開啟修改":"本週已確認"):canFinalConfirm()?"副主席權限已開啟":"僅副主席可操作";
     $$("[data-save], [data-bulk], #clearWeek").forEach(node=>{
       if(node.id==="loginUser")return;
       node.disabled=confirmed;
@@ -292,6 +293,44 @@ ${groupedLines("缺席",absenceTotal)}
     }
     update();
   }
+  async function reopenWeek(){
+    if(!canFinalConfirm()||!confirmed)return;
+    if(!confirm("要重新開啟這一週的點名紀錄嗎？重新開啟後請修正內容，並再次完成主要紀錄與副主席確認。"))return;
+    $("#reopenWeek").disabled=true;
+    $("#saveState").textContent="正在重新開啟本週紀錄…";
+    try{
+      const result=await api("POST",{action:"reopen",meetingDate:$("#meetingDate").value});
+      confirmed=false;
+      storedAnnouncement="";
+      toast(result.message);
+      await loadDate($("#meetingDate").value);
+    }catch(error){
+      $("#saveState").textContent="重新開啟失敗";
+      $("#saveTime").textContent=error.message;
+      toast(error.message);
+    }finally{
+      $("#reopenWeek").disabled=false;
+    }
+    update();
+  }
+  async function copyAnnouncement(){
+    const text=buildAnnouncement();
+    try{
+      if(!navigator.clipboard?.writeText)throw new Error("Clipboard API unavailable");
+      await navigator.clipboard.writeText(text);
+    }catch{
+      const textarea=document.createElement("textarea");
+      textarea.value=text;
+      textarea.setAttribute("readonly","");
+      textarea.style.cssText="position:fixed;left:-9999px;top:0;opacity:0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      const copied=document.execCommand("copy");
+      textarea.remove();
+      if(!copied)return toast("瀏覽器無法自動複製，請長按預覽文字後選擇複製");
+    }
+    toast(confirmed?"已複製確認版公告，可貼到 LINE 群組":"公告已複製；本週尚未由副主席確認");
+  }
   async function init(){
     const now=new Date(),pad=value=>String(value).padStart(2,"0");
     configureIdentity();
@@ -326,10 +365,8 @@ ${groupedLines("缺席",absenceTotal)}
         scheduleSave();
       }
     };
-    $("#copyAnnouncement").onclick=async()=>{
-      await navigator.clipboard.writeText(buildAnnouncement());
-      toast(confirmed?"已複製確認版公告，可貼到 LINE 群組":"公告已複製；本週尚未由副主席確認");
-    };
+    $("#copyAnnouncement").onclick=copyAnnouncement;
+    $("#reopenWeek").onclick=reopenWeek;
     $("#confirmWeek").onclick=confirmWeek;
     update();
   }
