@@ -244,6 +244,7 @@ test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", (
   const edge = read("supabase/functions/app-api/index.ts");
   const monthly = read("apps/vice-chair/assets/js/monthly-meeting.js");
   const rpcFix = read("supabase/migrations/20260727131500_fix_edge_save_task_ambiguity.sql");
+  const rpcVariableFix = read("supabase/migrations/20260727133000_fix_edge_save_task_variable_ambiguity.sql");
   assert.match(edge, /async function ensureMonthlyCareTasks/);
   assert.match(edge, /body\.action === "reconcile-care-tasks"/);
   assert.match(edge, /record = \(await ensureMonthlyCareTasks\(record, context\)\)\.record/);
@@ -253,4 +254,9 @@ test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", (
   assert.match(monthly, /staleSchedule\?"pending"/);
   assert.match(rpcFix, /on conflict on constraint task_private_details_pkey/);
   assert.doesNotMatch(rpcFix, /on conflict \(task_id\)/);
+  assert.match(rpcVariableFix, /due_at = v_due_at/);
+  assert.match(rpcVariableFix, /completed_at = v_completed_at/);
+  assert.match(rpcVariableFix, /status = v_task_status/);
+  assert.match(rpcVariableFix, /returning public\.tasks\.id, public\.tasks\.revision/);
+  assert.doesNotMatch(rpcVariableFix, /^\s{2}(task_status|completed_at|due_at|companion_id)\s/m);
 });

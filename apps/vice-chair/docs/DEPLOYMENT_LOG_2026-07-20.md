@@ -10,6 +10,8 @@
 - `app-api` 已部署為 version 15、狀態 `ACTIVE`、`verify_jwt = true`；月會保存會先核對並建立／連回 Supabase 任務，失敗時不保存不實的已排定狀態。
 - 月會頁新增未結案舊草稿自動修復與任務快取刷新；前台不再信任沒有正式任務佐證的舊 `taskId`。
 - 正式首次修復測試另發現 `edge_save_task` 的回傳欄位 `task_id` 與 `ON CONFLICT (task_id)` 產生 PostgreSQL 歧義；`20260727131500_fix_edge_save_task_ambiguity.sql` 已通過 dry-run 並正式 push，改用明確主鍵 constraint。
+- 後續更新既有案件時再發現函式區域變數 `due_at` 與資料表欄位同名；`20260727133000_fix_edge_save_task_variable_ambiguity.sql` 已通過 dry-run 並正式 push，將全部區域變數統一改為 `v_` 前綴並限定資料表欄位。
+- 正式頁面保留的失敗內容已在 migration 套用後自動重試；`taskSyncAlert` 消失且沒有新的瀏覽器同步錯誤，確認更新既有任務的交易路徑恢復。
 - 正式頁面實測：7 月月會顯示「草稿已保存」，邱德晏特定關懷為「已排定」；工作台同步顯示「特定關懷・邱德晏／會員關懷已排定／主責：紀韻霓／原排定 7/22」，確認案件已由 Supabase API 返回。
 - 完整驗證：34／34 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
 
