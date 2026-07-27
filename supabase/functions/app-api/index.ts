@@ -639,6 +639,100 @@ function meetingToApi(row: any, names: Map<string, string>) {
   };
 }
 
+function monthlyCareTaskReference(record: any, item: any) {
+  if (String(item.taskId || "").trim()) return String(item.taskId).trim().slice(0, 160);
+  const careId = String(item.id || `${item.taskType}-${item.member}`)
+    .normalize("NFKC")
+    .replace(/[^\p{Letter}\p{Number}-]+/gu, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "care";
+  return `monthly-${String(record.id || "meeting").slice(0, 70)}-${careId}`.slice(0, 160);
+}
+
+function monthlyCareTaskInput(record: any, item: any, id: string, context: Context) {
+  const scheduledAt = String(item.dueDate).includes("T") ? item.dueDate : `${item.dueDate}T19:00`;
+  return {
+    id,
+    type: item.taskType,
+    member: item.member,
+    profession: "",
+    scheduledAt,
+    lead: item.owner,
+    companions: item.companion ? [item.companion] : [],
+    priority: item.taskType === "midterm" ? "normal" : "high",
+    stage: item.taskType === "renewal"
+      ? "續約訪談已排定"
+      : item.taskType === "midterm"
+        ? "期中關懷已排定"
+        : "會員關懷已排定",
+    notes: item.note || item.action || "",
+    completed: false,
+    createdAt: new Date().toISOString(),
+    createdBy: context.name,
+    source: "monthly-meeting",
+    sourceMeetingId: record.id,
+    sourceCareId: item.id,
+  };
+}
+
+async function ensureMonthlyCareTasks(record: any, context: Context, directory?: any) {
+  const care = record?.care || {};
+  const items = Array.isArray(care.items) ? care.items.map((item: any) => ({ ...item })) : [];
+  const actionable = items.filter((item: any) =>
+    item.assignmentRequired !== false
+    && ["pending", "scheduled", "active"].includes(String(item.state || "pending"))
+    && ["renewal", "midterm", "special"].includes(String(item.taskType || ""))
+    && String(item.member || "").trim()
+    && String(item.owner || "").trim()
+    && String(item.dueDate || "").trim()
+  );
+  if (!actionable.length) return { record: { ...record, care: { ...care, items } }, created: 0, linked: 0 };
+
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,category,title,status,result_summary`);
+  const byReference = new Map((rows || []).map((row: any) => [row.source_reference, row]));
+  const directoryState = directory || await taskDirectory();
+  let created = 0;
+  let linked = 0;
+
+  for (const item of actionable) {
+    const preferredReference = monthlyCareTaskReference(record, item);
+    let existing = byReference.get(preferredReference);
+    if (!existing) {
+      existing = (rows || []).find((row: any) => {
+        const meta: any = parseTaskJson(row.result_summary);
+        return (meta.sourceMeetingId === record.id && meta.sourceCareId === item.id)
+          || (row.status !== "completed" && row.category === item.taskType && row.title === item.member);
+      });
+    }
+    if (existing) {
+      if (item.taskId !== existing.source_reference) linked += 1;
+      item.taskId = existing.source_reference;
+      item.taskCreatedByMeeting = parseTaskJson(existing.result_summary).localSource === "monthly-meeting";
+      continue;
+    }
+
+    await saveLeadershipTask(monthlyCareTaskInput(record, item, preferredReference, context), context, directoryState);
+    item.taskId = preferredReference;
+    item.taskCreatedByMeeting = true;
+    if (item.state === "pending") item.state = "scheduled";
+    const inserted = {
+      source_reference: preferredReference,
+      category: item.taskType,
+      title: item.member,
+      status: "pending",
+      result_summary: JSON.stringify({
+        localSource: "monthly-meeting",
+        sourceMeetingId: record.id,
+        sourceCareId: item.id,
+      }),
+    };
+    rows.push(inserted);
+    byReference.set(preferredReference, inserted);
+    created += 1;
+  }
+  return { record: { ...record, care: { ...care, items } }, created, linked };
+}
+
 async function committeeMeetingsApi(request: Request, context: Context) {
   const settingsRows = await db("app_settings?key=eq.monthly_meeting&select=value&limit=1");
   const settings = settingsRows?.[0]?.value || { chapterSizeTarget: 51 };
@@ -653,6 +747,27 @@ async function committeeMeetingsApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   leadership(context);
   const body = await requestBody(request);
+  if (body.action === "reconcile-care-tasks") {
+    const rows = await db("committee_meetings?status=eq.draft&select=*&order=meeting_date.desc");
+    const directory = await taskDirectory();
+    let created = 0;
+    let linked = 0;
+    for (const row of rows || []) {
+      const current = meetingToApi(row, names);
+      const result = await ensureMonthlyCareTasks(current, context, directory);
+      created += result.created;
+      linked += result.linked;
+      if (!result.created && !result.linked) continue;
+      await db(`committee_meetings?id=eq.${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          care_summary: { ...(result.record.care || {}), _updatedBy: context.identity },
+        }),
+      });
+    }
+    return { repaired: created, relinked: linked };
+  }
   if (body.action === "settings") {
     const target = Math.round(Number(body.chapterSizeTarget));
     if (!Number.isFinite(target) || target < 1 || target > 500) throw new Error("分會目標人數不正確");
@@ -664,13 +779,14 @@ async function committeeMeetingsApi(request: Request, context: Context) {
     });
     return { settings: value };
   }
-  const record = body.record;
+  let record = body.record;
   if (!record || !/^meeting-\d{4}-\d{2}$/.test(String(record.id || ""))) throw new Error("會議紀錄編號不正確");
   const items = Array.isArray(record.care?.items) ? record.care.items : [];
   if (items.some((item: any) => item.assignmentRequired !== false && item.owner && item.owner === item.companion)) throw new Error("負責委員與陪訪委員不能是同一人");
   if (record.status === "final" && items.some((item: any) => item.assignmentRequired !== false && (!String(item.owner || "").trim() || !String(item.dueDate || "").trim()))) {
     throw new Error("續約及輔導項目都必須完成追蹤委員與排定日期後才能結案");
   }
+  record = (await ensureMonthlyCareTasks(record, context)).record;
   const recorderId = ids.get(record.recorder) || context.personId;
   const attendeeIds = (record.attendees || []).map((name: string) => ids.get(name)).filter(Boolean);
   const now = new Date().toISOString();

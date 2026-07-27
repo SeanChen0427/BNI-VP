@@ -27,7 +27,7 @@
     const newCases=tasks.filter(task=>task.type==="new"),approved=newCases.filter(task=>{const state=workflow(task),votes=Object.values(state.votes||{});return isClosedTask(task)&&inMonth(task.completedAt,month)&&votes.filter(v=>v==="approve").length>votes.filter(v=>v==="reject").length});
     const pending=newCases.filter(task=>!isClosedTask(task));
     const care=tasks.filter(task=>!isClosedTask(task)&&["renewal","midterm","special"].includes(task.type)).map(task=>({id:task.id,member:task.member,taskType:task.type,type:task.type==="renewal"?"續約／終期輔導":task.type==="midterm"?"期中輔導":"特定關懷",stage:task.stage||"待處理",lead:task.lead||"",companion:task.companions?.[0]||"",scheduledAt:task.scheduledAt||"",notes:task.notes||"",source:task.source||""}));
-    return{lostCount:departures.length,applicationCount:applications.length,growthCount:approved.length-departures.length,approvedCount:approved.length,conditionalCount:0,pendingReviewCount:pending.length,taskCareMembers:care};
+    return{lostCount:departures.length,applicationCount:applications.length,growthCount:approved.length-departures.length,approvedCount:approved.length,conditionalCount:0,pendingReviewCount:pending.length,taskCareMembers:care,taskIds:tasks.map(task=>task.id),completedTaskIds:tasks.filter(isClosedTask).map(task=>task.id)};
   }
   async function loadBni(){try{const response=await fetch("/api/bni-analysis",{cache:"no-store"});if(response.ok)snapshot=await response.json()}catch{}}
   const careStates={pending:"待討論",scheduled:"已排定",active:"追蹤中",done:"已完成"};
@@ -47,8 +47,14 @@
       if(matched)Object.assign(matched,assignment);
       else push("已排定關懷案件",task.member,`${task.type}｜${task.stage}`,task.lead?`已由 ${task.lead} 負責`:"尚未指派負責人",assignment);
     }
-    const previous=new Map((existing||[]).map(item=>[item.id,item]));
-    return items.map(item=>{const saved=previous.get(item.id);return saved?{...item,state:saved.state||item.state,owner:saved.owner||item.owner,companion:saved.companion||item.companion,dueDate:saved.dueDate||item.dueDate,note:saved.note||item.note||"",taskId:saved.taskId||item.taskId,taskCreatedByMeeting:saved.taskCreatedByMeeting||item.taskCreatedByMeeting}:item});
+    const previous=new Map((existing||[]).map(item=>[item.id,item])),liveTaskIds=new Set(context.taskIds||[]),completedTaskIds=new Set(context.completedTaskIds||[]);
+    return items.map(item=>{
+      const saved=previous.get(item.id);if(!saved)return item;
+      if(item.taskId)return{...item,state:completedTaskIds.has(item.taskId)?"done":item.state};
+      const savedTaskExists=saved.taskId&&liveTaskIds.has(saved.taskId);
+      const staleSchedule=saved.taskId&&!savedTaskExists&&["scheduled","active"].includes(saved.state);
+      return{...item,state:staleSchedule?"pending":completedTaskIds.has(saved.taskId)?"done":saved.state||item.state,owner:saved.owner||item.owner,companion:saved.companion||item.companion,dueDate:saved.dueDate||item.dueDate,note:saved.note||item.note||"",taskId:savedTaskExists?saved.taskId:"",taskCreatedByMeeting:savedTaskExists&&Boolean(saved.taskCreatedByMeeting),syncMissing:Boolean(staleSchedule)};
+    });
   }
   function careMembersText(items=[]){
     if(!items.length)return"目前會員關懷儀表板與進行中案件均無待討論名單。";
@@ -143,6 +149,10 @@
   async function init(){
     try{
       await window.FulianTaskStore.ready;
+      if(canManage){
+        const reconciliation=await api("POST",{identity,action:"reconcile-care-tasks"});
+        if(reconciliation.repaired||reconciliation.relinked)await window.FulianTaskStore.refresh();
+      }
       await Promise.all([loadBni(),api().then(data=>store=data)]);
       if(!canManage){
         document.body.classList.add("committee-history-mode");$("#accessNotice").hidden=false;

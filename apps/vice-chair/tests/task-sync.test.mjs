@@ -239,3 +239,15 @@ test("共同編輯衝突會停止覆寫，暫時斷線會自動重試", () => {
   assert.match(taskStore, /retryTasks/);
   assert.match(taskStore, /retryPending/);
 });
+
+test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", () => {
+  const edge = read("supabase/functions/app-api/index.ts");
+  const monthly = read("apps/vice-chair/assets/js/monthly-meeting.js");
+  assert.match(edge, /async function ensureMonthlyCareTasks/);
+  assert.match(edge, /body\.action === "reconcile-care-tasks"/);
+  assert.match(edge, /record = \(await ensureMonthlyCareTasks\(record, context\)\)\.record/);
+  assert.match(edge, /await saveLeadershipTask\(monthlyCareTaskInput/);
+  assert.match(monthly, /action:"reconcile-care-tasks"/);
+  assert.match(monthly, /await window\.FulianTaskStore\.refresh\(\)/);
+  assert.match(monthly, /staleSchedule\?"pending"/);
+});
