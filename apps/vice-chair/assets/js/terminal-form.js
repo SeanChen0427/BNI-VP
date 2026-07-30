@@ -201,9 +201,49 @@ function toast(msg) { const t=$("#toast"); t.textContent=msg; t.classList.add("s
 function radioValue(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value || ""; }
 function mark(selected, value) { return selected === value ? "■" : "□"; }
 function answer(id) { return $(id)?.value.trim() || ""; }
+function completionMissingFields() {
+  const textFields = [
+    ...metricDefs.map(item => [`${item.id}Answer`, `第 ${item.no} 題`]),
+    ...experienceDefs.map(([no,id]) => [`${id}Answer`, `第 ${no} 題`]),
+    ["chapterNotes", "第 18 題分會備註"],
+    ["summary", "訪談人總結和建議"],
+    ["interviewerOpinion", "訪談人意見"],
+  ];
+  const missing = textFields
+    .filter(([id]) => !answer(`#${id}`))
+    .map(([id,label]) => ({ id, label, node: $(`#${id}`) }));
+  [
+    ["receivedBenefit", "第 4 題效益確認"],
+    ["oneToOneBenefit", "第 7 題效益確認"],
+    ["workshopWilling", "第 9 題培訓意願"],
+  ].forEach(([name,label]) => {
+    if (!radioValue(name)) missing.push({ id: name, label, node: document.querySelector(`input[name="${name}"]`) });
+  });
+  const satisfaction = Number(answer("#satisfactionScore"));
+  if (!Number.isInteger(satisfaction) || satisfaction < 1 || satisfaction > 10) {
+    missing.push({ id: "satisfactionScore", label: "第 15 題滿意度分數", node: $("#satisfactionScore") });
+  }
+  [
+    ["mspUnderstood", "第 17 題 MSP 確認"],
+    ["policyUnderstood", "第 20 題權責確認"],
+  ].forEach(([id,label]) => {
+    const node = $(`#${id}`);
+    if (!node?.checked) missing.push({ id, label, node });
+  });
+  return missing;
+}
 
 async function downloadWord() {
   if(typeof docx==="undefined"){toast("Word 元件尚未載入，請重新整理後再試");return}
+  const missing=completionMissingFields();
+  if(missing.length){
+    const preview=missing.slice(0,3).map(item=>item.label).join("、");
+    const remaining=missing.length>3?`等 ${missing.length} 項`:"";
+    toast(`尚未完成：${preview}${remaining}。請補齊後再產生 Word`);
+    missing[0].node?.scrollIntoView?.({behavior:"smooth",block:"center"});
+    missing[0].node?.focus?.();
+    return;
+  }
   terminalCompletion.begin();
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, PageOrientation, ShadingType } = docx;
   const m = currentMember.metrics, fp = window.formPeriods;
