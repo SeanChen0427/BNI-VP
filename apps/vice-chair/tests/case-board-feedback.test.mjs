@@ -13,6 +13,10 @@ const workflowHtml = readFileSync(
   new URL("../case-workflow.html", import.meta.url),
   "utf8"
 );
+const workflowCss = readFileSync(
+  new URL("../assets/css/case-workflow.css", import.meta.url),
+  "utf8"
+);
 
 assert.match(
   boardSource,
@@ -62,6 +66,17 @@ assert.match(
   /<aside class="side-column vp-only-section">/,
   "案件狀態與歷程側欄只能顯示於副主席介面"
 );
+assert.doesNotMatch(
+  workflowHtml,
+  /sticky-card/,
+  "案件狀態不得在捲動時黏著畫面"
+);
+assert.doesNotMatch(
+  workflowCss,
+  /\.sticky-card\{position:sticky/,
+  "案件狀態不得透過 CSS 跟隨頁面捲動"
+);
+assert.match(workflowHtml, /case-workflow\.css\?v=2/);
 assert.match(workflowSource, /\$\$\("\.vp-only-section"\)/);
 assert.match(workflowSource, /classList\.toggle\("committee-view",!allowed\)/);
 assert.match(
