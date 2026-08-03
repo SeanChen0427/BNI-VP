@@ -10,6 +10,7 @@
 - 物件路徑改為純 ASCII 系統編號；中文原始檔名只存於 `report_imports.metadata.originalFilename`，不影響使用者辨識與稽核。
 - 修正只涉及上傳物件路徑與回歸測試，未修改既有 PALMS、分析快照、會員資料或計分規則。
 - `app-api` 已部署為 version 17、狀態 `ACTIVE`、`verify_jwt = true`；完整驗證為 41／41 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
+- 正式 GitHub Pages 以副主席身分重新上傳 2026-07 單月 PALMS 成功；頁面顯示「已上傳並完成月會摘要」，每月資料進度由 1／4 更新為 2／4。
 
 ## 2026-07-30 回饋投票頁捲動體驗修正
 

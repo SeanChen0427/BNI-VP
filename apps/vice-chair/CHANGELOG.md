@@ -5,6 +5,7 @@
 - 修正每月資料上傳把中文原始檔名直接保留在 Supabase Storage object key，導致 `Invalid key` 並無法入檔。
 - `raw-reports` 物件路徑改用純 ASCII 的月份、資料類型、時間、序號及 SHA-256 短指紋；原始中文檔名仍保存在 `report_imports.metadata.originalFilename` 供畫面與稽核辨識。
 - 新增 object key 格式與輸入驗證回歸測試；未修改 PALMS 解析、計分、既有報表或分析快照。
+- 正式頁面已用原失敗的 2026-07 單月 PALMS 重試成功，畫面確認 Private Storage 入檔及月會摘要完成。
 
 ## 2026-07-30－回饋投票頁案件狀態捲動修正
 
