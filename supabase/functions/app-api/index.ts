@@ -1040,16 +1040,28 @@ async function aiChatApi(request: Request, context: Context) {
 
 async function loadEngineSources() {
   const imports = await reportImports();
-  const half = latestByCategory(imports, "halfYear") || imports.find((row: any) => row.report_type === "half_year_palms" && !/annual/i.test(JSON.stringify(row.metadata || {})));
+  const expectedMonth = monthWindow(-1, 1);
+  const expectedHalf = monthWindow(-1, 6);
+  const expectedAnnual = monthWindow(-1, 12);
+  const half = latestByCategory(imports, "halfYear", expectedHalf);
   const expiry = latestByCategory(imports, "membership");
   const tenure = latestByCategory(imports, "tenure");
-  if (!half || !expiry || !tenure) throw new Error("正式分析需要半年 PALMS、會員到期日與會齡三份基準報表，Private Storage 目前不完整");
+  const annualRow = latestByCategory(imports, "annual", expectedAnnual);
+  const missing = [];
+  if (!half) missing.push(`半年 PALMS（${expectedHalf.start} 至 ${expectedHalf.end}）`);
+  if (!annualRow) missing.push(`一年 PALMS（${expectedAnnual.start} 至 ${expectedAnnual.end}）`);
+  if (!expiry) missing.push("會員到期日報告");
+  if (!tenure) missing.push("會齡報告");
+  if (missing.length) throw new Error(`正式分析資料尚未完整：請先上傳${missing.join("、")}`);
   const [halfText, expiryText, tenureText] = await Promise.all([downloadReport(half), downloadReport(expiry), downloadReport(tenure)]);
-  const annualRow = latestByCategory(imports, "annual");
-  const annual = annualRow ? parsePalmsText(await downloadReport(annualRow), annualRow.storage_path) : null;
+  const annual = parsePalmsText(await downloadReport(annualRow), annualRow.storage_path);
   const allAuditRows = imports.filter((row: any) => reportCategory(row) === "audit" && auditDate(row));
-  const latestAuditMonth = allAuditRows.map((row: any) => auditDate(row).slice(0, 7)).sort().at(-1) || null;
-  const auditRows = allAuditRows.filter((row: any) => auditDate(row).startsWith(latestAuditMonth)).slice(0, 8);
+  const auditRows = allAuditRows.filter((row: any) => {
+    const date = auditDate(row);
+    return date >= expectedMonth.start && date <= expectedMonth.end;
+  }).slice(0, 8);
+  const expectedAudits = expectedAuditWeeks(expectedMonth.start, expectedMonth.end);
+  if (auditRows.length < expectedAudits) throw new Error(`正式分析資料尚未完整：${expectedMonth.month} 每週審計報告預計 ${expectedAudits} 份，目前 ${auditRows.length} 份`);
   const audits = [];
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
@@ -1062,8 +1074,8 @@ async function loadEngineSources() {
       tenure: parseTenureText(tenureText, tenure.storage_path),
       departed,
       annual,
-      auditMonth: audits.length ? combineAuditWeeks(audits) : null,
-      auditMonthName: latestAuditMonth,
+      auditMonth: combineAuditWeeks(audits),
+      auditMonthName: expectedMonth.month,
       sources,
     }),
   };

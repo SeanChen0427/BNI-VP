@@ -15,9 +15,17 @@
   const radarLabel = { "expired-unrenewed": "已到期未續約", overdue: "已過續約截止", "due-this-month": "本月截止", upcoming: "即將截止", "weak-early-warning": "審查弱項預警" };
   let currentDraft = null;
 
+  const readJson = async (response) => {
+    try {
+      return await response.json();
+    } catch {
+      throw Object.assign(new Error("分析服務回應格式不正確，請重新整理後再試"), { status: response.status });
+    }
+  };
+
   const post = async (payload) => {
     const response = await fetch("/api/analysis-draft", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ identity, ...payload }) });
-    const data = await response.json();
+    const data = await readJson(response);
     if (!response.ok) throw Object.assign(new Error(data.message || "操作失敗"), { data, status: response.status });
     return data;
   };
@@ -67,7 +75,7 @@
   async function loadDraft() {
     try {
       const response = await fetch(`/api/analysis-draft?identity=${encodeURIComponent(identity)}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readJson(response);
       if (response.ok) renderDraft(data.draft);
     } catch { /* 伺服器未啟動時保持初始畫面 */ }
   }
@@ -75,7 +83,7 @@
   async function loadHistory() {
     try {
       const response = await fetch(`/api/analysis-snapshots?identity=${encodeURIComponent(identity)}`, { cache: "no-store" });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok || !data.snapshots?.length) return;
       $("#historyList").innerHTML = data.snapshots.slice().reverse().map((s) => `<article><b>第 ${s.version} 版</b><span>期間 ${s.period?.start || "—"} ~ ${s.period?.end || "—"}</span><span>發佈 ${new Date(s.publishedAt).toLocaleString("zh-TW")}｜${s.publishedBy.split(":")[1] || s.publishedBy}</span></article>`).join("");
     } catch { /* 同上 */ }

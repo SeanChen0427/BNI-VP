@@ -1,5 +1,12 @@
 # 變更紀錄
 
+## 2026-08-03－月度分析草稿正式 API 與資料期間防呆
+
+- 修正「月度分析審閱」頁漏載正式 Supabase API 橋接，導致 `/api/analysis-draft` 落到 GitHub Pages 並把 HTML 404 誤當 JSON 解析。
+- 分析頁加入非 JSON 回應的清楚錯誤訊息，不再直接顯示 `Unexpected token '<'`。
+- 正式分析後端只接受本期半年 PALMS、全年 PALMS與上月完整審計報告；資料未齊時明確阻擋，不再沿用舊月份報表混產新草稿。
+- 未修改 PALMS 解析、計分公式、會員資料或既有分析快照。
+
 ## 2026-08-03－PALMS 中文檔名上傳修正
 
 - 修正每月資料上傳把中文原始檔名直接保留在 Supabase Storage object key，導致 `Invalid key` 並無法入檔。

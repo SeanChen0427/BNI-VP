@@ -4,6 +4,13 @@
 
 本文件如實記錄 2026-07-20 的實際操作、驗證結果、錯誤繞路與後續清理事項。不得把暫時網址或未完成項目描述為正式上架完成。
 
+## 2026-08-03 月度分析草稿 API 路由修正
+
+- 原因確認：`analysis-review.html` 未載入 `supabase-data.js`，正式頁面呼叫相對路徑 `/api/analysis-draft` 時由 GitHub Pages 回傳 HTML 404，前端再以 JSON 解析而顯示 `Unexpected token '<'`。
+- 分析頁補回 Edge API 橋接及非 JSON 防呆；後端同步鎖定本期半年、全年與審計資料期間，禁止沿用舊報表產生看似最新的草稿。
+- 本次不修改計分規則、會員資料或既有快照。
+- `app-api` 已部署為 version 18、狀態 `ACTIVE`、`verify_jwt = true`；完整驗證為 44／44 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
+
 ## 2026-08-03 PALMS 中文檔名 Storage key 修正
 
 - 原因確認：月度上傳程式的清理規則允許 Unicode 字母，導致原始檔名中的中文仍進入 `raw-reports` object path，Supabase Storage 以 `Invalid key` 拒絕上傳。
