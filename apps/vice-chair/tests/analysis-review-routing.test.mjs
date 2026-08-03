@@ -76,13 +76,18 @@ test("成功重跑分析時會清除上一次的阻擋文字", async () => {
   assert.match(css, /\.issues\[hidden\]\{display:none\}/);
 });
 
-test("Gemini 流量壅塞只對暫時性錯誤自動重試", () => {
+test("Gemini 流量壅塞只在 Edge 總時間預算內自動重試", () => {
   assert.match(edgeSource, /function temporaryGeminiFailure\(response: Response, payload: any\)/);
   assert.match(edgeSource, /response\.status === 429/);
   assert.match(edgeSource, /response\.status === 503/);
-  assert.match(edgeSource, /for \(let attempt = 0; attempt < 3; attempt \+= 1\)/);
-  assert.match(edgeSource, /if \(!temporaryGeminiFailure\(response, payload\)\) break/);
-  assert.match(edgeSource, /系統已自動重試 2 次仍未成功/);
+  assert.match(edgeSource, /GEMINI_EDGE_TOTAL_BUDGET_MS = 110_000/);
+  assert.match(edgeSource, /GEMINI_FLASH_ATTEMPT_TIMEOUT_MS = 32_000/);
+  assert.match(edgeSource, /GEMINI_PRO_ATTEMPT_TIMEOUT_MS = 100_000/);
+  assert.match(edgeSource, /for \(let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt \+= 1\)/);
+  assert.match(edgeSource, /new AbortController\(\)/);
+  assert.match(edgeSource, /clearTimeout\(timer\)/);
+  assert.match(edgeSource, /remainingAfterDelay < GEMINI_MIN_ATTEMPT_MS/);
+  assert.match(edgeSource, /系統已在 Supabase 強制終止前主動取消/);
 });
 
 test("Gemini AI 審視可由使用者選擇後端白名單模型", () => {
