@@ -43,3 +43,43 @@
 .vp-only-section[hidden] {
   display: none !important;
 }
+
+.feedback-proxy-control {
+  display: grid;
+  grid-template-columns: minmax(220px, 360px) 1fr;
+  gap: 14px;
+  align-items: end;
+  margin-bottom: 14px;
+  padding: 12px;
+  border: 1px solid #e7d7c5;
+  border-radius: 11px;
+  background: #fff8ed;
+}
+
+.feedback-proxy-control[hidden] {
+  display: none;
+}
+
+.feedback-proxy-control small {
+  padding-bottom: 8px;
+  color: #85622a;
+}
+
+.feedback-item .feedback-byline {
+  display: block;
+  margin-top: 5px;
+  color: #9a6420;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .feedback-proxy-control {
+    grid-template-columns: 1fr;
+  }
+
+  .feedback-proxy-control small {
+    padding-bottom: 0;
+  }
+}
