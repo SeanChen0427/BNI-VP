@@ -1132,6 +1132,14 @@ async function currentDraft() {
   return rows?.[0] || null;
 }
 
+function assertAnalysisReconciled(engine: any) {
+  const issues = Array.isArray(engine?.reconciliation?.issues) ? engine.reconciliation.issues : [];
+  const blocking = issues.filter((issue: any) => issue?.level === "blocking");
+  if (engine?.aborted || blocking.length) {
+    throw Object.assign(new Error("對帳未通過，未產生草稿（先對帳，後分析）"), { status: 409, issues });
+  }
+}
+
 async function analysisDraftApi(request: Request, context: Context) {
   leadership(context);
   if (request.method === "GET") {
@@ -1142,7 +1150,7 @@ async function analysisDraftApi(request: Request, context: Context) {
   const body = await requestBody(request);
   if (body.action === "generate") {
     const { engine } = await loadEngineSources();
-    if (engine.aborted) throw Object.assign(new Error("對帳未通過，未產生草稿（先對帳，後分析）"), { status: 409, issues: engine.reconciliation.issues });
+    assertAnalysisReconciled(engine);
     const previous = await currentDraft();
     const draft = { id: `draft-${Date.now()}`, status: "draft", engine, aiReview: null, feedback: previous?.snapshot?.draft?.engine?.meta?.period?.end === engine.meta.period.end ? previous.snapshot.draft.feedback || [] : [], createdAt: new Date().toISOString(), createdBy: context.identity };
     await db("analysis_snapshots", {
@@ -1163,6 +1171,7 @@ async function analysisDraftApi(request: Request, context: Context) {
     return { draft, message: "已記錄退回原因；重新執行 AI 審視時會一併帶入" };
   }
   if (body.action === "ai-review") {
+    assertAnalysisReconciled(draft.engine);
     const provider = body.provider as Provider;
     if (!PROVIDERS.includes(provider)) throw new Error("AI 平台不正確");
     const previous = await latestPublished();
@@ -1173,6 +1182,7 @@ async function analysisDraftApi(request: Request, context: Context) {
     return { draft };
   }
   if (body.action === "publish") {
+    assertAnalysisReconciled(draft.engine);
     if (!draft.aiReview) throw new Error("尚未執行 AI 審視，請先完成審視再發佈");
     const history = await db("analysis_snapshots?is_published=eq.true&select=id");
     const version = history.length + 1;

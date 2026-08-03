@@ -96,11 +96,12 @@
     const button = $("#generateButton");
     button.disabled = true;
     $("#generateStatus").textContent = "解析與對帳中…";
-    $("#reconcileIssues").hidden = true;
-    $("#departureResolution").hidden = true;
+    renderIssues($("#reconcileIssues"), []);
+    renderDepartureResolution([]);
     try {
       const data = await post({ action: "generate" });
       $("#generateStatus").textContent = "草稿已產出";
+      renderIssues($("#reconcileIssues"), []);
       renderDepartureResolution([]);
       renderDraft(data.draft);
     } catch (error) {

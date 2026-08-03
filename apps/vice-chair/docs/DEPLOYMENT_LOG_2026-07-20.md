@@ -273,6 +273,14 @@ Supabase PostgreSQL／Private Storage／Edge Functions
 - 排程與案件狀態加入前景／焦點及 30 秒安全更新；偵測本機正在寫入或同步失敗時停止遠端覆蓋。
 - 本機測試增至 31 項，包含兩位委員以相同舊 revision 同時提交回饋與投票仍各自保留。
 
+## 2026-08-04 月度分析離會差異與假阻擋修正
+
+- 上線前已離會但未遷入 Supabase 現任會員主檔的人員，改由月度分析差異確認流程建立 `departed` 歷史人員／會員紀錄；不會加入現任名單。
+- 黃庭安、馬鼎鈞、林偉潔、楊秉諺及柳欽貿的本期「到期報告有、PALMS 無」差異已完成排除；正式引擎目前回傳 `reconciliation.ok = true`、`issues = []`、現任 43 人。
+- `app-api` 已部署為 version 21、狀態 `ACTIVE`、`verify_jwt = true`；後端新增 fail-closed 防線，任何 `blocking` issue 都禁止產出、AI 審視與發佈。
+- 修正前台成功重跑後仍殘留上一輪 blocking 文字：產出前與成功後清空舊訊息，並以 `.issues[hidden]` 確保隱藏狀態不被版面樣式覆蓋。
+- 完整驗證：49/49 系統測試通過、專案健檢 0 錯誤、PALMS 官方回歸 46/46 完全一致；未修改計分公式與既有已完成案件／訪談資料。
+
 ## 七、安全紀錄
 
 - 真實會員與 PALMS 未加入 GitHub 或公開前端 bucket。
