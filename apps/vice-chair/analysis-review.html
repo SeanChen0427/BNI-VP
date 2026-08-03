@@ -8,7 +8,7 @@
   <script src="assets/js/supabase-data.js?v=2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/analysis-review.css?v=1">
+  <link rel="stylesheet" href="assets/css/analysis-review.css?v=2">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
 </head>
 <body>
@@ -24,6 +24,15 @@
         <div class="panel-head"><h2>一、產出分析</h2><span class="hint">讀取最新已入檔報表，先對帳後計分</span></div>
         <div class="panel-actions"><button type="button" id="generateButton">產出本月分析草稿</button><span id="generateStatus"></span></div>
         <div class="issues" id="reconcileIssues" hidden></div>
+        <section class="departure-resolution" id="departureResolution" hidden>
+          <div>
+            <h3>確認離會差異</h3>
+            <p>到期報告有、PALMS 沒有的會員通常已離會。請只確認確定已離會者；新入會或姓名錯誤不要確認。</p>
+          </div>
+          <label>離會確認日<input type="date" id="departureConfirmDate"></label>
+          <div class="departure-candidates" id="departureCandidates"></div>
+          <p class="departure-status" id="departureResolveStatus"></p>
+        </section>
       </section>
       <section class="panel" id="draftPanel" hidden>
         <div class="panel-head"><h2>二、草稿內容</h2><span class="hint" id="draftMeta"></span></div>
@@ -65,6 +74,6 @@
     </div>
   </main>
   <script src="assets/js/workspace-nav.js?v=3"></script>
-  <script src="assets/js/analysis-review.js?v=2"></script>
+  <script src="assets/js/analysis-review.js?v=3"></script>
 </body>
 </html>

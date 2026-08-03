@@ -51,7 +51,7 @@ export function reconcile({ palms, expiry, tenure, departed }) {
         level: "blocking",
         code: "expiry-only",
         member: e.name,
-        message: `${e.name}：到期報告存在但 PALMS 名單找不到，人數差異必須逐一解釋（新入會？姓名不一致？）`,
+        message: `${e.name}：到期報告存在但 PALMS 名單找不到，請由副主席確認是否已離會；若是新入會或姓名不一致則先修正資料`,
       });
     }
   }

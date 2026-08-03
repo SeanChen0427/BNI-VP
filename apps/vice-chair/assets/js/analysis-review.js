@@ -30,9 +30,89 @@
     return data;
   };
 
+  const postDeparture = async (payload) => {
+    const response = await fetch("/api/member-departure", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ identity, ...payload }) });
+    const data = await readJson(response);
+    if (!response.ok) throw Object.assign(new Error(data.message || "離會登記失敗"), { data, status: response.status });
+    return data;
+  };
+
+  const localDay = () => {
+    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return `${values.year}-${values.month}-${values.day}`;
+  };
+
   function renderIssues(container, issues) {
     container.hidden = !issues.length;
     container.innerHTML = issues.map((issue) => `<p class="issue ${issue.level}"><b>[${issue.level === "blocking" ? "阻擋" : issue.level === "critical" ? "最高優先" : "警告"}]</b> ${issue.message}</p>`).join("");
+  }
+
+  function renderDepartureResolution(issues) {
+    const candidates = issues.filter((issue) => issue.level === "blocking" && issue.code === "expiry-only" && issue.member);
+    const panel = $("#departureResolution");
+    panel.hidden = !candidates.length;
+    $("#departureResolveStatus").textContent = "";
+    if (!candidates.length) {
+      $("#departureCandidates").replaceChildren();
+      return;
+    }
+    if (!$("#departureConfirmDate").value) $("#departureConfirmDate").value = localDay();
+    const cards = candidates.map((issue) => {
+      const card = document.createElement("article");
+      const name = document.createElement("strong");
+      const button = document.createElement("button");
+      name.textContent = issue.member;
+      button.type = "button";
+      button.textContent = "確認已離會";
+      button.addEventListener("click", () => confirmDeparture(issue.member, button));
+      card.append(name, button);
+      return card;
+    });
+    $("#departureCandidates").replaceChildren(...cards);
+  }
+
+  async function confirmDeparture(name, button) {
+    const confirmedAt = $("#departureConfirmDate").value;
+    if (!confirmedAt) {
+      $("#departureResolveStatus").textContent = "請先選擇離會確認日";
+      $("#departureConfirmDate").focus();
+      return;
+    }
+    if (!confirm(`確認「${name}」已離會？\n確認後會寫入正式會員主檔，後續分析自動排除；如有誤可到系統設定撤銷。`)) return;
+    button.disabled = true;
+    $("#departureResolveStatus").textContent = `正在登記 ${name}…`;
+    try {
+      const data = await postDeparture({ action: "register", name, confirmName: name, confirmedAt, note: "月度分析對帳確認：到期報告有、PALMS 無" });
+      $("#departureResolveStatus").textContent = data.message;
+      await generateDraft();
+    } catch (error) {
+      $("#departureResolveStatus").textContent = error.message;
+      button.disabled = false;
+    }
+  }
+
+  async function generateDraft() {
+    const button = $("#generateButton");
+    button.disabled = true;
+    $("#generateStatus").textContent = "解析與對帳中…";
+    $("#reconcileIssues").hidden = true;
+    $("#departureResolution").hidden = true;
+    try {
+      const data = await post({ action: "generate" });
+      $("#generateStatus").textContent = "草稿已產出";
+      renderDepartureResolution([]);
+      renderDraft(data.draft);
+    } catch (error) {
+      $("#generateStatus").textContent = error.message;
+      const issues = error.data?.issues || [];
+      if (issues.length) {
+        renderIssues($("#reconcileIssues"), issues);
+        renderDepartureResolution(issues);
+      }
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function renderDraft(draft) {
@@ -89,18 +169,7 @@
     } catch { /* 同上 */ }
   }
 
-  $("#generateButton").addEventListener("click", async () => {
-    $("#generateStatus").textContent = "解析與對帳中…";
-    $("#reconcileIssues").hidden = true;
-    try {
-      const data = await post({ action: "generate" });
-      $("#generateStatus").textContent = "草稿已產出";
-      renderDraft(data.draft);
-    } catch (error) {
-      $("#generateStatus").textContent = error.message;
-      if (error.data?.issues) renderIssues($("#reconcileIssues"), error.data.issues);
-    }
-  });
+  $("#generateButton").addEventListener("click", generateDraft);
 
   $("#reviewButton").addEventListener("click", async () => {
     const button = $("#reviewButton");
