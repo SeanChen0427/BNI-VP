@@ -1,5 +1,11 @@
 # 變更紀錄
 
+## 2026-08-03－PALMS 中文檔名上傳修正
+
+- 修正每月資料上傳把中文原始檔名直接保留在 Supabase Storage object key，導致 `Invalid key` 並無法入檔。
+- `raw-reports` 物件路徑改用純 ASCII 的月份、資料類型、時間、序號及 SHA-256 短指紋；原始中文檔名仍保存在 `report_imports.metadata.originalFilename` 供畫面與稽核辨識。
+- 新增 object key 格式與輸入驗證回歸測試；未修改 PALMS 解析、計分、既有報表或分析快照。
+
 ## 2026-07-30－回饋投票頁案件狀態捲動修正
 
 - 移除「訪談後回饋與投票流程」右側案件狀態卡的 sticky 定位；向下閱讀回饋、投票與董顧流程時，案件狀態不再跟隨畫面移動。

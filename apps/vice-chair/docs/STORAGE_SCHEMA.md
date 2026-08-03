@@ -43,6 +43,7 @@
 - `ai_profiles`：個人預設 AI 平台。
 - `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。
 - `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
+  - Storage object path 僅使用月份、報表類型、上傳時間、序號及 SHA-256 短指紋等 ASCII 字元；使用者原始檔名只保存於 `report_imports.metadata.originalFilename`，不得直接組入 object path。
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。

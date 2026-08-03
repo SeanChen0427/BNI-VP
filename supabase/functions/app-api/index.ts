@@ -4,6 +4,7 @@ import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analy
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
+import { rawReportObjectPath } from "./storage-object-key.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -600,15 +601,21 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
       period = parsed.period;
       reportType = body.type === "monthly" ? "monthly_palms" : "half_year_palms";
     }
-    const safeName = String(file.name || "report.xls").replace(/[^\p{Letter}\p{Number}._-]+/gu, "_").slice(-120);
-    const storagePath = `monthly-data/${monthly.month}/${body.type}/${Date.now()}-${index}-${safeName}`;
+    const contentHash = await sha256(bytes);
+    const storagePath = rawReportObjectPath({
+      month: monthly.month,
+      type: body.type,
+      index,
+      createdAt: Date.now(),
+      sha256: contentHash,
+    });
     await uploadRawFile(bytes, storagePath);
     const imported = await insertReportImport({
       report_type: reportType,
       period_start: period.start,
       period_end: period.end,
       storage_path: storagePath,
-      sha256: await sha256(bytes),
+      sha256: contentHash,
       imported_by: context.personId,
       metadata: { category: body.type, originalFilename: file.name || "", uploadedBy: context.identity },
     });

@@ -4,6 +4,13 @@
 
 本文件如實記錄 2026-07-20 的實際操作、驗證結果、錯誤繞路與後續清理事項。不得把暫時網址或未完成項目描述為正式上架完成。
 
+## 2026-08-03 PALMS 中文檔名 Storage key 修正
+
+- 原因確認：月度上傳程式的清理規則允許 Unicode 字母，導致原始檔名中的中文仍進入 `raw-reports` object path，Supabase Storage 以 `Invalid key` 拒絕上傳。
+- 物件路徑改為純 ASCII 系統編號；中文原始檔名只存於 `report_imports.metadata.originalFilename`，不影響使用者辨識與稽核。
+- 修正只涉及上傳物件路徑與回歸測試，未修改既有 PALMS、分析快照、會員資料或計分規則。
+- `app-api` 已部署為 version 17、狀態 `ACTIVE`、`verify_jwt = true`；完整驗證為 41／41 測試通過、專案健檢 0 錯誤、PALMS 46／46 完全吻合。
+
 ## 2026-07-30 回饋投票頁捲動體驗修正
 
 - 移除案件決議工作台右側案件狀態卡的 `position: sticky`，避免使用者向下填寫回饋、投票及董顧資料時，狀態卡持續跟隨並干擾閱讀。
