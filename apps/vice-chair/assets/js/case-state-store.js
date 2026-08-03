@@ -305,6 +305,7 @@
     ),
     saveVote: (taskId, value) => postAction(taskId, "vote", value),
     openVote: (taskId, workflow) => postAction(taskId, "open-vote", workflow),
+    saveWorkflow: (taskId, workflow) => postAction(taskId, "workflow", workflow),
     reset: (taskId) => postAction(taskId, "reset", {}),
   };
 

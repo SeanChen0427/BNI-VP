@@ -17,6 +17,13 @@ const MODELS = {
   gemini: "gemini-3.5-flash",
   anthropic: "claude-sonnet-5",
 } as const;
+const DEFAULT_GEMINI_REVIEW_MODEL = "gemini-3.6-flash";
+const GEMINI_REVIEW_MODELS = new Set([
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-2.5-pro",
+]);
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
@@ -1017,7 +1024,25 @@ function assertCompleteAiResponse(provider: Provider, payload: any) {
   throw Object.assign(new Error(`AI 平台未完整產生回答（${String(reason).slice(0, 60)}）`), { status: 502 });
 }
 
-async function callProvider(provider: Provider, apiKey: string, system: string, prompt: string, maxTokens = 1000) {
+function temporaryGeminiFailure(response: Response, payload: any) {
+  const message = String(payload?.error?.message || payload?.error?.status || "");
+  return response.status === 429
+    || response.status === 503
+    || /high demand|try again later|temporar|resource_exhausted|unavailable/i.test(message);
+}
+
+function retryDelay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function reviewModel(provider: Provider, requested: unknown) {
+  if (provider !== "gemini") return MODELS[provider];
+  const model = String(requested || DEFAULT_GEMINI_REVIEW_MODEL);
+  if (!GEMINI_REVIEW_MODELS.has(model)) throw new Error("不支援的 Gemini 模型，請重新選擇");
+  return model;
+}
+
+async function callProvider(provider: Provider, apiKey: string, system: string, prompt: string, maxTokens = 1000, selectedModel = MODELS[provider]) {
   let response;
   let payload: any;
   if (provider === "openai") {
@@ -1028,11 +1053,18 @@ async function callProvider(provider: Provider, apiKey: string, system: string, 
       return { text: extractOpenAiText(payload), model: MODELS.openai };
     }
   } else if (provider === "gemini") {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent`, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }) });
-    payload = await response.json().catch(() => ({}));
-    if (response.ok) {
-      assertCompleteAiResponse(provider, payload);
-      return { text: (payload?.candidates?.[0]?.content?.parts || []).map((part: any) => part?.text || "").join("\n").trim(), model: MODELS.gemini };
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }) });
+      payload = await response.json().catch(() => ({}));
+      if (response.ok) {
+        assertCompleteAiResponse(provider, payload);
+        return { text: (payload?.candidates?.[0]?.content?.parts || []).map((part: any) => part?.text || "").join("\n").trim(), model: selectedModel };
+      }
+      if (!temporaryGeminiFailure(response, payload)) break;
+      if (attempt < 2) await retryDelay(1500 * (attempt + 1));
+    }
+    if (temporaryGeminiFailure(response, payload)) {
+      throw new Error(`Google Gemini（${selectedModel}）目前流量過高，系統已自動重試 2 次仍未成功。請改選另一個 Gemini 模型或稍後再試`);
     }
   } else {
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" }, body: JSON.stringify({ model: MODELS.anthropic, max_tokens: maxTokens, system, messages: [{ role: "user", content: prompt }] }) });
@@ -1110,6 +1142,19 @@ async function loadEngineSources() {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
+  const [renewalRows, activeMemberRows] = await Promise.all([
+    db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
+    db("members?status=eq.active&select=id,people!inner(display_name)"),
+  ]);
+  const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
+  const renewalCompletions = (renewalRows || []).map((row: any) => ({
+    id: row.id,
+    name: renewalNames.get(row.member_id) || "",
+    priorExpiryOn: row.prior_expiry_on,
+    completedOn: row.completed_on,
+    source: row.source,
+    confirmedAt: row.confirmed_at,
+  })).filter((row: any) => row.name);
   const sources = [half, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   return {
     engine: buildAnalysisFromParsed({
@@ -1120,6 +1165,7 @@ async function loadEngineSources() {
       annual,
       auditMonth: combineAuditWeeks(audits),
       auditMonthName: expectedMonth.month,
+      renewalCompletions,
       sources,
     }),
   };
@@ -1163,6 +1209,69 @@ async function analysisDraftApi(request: Request, context: Context) {
   const row = await currentDraft();
   if (!row?.snapshot?.draft) throw new Error("目前沒有分析草稿，請先產出分析");
   const draft = row.snapshot.draft;
+  if (body.action === "confirm-renewal") {
+    const name = String(body.name || "").replace(/\s+/g, "");
+    const priorExpiryOn = String(body.priorExpiryOn || "");
+    const completedOn = String(body.completedOn || "");
+    if (!name || !/^\d{4}-\d{2}-\d{2}$/.test(priorExpiryOn)) throw new Error("續約會員或原到期日不正確");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(completedOn) || completedOn > taipeiDay()) throw new Error("中心區完成日不正確或在未來");
+    const radarItem = (draft.engine?.renewalRadar || []).find((item: any) => item.name === name && item.expiryDate === priorExpiryOn);
+    if (!radarItem) throw Object.assign(new Error("這筆續約提醒已更新，請重新整理草稿後再確認"), { status: 409 });
+    const memberRows = await db(`members?status=eq.active&select=id,membership_expires_on,people!inner(display_name)&people.display_name=eq.${encodeURIComponent(name)}&limit=1`);
+    const member = memberRows?.[0];
+    if (!member?.id) throw new Error(`${name} 不在現任會員主檔中`);
+    if (member.membership_expires_on && member.membership_expires_on !== priorExpiryOn) {
+      throw Object.assign(new Error("會員主檔到期日已更新，請重新產出分析後再確認"), { status: 409 });
+    }
+    await db("membership_renewal_completions?on_conflict=member_id,prior_expiry_on", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({
+        member_id: member.id,
+        prior_expiry_on: priorExpiryOn,
+        completed_on: completedOn,
+        source: "center-office",
+        confirmed_by: context.personId,
+        confirmed_at: new Date().toISOString(),
+        revoked_at: null,
+        revoked_by: null,
+      }),
+    });
+    const { engine } = await loadEngineSources();
+    assertAnalysisReconciled(engine);
+    draft.engine = engine;
+    draft.aiReview = null;
+    draft.createdAt = new Date().toISOString();
+    draft.createdBy = context.identity;
+    await db(`analysis_snapshots?id=eq.${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ generated_at: draft.createdAt, reconciliation: engine.reconciliation, snapshot: { draft } }),
+    });
+    return { draft, message: `${name} 已記錄為中心區完成續約；本到期週期已自續約雷達移除` };
+  }
+  if (body.action === "revoke-renewal") {
+    const completionId = String(body.completionId || "");
+    const confirmation = (draft.engine?.renewalConfirmations || []).find((item: any) => item.id === completionId);
+    if (!confirmation) throw Object.assign(new Error("這筆完成紀錄已更新，請重新整理草稿後再操作"), { status: 409 });
+    await db(`membership_renewal_completions?id=eq.${encodeURIComponent(completionId)}&revoked_at=is.null`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ revoked_at: new Date().toISOString(), revoked_by: context.personId }),
+    });
+    const { engine } = await loadEngineSources();
+    assertAnalysisReconciled(engine);
+    draft.engine = engine;
+    draft.aiReview = null;
+    draft.createdAt = new Date().toISOString();
+    draft.createdBy = context.identity;
+    await db(`analysis_snapshots?id=eq.${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ generated_at: draft.createdAt, reconciliation: engine.reconciliation, snapshot: { draft } }),
+    });
+    return { draft, message: `${confirmation.name} 的中心區完成確認已撤銷，續約提醒已恢復` };
+  }
   if (body.action === "reject") {
     const reason = String(body.reason || "").trim().slice(0, 2000);
     if (!reason) throw new Error("退回重做必須附上原因");
@@ -1174,9 +1283,10 @@ async function analysisDraftApi(request: Request, context: Context) {
     assertAnalysisReconciled(draft.engine);
     const provider = body.provider as Provider;
     if (!PROVIDERS.includes(provider)) throw new Error("AI 平台不正確");
+    const model = reviewModel(provider, body.model);
     const previous = await latestPublished();
     const prompt = `前一期正式資料：\n${JSON.stringify(previous?.snapshot?.analysisReview || null)}\n\n副主席退回回饋：\n${JSON.stringify(draft.feedback || [])}\n\n本期引擎結果（唯一數據來源）：\n${JSON.stringify(draft.engine)}`;
-    const result = await callProvider(provider, await credential(context.personId, provider), REVIEW_SYSTEM, prompt, REVIEW_MAX_TOKENS);
+    const result = await callProvider(provider, await credential(context.personId, provider), REVIEW_SYSTEM, prompt, REVIEW_MAX_TOKENS, model);
     draft.aiReview = { provider, model: result.model, text: result.text, generatedAt: new Date().toISOString(), promptChars: prompt.length, feedbackCount: (draft.feedback || []).length };
     await db(`analysis_snapshots?id=eq.${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ snapshot: { draft } }) });
     return { draft };
@@ -1804,12 +1914,13 @@ async function caseStatesApi(request: Request, context: Context) {
   } else if (body.kind === "reset") {
     leadership(context);
     try {
-      await db("rpc/edge_reset_task_case", {
+      await db("rpc/edge_reset_task_case_as_user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           p_task_id: access.task.id,
           p_actor: context.personId,
+          p_actor_auth_user_id: context.userId,
           p_expected_revision: expectedRevision,
         }),
       });
@@ -1870,12 +1981,13 @@ async function caseStatesApi(request: Request, context: Context) {
   }
 
   try {
-    await db("rpc/edge_save_case_state", {
+    await db("rpc/edge_save_case_state_as_user", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         p_task_id: access.task.id,
         p_actor: context.personId,
+        p_actor_auth_user_id: context.userId,
         p_workflow: workflow,
         p_draft: draft,
         p_expected_revision: expectedRevision,

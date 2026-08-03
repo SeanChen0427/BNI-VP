@@ -10,9 +10,9 @@ const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/i
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
   const authIndex = html.indexOf("assets/js/auth.js?v=7");
   const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=2");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=5");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=7");
   assert.ok(authIndex >= 0 && bridgeIndex > authIndex && pageIndex > bridgeIndex);
-  assert.match(html, /assets\/css\/analysis-review\.css\?v=3/);
+  assert.match(html, /assets\/css\/analysis-review\.css\?v=5/);
 });
 
 test("月度分析頁不把 HTML 錯誤頁當成 JSON 顯示", () => {
@@ -74,4 +74,24 @@ test("成功重跑分析時會清除上一次的阻擋文字", async () => {
   assert.match(pageSource, /renderIssues\(\$\("#reconcileIssues"\), \[\]\);\s*renderDepartureResolution\(\[\]\);\s*try/);
   assert.match(pageSource, /textContent = "草稿已產出";\s*renderIssues\(\$\("#reconcileIssues"\), \[\]\)/);
   assert.match(css, /\.issues\[hidden\]\{display:none\}/);
+});
+
+test("Gemini 流量壅塞只對暫時性錯誤自動重試", () => {
+  assert.match(edgeSource, /function temporaryGeminiFailure\(response: Response, payload: any\)/);
+  assert.match(edgeSource, /response\.status === 429/);
+  assert.match(edgeSource, /response\.status === 503/);
+  assert.match(edgeSource, /for \(let attempt = 0; attempt < 3; attempt \+= 1\)/);
+  assert.match(edgeSource, /if \(!temporaryGeminiFailure\(response, payload\)\) break/);
+  assert.match(edgeSource, /系統已自動重試 2 次仍未成功/);
+});
+
+test("Gemini AI 審視可由使用者選擇後端白名單模型", () => {
+  assert.match(html, /id="geminiModelSelect"/);
+  assert.match(html, /gemini-3\.6-flash/);
+  assert.match(html, /gemini-3\.5-flash-lite/);
+  assert.match(pageSource, /provider === "gemini" \? \$\("#geminiModelSelect"\)\.value : undefined/);
+  assert.match(edgeSource, /const GEMINI_REVIEW_MODELS = new Set/);
+  assert.match(edgeSource, /if \(!GEMINI_REVIEW_MODELS\.has\(model\)\)/);
+  assert.match(edgeSource, /const model = reviewModel\(provider, body\.model\)/);
+  assert.match(edgeSource, /selectedModel\}:generateContent/);
 });

@@ -8,7 +8,7 @@
   <script src="assets/js/supabase-data.js?v=2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/analysis-review.css?v=3">
+  <link rel="stylesheet" href="assets/css/analysis-review.css?v=5">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
 </head>
 <body>
@@ -37,6 +37,16 @@
       <section class="panel" id="draftPanel" hidden>
         <div class="panel-head"><h2>二、草稿內容</h2><span class="hint" id="draftMeta"></span></div>
         <div class="summary-grid" id="draftSummary"></div>
+        <section class="renewal-resolution" id="renewalResolution" hidden>
+          <div>
+            <h3>中心區續約完成確認</h3>
+            <p>只有收到中心區完成訊息後才確認。系統保留原到期日，不會推算新到期日；新一期官方報告更新後會自動開始下一個週期。</p>
+          </div>
+          <label>中心區完成日<input type="date" id="renewalCompletedDate"></label>
+          <div class="renewal-candidates" id="renewalCandidates"></div>
+          <div class="renewal-confirmed" id="renewalConfirmed"></div>
+          <p class="renewal-status" id="renewalResolveStatus"></p>
+        </section>
         <div class="issues warning" id="draftWarnings" hidden></div>
         <details class="raw-json"><summary>引擎完整結構化結果（JSON）</summary><pre id="draftJson"></pre></details>
       </section>
@@ -45,6 +55,14 @@
         <div class="panel-actions">
           <label>平台
             <select id="providerSelect"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI GPT</option><option value="gemini">Google Gemini</option></select>
+          </label>
+          <label id="geminiModelWrap" hidden>Gemini 模型
+            <select id="geminiModelSelect">
+              <option value="gemini-3.6-flash">Gemini 3.6 Flash（建議）</option>
+              <option value="gemini-3.5-flash">Gemini 3.5 Flash</option>
+              <option value="gemini-3.5-flash-lite">Gemini 3.5 Flash-Lite（較省資源）</option>
+              <option value="gemini-2.5-pro">Gemini 2.5 Pro（複雜分析）</option>
+            </select>
           </label>
           <button type="button" id="reviewButton">執行 AI 審視</button>
           <span id="reviewStatus"></span>
@@ -74,6 +92,6 @@
     </div>
   </main>
   <script src="assets/js/workspace-nav.js?v=3"></script>
-  <script src="assets/js/analysis-review.js?v=5"></script>
+  <script src="assets/js/analysis-review.js?v=7"></script>
 </body>
 </html>

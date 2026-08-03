@@ -11,7 +11,7 @@
   <script src="core/calendar-domain.js?v=1"></script>
   <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=4"></script>
-  <script src="assets/js/case-state-store.js?v=5"></script>
+  <script src="assets/js/case-state-store.js?v=6"></script>
   <script src="services/case-files.js?v=4"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -135,16 +135,16 @@
           <div class="side-head"><small>CASE STATUS</small><h2>案件狀態</h2></div>
           <div class="case-stage"><span id="stageNumber">3</span><div><small>目前階段</small><strong id="stageTitle">蒐集委員回饋</strong></div></div>
           <div class="progress"><i><em id="progressBar"></em></i><span id="progressText">30%</span></div>
-          <dl class="case-summary"><div><dt>案件編號</dt><dd id="caseId">未編號</dd></div><div><dt>申請者</dt><dd id="summaryApplicant">未填寫</dd></div><div><dt>有效基數</dt><dd id="summaryBase">7 人</dd></div><div><dt>最低參與</dt><dd id="summaryQuorum">4 人</dd></div><div><dt>LINE Bot</dt><dd>模擬模式</dd></div><div><dt>資料保存</dt><dd>本機草稿</dd></div></dl>
+          <dl class="case-summary"><div><dt>案件編號</dt><dd id="caseId">未編號</dd></div><div><dt>申請者</dt><dd id="summaryApplicant">未填寫</dd></div><div><dt>有效基數</dt><dd id="summaryBase">7 人</dd></div><div><dt>最低參與</dt><dd id="summaryQuorum">4 人</dd></div><div><dt>LINE Bot</dt><dd>模擬模式</dd></div><div><dt>資料保存</dt><dd>Supabase 正式資料</dd></div></dl>
           <div class="permission-note"><b>副主席權限</b><span id="permissionText">目前可操作開票、通知、送三長群與結案。</span></div>
-          <button id="resetCase" class="ghost reset-case">重設示範流程</button>
+          <button id="resetCase" class="ghost reset-case">清除並重設案件流程</button>
         </section>
         <section class="card log-card"><div class="side-head"><small>AUDIT LOG</small><h2>案件歷程</h2></div><ol id="activityLog"></ol></section>
       </aside>
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=17"></script>
+  <script src="assets/js/case-workflow.js?v=18"></script>
   <script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>

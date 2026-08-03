@@ -21,6 +21,7 @@ main{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 .panel-head .hint{font-size:13px;color:#6b7280}
 .panel-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .panel-actions label{font-size:14px;color:#6b7280;display:inline-flex;align-items:center;gap:8px}
+.panel-actions label[hidden]{display:none}
 .panel-actions select{border:1px solid #e7e5e0;border-radius:8px;padding:10px;font-size:14px;min-height:44px;background:#fff}
 .panel-actions button,.decision button{background:#991b1f;color:#fff;border:0;border-radius:9px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px}
 .panel-actions button:disabled{opacity:.5;cursor:wait}
@@ -43,6 +44,21 @@ main{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 .departure-candidates button{border:0;border-radius:8px;background:#991b1f;color:#fff;padding:9px 14px;min-height:44px;font-weight:600;cursor:pointer}
 .departure-candidates button:disabled{opacity:.55;cursor:wait}
 .departure-status{min-height:20px}
+.renewal-resolution{margin-top:14px;border:1px solid #b9d7c6;border-left:3px solid #2e7d54;border-radius:10px;padding:14px;background:#f4faf6;display:grid;gap:12px}
+.renewal-resolution[hidden]{display:none}
+.renewal-resolution h3{font-size:15px;color:#245f42}
+.renewal-resolution p{font-size:13px;color:#4c6656;margin-top:3px}
+.renewal-resolution label{display:flex;align-items:center;gap:10px;font-size:13px;color:#4c6656}
+.renewal-resolution input{border:1px solid #b9d7c6;border-radius:8px;padding:9px 10px;background:#fff;font:inherit;min-height:44px}
+.renewal-candidates,.renewal-confirmed{display:grid;gap:8px}
+.renewal-candidates article,.renewal-confirmed article{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#fff;border:1px solid #d4e7db;border-radius:9px;padding:10px 12px}
+.renewal-candidates span,.renewal-confirmed span{display:flex;flex-direction:column;gap:2px}
+.renewal-candidates strong,.renewal-confirmed strong{font-size:14px}
+.renewal-candidates small,.renewal-confirmed small{font-size:12px;color:#6b7280}
+.renewal-candidates button,.renewal-confirmed button{border:0;border-radius:8px;background:#2e7d54;color:#fff;padding:9px 14px;min-height:44px;font-weight:600;cursor:pointer}
+.renewal-confirmed button.secondary{background:#fff;color:#7c5515;border:1px solid #d7c6a5}
+.renewal-candidates button:disabled,.renewal-confirmed button:disabled{opacity:.55;cursor:wait}
+.renewal-status{min-height:20px}
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px}
 .summary-grid article{border:1px solid #e7e5e0;border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:2px}
 .summary-grid small{color:#6b7280;font-size:12px}
@@ -70,4 +86,4 @@ main{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 .history article b{font-size:14px}
 .history article span{color:#6b7280}
 .history .empty{color:#6b7280;font-size:14px}
-@media (max-width:640px){.hero{flex-direction:column}.flow-note{max-width:none}.departure-candidates article{align-items:stretch;flex-direction:column}.departure-candidates button{width:100%}}
+@media (max-width:640px){.hero{flex-direction:column}.flow-note{max-width:none}.departure-candidates article,.renewal-candidates article,.renewal-confirmed article{align-items:stretch;flex-direction:column}.departure-candidates button,.renewal-candidates button,.renewal-confirmed button{width:100%}}
