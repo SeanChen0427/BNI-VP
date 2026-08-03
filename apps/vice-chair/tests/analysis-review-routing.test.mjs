@@ -10,7 +10,7 @@ const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/i
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
   const authIndex = html.indexOf("assets/js/auth.js?v=7");
   const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=2");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=3");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=4");
   assert.ok(authIndex >= 0 && bridgeIndex > authIndex && pageIndex > bridgeIndex);
 });
 
@@ -22,9 +22,18 @@ test("月度分析頁不把 HTML 錯誤頁當成 JSON 顯示", () => {
 test("到期報告有而 PALMS 無時由副主席確認離會並重新分析", () => {
   assert.match(html, /id="departureResolution"/);
   assert.match(pageSource, /issue\.code === "expiry-only"/);
-  assert.match(pageSource, /postDeparture\(\{ action: "register", name, confirmName: name, confirmedAt/);
+  assert.match(pageSource, /postDeparture\(\{ action: "register", source: "analysis-reconciliation", name, confirmName: name, confirmedAt/);
   assert.match(pageSource, /後續分析自動排除/);
   assert.match(pageSource, /await generateDraft\(\)/);
+});
+
+test("分析差異中的歷史離會者即使不在現任主檔也可建立離會紀錄", () => {
+  assert.match(edgeSource, /async function verifiedHistoricalDepartureCandidate\(name: string\)/);
+  assert.match(edgeSource, /body\.source === "analysis-reconciliation"/);
+  assert.match(edgeSource, /people\?on_conflict=display_name/);
+  assert.match(edgeSource, /members\?on_conflict=person_id/);
+  assert.match(edgeSource, /status: "departed"/);
+  assert.match(edgeSource, /仍存在於本期 PALMS，不可由名單差異流程登記離會/);
 });
 
 test("正式分析只接受本期半年、全年及審計報表", () => {

@@ -843,6 +843,22 @@ async function memberDepartureState() {
   };
 }
 
+async function verifiedHistoricalDepartureCandidate(name: string) {
+  const imports = await reportImports();
+  const expectedHalf = monthWindow(-1, 6);
+  const halfRow = latestByCategory(imports, "halfYear", expectedHalf);
+  const expiryRow = latestByCategory(imports, "membership");
+  if (!halfRow || !expiryRow) throw new Error("缺少本期半年 PALMS 或會員到期日報告，無法確認這筆名單差異");
+  const [palms, expiry] = await Promise.all([
+    downloadReport(halfRow).then((text) => parsePalmsText(text, halfRow.storage_path)),
+    downloadReport(expiryRow).then((text) => parseExpiryText(text, expiryRow.storage_path)),
+  ]);
+  if (palms.members.some((member: any) => member.name === name)) throw new Error(`${name} 仍存在於本期 PALMS，不可由名單差異流程登記離會`);
+  const candidate = expiry.members.find((member: any) => member.name === name);
+  if (!candidate) throw new Error(`${name} 已不在目前的到期報告差異中，請重新產出分析`);
+  return candidate;
+}
+
 async function memberDepartureApi(request: Request, context: Context) {
   leadership(context);
   if (request.method === "GET") return memberDepartureState();
@@ -851,20 +867,48 @@ async function memberDepartureApi(request: Request, context: Context) {
   const name = String(body.name || "").replace(/\s+/g, "");
   if (!name || String(body.confirmName || "").replace(/\s+/g, "") !== name) throw new Error("確認姓名不一致：請重新輸入完整姓名");
   const people = await db(`people?display_name=eq.${encodeURIComponent(name)}&select=id,status,notes&limit=1`);
-  const person = people?.[0];
-  if (!person) throw new Error(`${name} 不在會員主檔中`);
-  const members = await db(`members?person_id=eq.${person.id}&select=id,status,departed_on&limit=1`);
-  const member = members?.[0];
-  if (!member) throw new Error(`${name} 沒有會員主檔`);
+  let person = people?.[0];
+  const members = person ? await db(`members?person_id=eq.${person.id}&select=id,status,departed_on&limit=1`) : [];
+  let member = members?.[0];
   if (body.action === "register") {
     const confirmedAt = String(body.confirmedAt || "");
     if (!/^\d{4}-\d{2}-\d{2}$/.test(confirmedAt) || confirmedAt > taipeiDay()) throw new Error("離會確認日不正確或在未來");
-    if (member.status === "departed") throw new Error(`${name} 已在離會名單中`);
+    const note = String(body.note || "").trim().slice(0, 120);
+    if (!member && body.source === "analysis-reconciliation") {
+      const candidate = await verifiedHistoricalDepartureCandidate(name);
+      const peopleRows = await db("people?on_conflict=display_name", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify({ display_name: name, status: "departed", notes: note }),
+      });
+      person = peopleRows?.[0];
+      if (!person?.id) throw new Error(`${name} 的歷史離會人員資料建立失敗`);
+      const memberRows = await db("members?on_conflict=person_id", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify({
+          person_id: person.id,
+          profession: candidate.occupation || "",
+          membership_started_on: candidate.startDate || null,
+          membership_expires_on: candidate.expiryDate || null,
+          status: "departed",
+          departed_on: confirmedAt,
+        }),
+      });
+      member = memberRows?.[0];
+      if (!member?.id) throw new Error(`${name} 的歷史離會會員資料建立失敗`);
+      return { message: `${name} 已建立歷史離會紀錄；下次產出分析會自動排除`, historical: true, state: await memberDepartureState() };
+    }
+    if (!person) throw new Error(`${name} 不在會員主檔中`);
+    if (!member) throw new Error(`${name} 沒有會員主檔`);
+    if (member.status === "departed") return { message: `${name} 已在離會名單中；下次產出分析會自動排除`, state: await memberDepartureState() };
     await db(`members?id=eq.${member.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "departed", departed_on: confirmedAt }) });
-    await db(`people?id=eq.${person.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "departed", notes: String(body.note || "").trim().slice(0, 120) }) });
+    await db(`people?id=eq.${person.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "departed", notes: note }) });
     return { message: `${name} 已登記離會；下次產出分析會自動排除`, state: await memberDepartureState() };
   }
   if (body.action === "undo") {
+    if (!person) throw new Error(`${name} 不在會員主檔中`);
+    if (!member) throw new Error(`${name} 沒有會員主檔`);
     if (member.status !== "departed") throw new Error(`${name} 目前不是離會狀態`);
     await db(`members?id=eq.${member.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "active", departed_on: null }) });
     await db(`people?id=eq.${person.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "active" }) });

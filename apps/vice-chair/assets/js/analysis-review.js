@@ -83,7 +83,7 @@
     button.disabled = true;
     $("#departureResolveStatus").textContent = `正在登記 ${name}…`;
     try {
-      const data = await postDeparture({ action: "register", name, confirmName: name, confirmedAt, note: "月度分析對帳確認：到期報告有、PALMS 無" });
+      const data = await postDeparture({ action: "register", source: "analysis-reconciliation", name, confirmName: name, confirmedAt, note: "月度分析對帳確認：到期報告有、PALMS 無" });
       $("#departureResolveStatus").textContent = data.message;
       await generateDraft();
     } catch (error) {
