@@ -1512,7 +1512,7 @@ async function caseParticipationForCases(caseIds: string[]) {
   const filter = `in.(${ids.join(",")})`;
   const [people, feedback, snapshots] = await Promise.all([
     db("people?select=id,display_name"),
-    db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,body,submitted_at,updated_at`),
+    db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,submitted_by_person_id,body,submitted_at,updated_at`),
     db(`vote_snapshots?case_id=${filter}&select=id,case_id,status,opened_at,deadline_at,closed_at,original_base,eligible_base,majority_threshold,result,approve_count,reject_count`),
   ]);
   const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
@@ -1537,6 +1537,18 @@ async function caseParticipationForCases(caseIds: string[]) {
       feedback: Object.fromEntries((feedback || [])
         .filter((item: any) => item.case_id === caseId)
         .map((item: any) => [names.get(item.author_person_id), item.body])
+        .filter(([name]: any) => Boolean(name))),
+      feedbackMeta: Object.fromEntries((feedback || [])
+        .filter((item: any) => item.case_id === caseId)
+        .map((item: any) => {
+          const authorName = names.get(item.author_person_id);
+          const submittedBy = names.get(item.submitted_by_person_id) || authorName;
+          return [authorName, {
+            submittedBy,
+            delegated: Boolean(item.submitted_by_person_id && item.submitted_by_person_id !== item.author_person_id),
+            updatedAt: item.updated_at || item.submitted_at || "",
+          }];
+        })
         .filter(([name]: any) => Boolean(name))),
       voterSnapshot: snapshotVoters
         .filter((voter: any) => !voter.is_recused)
@@ -1571,6 +1583,9 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
       feedback: recusedApplicant
         ? {}
         : { ...(fullWorkflow.feedback || {}), ...(participation?.feedback || {}) },
+      feedbackMeta: recusedApplicant
+        ? {}
+        : { ...(fullWorkflow.feedbackMeta || {}), ...(participation?.feedbackMeta || {}) },
       voterSnapshot: participation?.snapshot
         ? participation.voterSnapshot
         : (Array.isArray(fullWorkflow.voterSnapshot) ? fullWorkflow.voterSnapshot : []),
@@ -1707,7 +1722,23 @@ async function caseStatesApi(request: Request, context: Context) {
 
   if (body.kind === "feedback") {
     if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能提交委員回饋"), { status: 403 });
-    if (String(access.task.title || "").trim() === context.name) {
+    const requestedAuthorName = String(body.authorName || "").trim();
+    let authorPersonId = context.personId;
+    let authorName = context.name;
+    if (requestedAuthorName && requestedAuthorName !== context.name) {
+      if (context.role !== "vp") {
+        throw Object.assign(new Error("只有副主席可以代填會員委員回饋"), { status: 403 });
+      }
+      const roster = await activeVotingRoster();
+      const target = (roster || []).find((item: any) =>
+        item.role === "committee"
+        && String(item.people?.display_name || "").trim() === requestedAuthorName
+      );
+      if (!target) throw Object.assign(new Error("只能代填現任會員委員的回饋"), { status: 403 });
+      authorPersonId = target.person_id;
+      authorName = String(target.people?.display_name || "").trim();
+    }
+    if (String(access.task.title || "").trim() === authorName) {
       throw Object.assign(new Error("申請者本人須迴避，不得提交本案回饋"), { status: 403 });
     }
     if (currentWorkflow.closed) throw Object.assign(new Error("案件已結案，無法修改回饋"), { status: 409 });
@@ -1716,7 +1747,12 @@ async function caseStatesApi(request: Request, context: Context) {
     await db("rpc/edge_save_case_feedback", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ p_task_id: access.task.id, p_actor: context.personId, p_body: value }),
+      body: JSON.stringify({
+        p_task_id: access.task.id,
+        p_actor: context.personId,
+        p_body: value,
+        p_author: authorPersonId,
+      }),
     });
     const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
     return caseStateResponse(access, latestRows?.[0] || existing, context);

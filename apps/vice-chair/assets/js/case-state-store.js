@@ -206,7 +206,7 @@
     return result;
   };
 
-  async function postAction(taskId, kind, value) {
+  async function postAction(taskId, kind, value, extra = {}) {
     if (refreshPromise) await refreshPromise.catch(() => undefined);
     pendingWrites += 1;
     try {
@@ -219,6 +219,7 @@
           kind,
           value,
           revision: revisions.get(taskId) || 0,
+          ...extra,
         }),
         cache: "no-store",
       });
@@ -296,7 +297,12 @@
     flush: () => queue,
     refresh,
     reconcileDraft,
-    saveFeedback: (taskId, value) => postAction(taskId, "feedback", value),
+    saveFeedback: (taskId, value, authorName = "") => postAction(
+      taskId,
+      "feedback",
+      value,
+      authorName ? { authorName } : {},
+    ),
     saveVote: (taskId, value) => postAction(taskId, "vote", value),
     openVote: (taskId, workflow) => postAction(taskId, "open-vote", workflow),
     reset: (taskId) => postAction(taskId, "reset", {}),

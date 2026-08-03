@@ -11,7 +11,7 @@
   <script src="core/calendar-domain.js?v=1"></script>
   <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=4"></script>
-  <script src="assets/js/case-state-store.js?v=4"></script>
+  <script src="assets/js/case-state-store.js?v=5"></script>
   <script src="services/case-files.js?v=4"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -73,9 +73,13 @@
         </section>
 
         <section class="card" id="feedbackSection">
-          <div class="section-title"><span>03</span><div><h2>委員回饋</h2><p>每位委員以自己的帳號填寫；達過半門檻後才能開啟投票</p></div></div>
+          <div class="section-title"><span>03</span><div><h2>委員回饋</h2><p>委員原則上自行填寫；副主席可依委員提供的 LINE 內容代填，達過半門檻後才能開啟投票</p></div></div>
           <div class="threshold-banner"><div><small>有效回饋</small><strong><span id="feedbackCount">0</span>／<span id="eligibleCount">7</span></strong></div><div><small>開票門檻</small><strong id="feedbackThreshold">4 人</strong></div><div class="threshold-result" id="feedbackResult">尚未達門檻</div></div>
           <div class="feedback-editor">
+            <div class="feedback-proxy-control" id="feedbackProxyControl" hidden>
+              <label>回饋歸屬委員<select id="feedbackAuthor"></select></label>
+              <small id="feedbackProxyHint">選擇本人，或選擇提供 LINE 回饋內容的會員委員。代填會保留副主席操作紀錄。</small>
+            </div>
             <label><span><b id="feedbackEditorName">本人的回饋</b><small>請引用訪談內容、數據或具體觀察，並提出建議與期待。</small></span><textarea id="myFeedback" rows="6" placeholder="輸入本人的委員回饋……"></textarea></label>
             <button id="saveFeedback" class="primary">儲存我的回饋</button>
           </div>
@@ -140,7 +144,7 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=16"></script>
+  <script src="assets/js/case-workflow.js?v=17"></script>
   <script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>
