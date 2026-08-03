@@ -77,6 +77,7 @@ export function buildAnalysisFromParsed({
   annual = null,
   auditMonth = null,
   auditMonthName = null,
+  renewalCompletions = [],
   asOf = new Date().toISOString().slice(0, 10),
   sources = [],
 } = {}) {
@@ -126,7 +127,19 @@ export function buildAnalysisFromParsed({
     meta.annualPeriod = annual.period;
   }
 
-  const radar = renewalRadar({ activeScored, expiryByName, annualByName, asOf, expiredUnrenewed: reconciliation.expiredUnrenewed });
+  const activeNames = new Set(activeScored.map((member) => member.name));
+  const confirmedRenewals = renewalCompletions.filter((item) => {
+    const expiry = expiryByName.get(item.name);
+    return activeNames.has(item.name) && expiry?.expiryDate === item.priorExpiryOn;
+  });
+  const radar = renewalRadar({
+    activeScored,
+    expiryByName,
+    annualByName,
+    asOf,
+    expiredUnrenewed: reconciliation.expiredUnrenewed,
+    confirmedRenewals,
+  });
 
   // 黃燈突圍
   const breakthroughs = activeScored.map((s) => yellowBreakthrough(s)).filter(Boolean);
@@ -164,6 +177,7 @@ export function buildAnalysisFromParsed({
     behavior,
     greenIdles,
     renewalRadar: radar,
+    renewalConfirmations: confirmedRenewals,
     yellowBreakthroughs: breakthroughs,
     lifecycle,
     audit,

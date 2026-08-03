@@ -14,7 +14,8 @@ const STORE_DIR = path.join(os.homedir(), "Library", "Application Support", "Ful
 const DRAFT_FILE = path.join(STORE_DIR, "analysis-draft.json");
 const PUBLISHED_FILE = path.join(STORE_DIR, "analysis-published.json");
 
-const REVIEW_MODELS = { openai: "gpt-5.6-luna", gemini: "gemini-3.5-flash", anthropic: "claude-sonnet-5" };
+const REVIEW_MODELS = { openai: "gpt-5.6-luna", gemini: "gemini-3.6-flash", anthropic: "claude-sonnet-5" };
+const GEMINI_REVIEW_MODELS = new Set(["gemini-3.6-flash", "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-2.5-pro"]);
 const REVIEW_MAX_TOKENS = 6000;
 const taipeiDay = (date = new Date()) => new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit",
@@ -104,36 +105,44 @@ export function buildReviewPrompt(draft, previousReport) {
   return sections.join("\n\n---\n\n");
 }
 
-async function callReviewProvider(provider, apiKey, prompt) {
+function selectedReviewModel(provider, requested) {
+  if (provider !== "gemini") return REVIEW_MODELS[provider];
+  const model = String(requested || REVIEW_MODELS.gemini);
+  if (!GEMINI_REVIEW_MODELS.has(model)) throw new Error("不支援的 Gemini 模型，請重新選擇");
+  return model;
+}
+
+async function callReviewProvider(provider, apiKey, prompt, requestedModel) {
   let response;
   let data;
+  const model = selectedReviewModel(provider, requestedModel);
   if (provider === "anthropic") {
     response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
-      body: JSON.stringify({ model: REVIEW_MODELS.anthropic, max_tokens: REVIEW_MAX_TOKENS, system: REVIEW_SYSTEM_PROMPT, messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model, max_tokens: REVIEW_MAX_TOKENS, system: REVIEW_SYSTEM_PROMPT, messages: [{ role: "user", content: prompt }] }),
     });
     data = await response.json().catch(() => ({}));
-    if (response.ok) return { text: (data?.content || []).filter((i) => i?.type === "text").map((i) => i.text).join("\n").trim(), model: REVIEW_MODELS.anthropic };
+    if (response.ok) return { text: (data?.content || []).filter((i) => i?.type === "text").map((i) => i.text).join("\n").trim(), model };
   } else if (provider === "openai") {
     response = await fetch("https://api.openai.com/v1/responses", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: REVIEW_MODELS.openai, instructions: REVIEW_SYSTEM_PROMPT, input: prompt, max_output_tokens: REVIEW_MAX_TOKENS }),
+      body: JSON.stringify({ model, instructions: REVIEW_SYSTEM_PROMPT, input: prompt, max_output_tokens: REVIEW_MAX_TOKENS }),
     });
     data = await response.json().catch(() => ({}));
     if (response.ok) {
       const text = typeof data?.output_text === "string" ? data.output_text.trim() : (data?.output || []).flatMap((i) => i?.content || []).filter((i) => i?.type === "output_text").map((i) => i.text).join("\n").trim();
-      return { text, model: REVIEW_MODELS.openai };
+      return { text, model };
     }
   } else if (provider === "gemini") {
-    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${REVIEW_MODELS.gemini}:generateContent`, {
+    response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: REVIEW_SYSTEM_PROMPT }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: REVIEW_MAX_TOKENS } }),
     });
     data = await response.json().catch(() => ({}));
-    if (response.ok) return { text: (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || "").join("\n").trim(), model: REVIEW_MODELS.gemini };
+    if (response.ok) return { text: (data?.candidates?.[0]?.content?.parts || []).map((p) => p?.text || "").join("\n").trim(), model };
   } else {
     throw new Error("不支援的 AI 平台");
   }
@@ -188,7 +197,7 @@ export async function analysisDraftApi(req, url, res, deps) {
       const published = await readPublished();
       const previous = published.snapshots.at(-1)?.aiReview?.text || null;
       const prompt = buildReviewPrompt(draft, previous);
-      const result = await callReviewProvider(provider, apiKey, prompt);
+      const result = await callReviewProvider(provider, apiKey, prompt, body.model);
       if (!result.text) throw new Error("AI 平台未回傳可顯示的文字");
       draft.aiReview = { provider, model: result.model, text: result.text, generatedAt: new Date().toISOString(), promptChars: prompt.length, feedbackCount: draft.feedback.length };
       await writeJsonFile(DRAFT_FILE, draft);

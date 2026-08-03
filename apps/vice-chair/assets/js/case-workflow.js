@@ -253,6 +253,7 @@ function renderSummary(){
   $("#feedbackNoticePreview").textContent=feedbackNotice();
   $("#sendFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.feedbackNotified&&!state.closed);
   $("#sendFeedbackNotice").textContent=state.feedbackNotified?"已通知委員":"模擬 LINE Bot 通知";
+  $("#resetCase").hidden=state.closed;
   $("#activityLog").innerHTML=state.log.map(item=>`<li class="${item.done?"done":""}"><b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.time)}</span></li>`).join("");
 }
 
@@ -351,7 +352,7 @@ function bindEvents(){
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
   $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});
   $("#saveAdvisor").addEventListener("click",()=>{if(!isVp())return;state.advisorStatus=$("#advisorStatus").value;state.advisorNote=$("#advisorNote").value.trim();addLog(state.advisorStatus==="confirmed"?"董事顧問已同意會員委員會決議":state.advisorStatus==="returned"?"董事顧問退回補充資料":"董事顧問確認仍待回覆");persistNow();toast("董顧確認狀態已保存");});
-  $("#closeCase").addEventListener("click",async()=>{if(!isVp()||state.advisorStatus!=="confirmed")return;state.closed=true;addLog("案件已由副主席確認結案存檔");try{await persistNow();await window.FulianTaskStore.refresh();sourceTask=window.FulianTaskStore.all().find(item=>item.id===CASE_ID)||sourceTask;toast("案件已結案存檔")}catch(error){toast(error.message||"案件結案同步失敗")}});
+  $("#closeCase").addEventListener("click",async()=>{if(!isVp()||state.advisorStatus!=="confirmed")return;const proposed={...state,form:collectForm(),closed:true,log:[{text:"案件已由副主席確認結案存檔",time:nowLabel(),done:true},...(state.log||[])].slice(0,20)};$("#saveState").textContent="正在確認 Supabase 正式結案…";lastPersist=window.FulianCaseStateStore.saveWorkflow(CASE_ID,proposed);try{await lastPersist;state=loadState();render();await window.FulianTaskStore.refresh();sourceTask=window.FulianTaskStore.all().find(item=>item.id===CASE_ID)||sourceTask;$("#saveState").textContent="案件已正式結案並保存至 Supabase";toast("案件已結案存檔")}catch(error){$("#saveState").textContent="Supabase 結案失敗，案件仍維持原狀";render();toast(error.message||"案件結案同步失敗")}});
   $("#resetCase").addEventListener("click",async()=>{if(!isVp())return toast("只有副主席可以重設案件");if(!confirm("要重設這個案件嗎？目前的回饋、投票與流程紀錄會清除。"))return;$("#saveState").textContent="正在重設案件…";try{await window.FulianCaseStateStore.reset(CASE_ID);location.reload()}catch(error){$("#saveState").textContent="重設失敗";toast(error.message||"案件重設失敗")}});
   window.addEventListener("fulian:data-changed",event=>{
     if(event.detail?.source!=="supabase-case-state"||event.detail?.taskId!==CASE_ID)return;

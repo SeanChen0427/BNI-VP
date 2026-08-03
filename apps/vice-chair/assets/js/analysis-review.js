@@ -13,6 +13,7 @@
 
   const lightLabel = { green: "綠燈", yellow: "黃燈", red: "紅燈", black: "黑燈" };
   const radarLabel = { "expired-unrenewed": "已到期未續約", overdue: "已過續約截止", "due-this-month": "本月截止", upcoming: "即將截止", "weak-early-warning": "審查弱項預警" };
+  const geminiModelKey = "fulian.analysis.gemini-model";
   let currentDraft = null;
 
   const readJson = async (response) => {
@@ -70,6 +71,81 @@
       return card;
     });
     $("#departureCandidates").replaceChildren(...cards);
+  }
+
+  function renderRenewalResolution(engine) {
+    const radar = Array.isArray(engine?.renewalRadar) ? engine.renewalRadar.filter((item) => item.expiryDate) : [];
+    const confirmed = Array.isArray(engine?.renewalConfirmations) ? engine.renewalConfirmations : [];
+    const panel = $("#renewalResolution");
+    panel.hidden = !radar.length && !confirmed.length;
+    $("#renewalResolveStatus").textContent = "";
+    if (!$("#renewalCompletedDate").value) $("#renewalCompletedDate").value = localDay();
+    const candidates = radar.map((item) => {
+      const card = document.createElement("article");
+      const details = document.createElement("span");
+      const name = document.createElement("strong");
+      const expiry = document.createElement("small");
+      const button = document.createElement("button");
+      name.textContent = item.name;
+      expiry.textContent = `原到期日 ${item.expiryDate}`;
+      details.append(name, expiry);
+      button.type = "button";
+      button.textContent = "中心已完成";
+      button.addEventListener("click", () => confirmRenewal(item, button));
+      card.append(details, button);
+      return card;
+    });
+    $("#renewalCandidates").replaceChildren(...candidates);
+    const completedCards = confirmed.map((item) => {
+      const card = document.createElement("article");
+      const details = document.createElement("span");
+      const name = document.createElement("strong");
+      const dates = document.createElement("small");
+      const button = document.createElement("button");
+      name.textContent = `${item.name}・中心已完成`;
+      dates.textContent = `完成日 ${item.completedOn}｜原到期日 ${item.priorExpiryOn}`;
+      details.append(name, dates);
+      button.type = "button";
+      button.className = "secondary";
+      button.textContent = "撤銷誤確認";
+      button.addEventListener("click", () => revokeRenewal(item, button));
+      card.append(details, button);
+      return card;
+    });
+    $("#renewalConfirmed").replaceChildren(...completedCards);
+  }
+
+  async function confirmRenewal(item, button) {
+    const completedOn = $("#renewalCompletedDate").value;
+    if (!completedOn) {
+      $("#renewalResolveStatus").textContent = "請先選擇中心區完成日";
+      $("#renewalCompletedDate").focus();
+      return;
+    }
+    if (!confirm(`確認「${item.name}」已由中心區完成續約？\n系統只排除原到期日 ${item.expiryDate} 這一個週期，不會自行產生新到期日。`)) return;
+    button.disabled = true;
+    $("#renewalResolveStatus").textContent = `正在記錄 ${item.name}…`;
+    try {
+      const data = await post({ action: "confirm-renewal", name: item.name, priorExpiryOn: item.expiryDate, completedOn });
+      renderDraft(data.draft);
+      $("#renewalResolveStatus").textContent = data.message;
+    } catch (error) {
+      $("#renewalResolveStatus").textContent = error.message;
+      button.disabled = false;
+    }
+  }
+
+  async function revokeRenewal(item, button) {
+    if (!confirm(`撤銷「${item.name}」的中心區完成確認？\n撤銷後，同一到期週期會重新出現在續約雷達。`)) return;
+    button.disabled = true;
+    try {
+      const data = await post({ action: "revoke-renewal", completionId: item.id });
+      renderDraft(data.draft);
+      $("#renewalResolveStatus").textContent = data.message;
+    } catch (error) {
+      $("#renewalResolveStatus").textContent = error.message;
+      button.disabled = false;
+    }
   }
 
   async function confirmDeparture(name, button) {
@@ -138,6 +214,7 @@
     ].map(([label, value, note]) => `<article><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
     renderIssues($("#draftWarnings"), e.reconciliation.issues || []);
     $("#draftJson").textContent = JSON.stringify(e, null, 2);
+    renderRenewalResolution(e);
 
     const feedback = draft.feedback || [];
     $("#feedbackList").hidden = !feedback.length;
@@ -172,12 +249,26 @@
 
   $("#generateButton").addEventListener("click", generateDraft);
 
+  function syncModelSelect() {
+    const isGemini = $("#providerSelect").value === "gemini";
+    $("#geminiModelWrap").hidden = !isGemini;
+  }
+
+  const savedGeminiModel = localStorage.getItem(geminiModelKey);
+  if (savedGeminiModel && [...$("#geminiModelSelect").options].some((option) => option.value === savedGeminiModel)) {
+    $("#geminiModelSelect").value = savedGeminiModel;
+  }
+  $("#providerSelect").addEventListener("change", syncModelSelect);
+  $("#geminiModelSelect").addEventListener("change", () => localStorage.setItem(geminiModelKey, $("#geminiModelSelect").value));
+  syncModelSelect();
+
   $("#reviewButton").addEventListener("click", async () => {
     const button = $("#reviewButton");
     button.disabled = true;
     $("#reviewStatus").textContent = "AI 審視進行中（完整脈絡，約需一至數分鐘）…";
     try {
-      const data = await post({ action: "ai-review", provider: $("#providerSelect").value });
+      const provider = $("#providerSelect").value;
+      const data = await post({ action: "ai-review", provider, model: provider === "gemini" ? $("#geminiModelSelect").value : undefined });
       $("#reviewStatus").textContent = "審視完成，請往下審閱";
       renderDraft(data.draft);
     } catch (error) {
