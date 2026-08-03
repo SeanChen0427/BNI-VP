@@ -1,5 +1,11 @@
 # 變更紀錄
 
+## 2026-08-04－Gemini AI 審視 WallClockTime 修正
+
+- 正式 Supabase log 確認 AI 審視失敗原因為 `WallClockTime`，當次 CPU 僅 48 ms、記憶體約 11.8 MB，並非運算量或記憶體不足；根因是等待 Gemini 與重試總時間碰到 Free 方案 150 秒上限。
+- Gemini 呼叫新增 `AbortController` 單次逾時與 110 秒總預算；Flash 單次最多 32 秒並可在預算內嘗試三次，Pro 單次最多 100 秒且逾時後不在同一請求重跑。
+- 系統會在 Supabase 強制終止前主動取消並回傳明確的模型逾時訊息；只有完整成功的 AI 審視才寫入草稿，逾時不改動任何分析或正式資料。
+
 ## 2026-08-04－Gemini AI 審視模型選擇
 
 - 月度分析審閱選擇 Google Gemini 後，可由使用者選擇 Gemini 3.6 Flash、3.5 Flash、3.5 Flash-Lite 或 2.5 Pro；預設改為 Google 官方較新的穩定 Gemini 3.6 Flash。

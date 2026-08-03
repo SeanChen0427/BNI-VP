@@ -1,5 +1,13 @@
 # 決策紀錄
 
+## 2026-08-04｜Gemini 呼叫必須保留 Supabase Edge 結束餘裕
+
+- 正式 log 顯示 `app-api v27` 的失敗為 `WallClockTime`，不是 CPU 或記憶體不足；不得讓外部 AI 等待與重試占滿 Supabase Free 方案 150 秒上限。
+- AI 審視採兩層時間預算：每次外部請求由 `AbortController` 主動取消，整體 Gemini 階段最多 110 秒，預留驗證、資料庫寫入與錯誤回傳時間。
+- Flash 類模型單次上限 32 秒、最多三次；Pro 單次上限 100 秒，若逾時不於同一 Edge 請求重跑。429／503 等快速暫時性錯誤仍可在剩餘預算內重試。
+- 逾時不寫入 `aiReview`，草稿與既有正式快照保持不變；後端須回傳明確訊息，不讓平台的資源不足通用文字誤導使用者。
+- 來源：Sean 2026-08-04 修正指示；Supabase 正式 Function log 與官方 Edge Function limits。
+
 ## 2026-08-04｜Gemini AI 審視由使用者選擇模型
 
 - 月度分析審閱選擇 Google Gemini 後，另外顯示模型選單；本次選擇送至正式後端並保存在 AI 審視紀錄中。

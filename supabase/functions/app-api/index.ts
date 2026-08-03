@@ -24,6 +24,11 @@ const GEMINI_REVIEW_MODELS = new Set([
   "gemini-3.5-flash-lite",
   "gemini-2.5-pro",
 ]);
+const GEMINI_EDGE_TOTAL_BUDGET_MS = 110_000;
+const GEMINI_FLASH_ATTEMPT_TIMEOUT_MS = 32_000;
+const GEMINI_PRO_ATTEMPT_TIMEOUT_MS = 100_000;
+const GEMINI_MIN_ATTEMPT_MS = 5_000;
+const GEMINI_MAX_ATTEMPTS = 3;
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
@@ -1035,6 +1040,29 @@ function retryDelay(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
+function geminiAttemptTimeout(model: string, elapsedMs: number) {
+  const remainingMs = GEMINI_EDGE_TOTAL_BUDGET_MS - elapsedMs;
+  if (remainingMs < GEMINI_MIN_ATTEMPT_MS) return 0;
+  const modelLimit = model.endsWith("-pro")
+    ? GEMINI_PRO_ATTEMPT_TIMEOUT_MS
+    : GEMINI_FLASH_ATTEMPT_TIMEOUT_MS;
+  return Math.min(modelLimit, remainingMs);
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function abortedRequest(error: unknown) {
+  return (error as any)?.name === "AbortError";
+}
+
 function reviewModel(provider: Provider, requested: unknown) {
   if (provider !== "gemini") return MODELS[provider];
   const model = String(requested || DEFAULT_GEMINI_REVIEW_MODEL);
@@ -1053,18 +1081,41 @@ async function callProvider(provider: Provider, apiKey: string, system: string, 
       return { text: extractOpenAiText(payload), model: MODELS.openai };
     }
   } else if (provider === "gemini") {
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }) });
-      payload = await response.json().catch(() => ({}));
-      if (response.ok) {
+    const startedAt = Date.now();
+    let attemptCount = 0;
+    let lastAttemptTimedOut = false;
+    for (let attempt = 0; attempt < GEMINI_MAX_ATTEMPTS; attempt += 1) {
+      const timeoutMs = geminiAttemptTimeout(selectedModel, Date.now() - startedAt);
+      if (!timeoutMs) break;
+      attemptCount += 1;
+      lastAttemptTimedOut = false;
+      try {
+        response = await fetchWithTimeout(`https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`, { method: "POST", headers: { "x-goog-api-key": apiKey, "Content-Type": "application/json" }, body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { maxOutputTokens: maxTokens } }) }, timeoutMs);
+        payload = await response.json().catch(() => ({}));
+      } catch (error) {
+        if (!abortedRequest(error)) throw error;
+        lastAttemptTimedOut = true;
+        payload = { error: { status: "DEADLINE_EXCEEDED", message: "Gemini request timed out" } };
+      }
+      if (!lastAttemptTimedOut && response?.ok) {
         assertCompleteAiResponse(provider, payload);
         return { text: (payload?.candidates?.[0]?.content?.parts || []).map((part: any) => part?.text || "").join("\n").trim(), model: selectedModel };
       }
-      if (!temporaryGeminiFailure(response, payload)) break;
-      if (attempt < 2) await retryDelay(1500 * (attempt + 1));
+      if (!lastAttemptTimedOut && (!response || !temporaryGeminiFailure(response, payload))) break;
+      if (lastAttemptTimedOut && selectedModel.endsWith("-pro")) break;
+      if (attempt < GEMINI_MAX_ATTEMPTS - 1) {
+        const delayMs = 1500 * (attempt + 1);
+        const remainingAfterDelay = GEMINI_EDGE_TOTAL_BUDGET_MS - (Date.now() - startedAt) - delayMs;
+        if (remainingAfterDelay < GEMINI_MIN_ATTEMPT_MS) break;
+        await retryDelay(delayMs);
+      }
     }
-    if (temporaryGeminiFailure(response, payload)) {
-      throw new Error(`Google Gemini（${selectedModel}）目前流量過高，系統已自動重試 2 次仍未成功。請改選另一個 Gemini 模型或稍後再試`);
+    if (lastAttemptTimedOut) {
+      const modelHint = selectedModel.endsWith("-pro") ? "請改選 Flash 模型，或稍後再試" : "請改選另一個 Gemini 模型，或稍後再試";
+      throw Object.assign(new Error(`Google Gemini（${selectedModel}）回應逾時；系統已在 Supabase 強制終止前主動取消。${modelHint}`), { status: 504 });
+    }
+    if (response && temporaryGeminiFailure(response, payload)) {
+      throw Object.assign(new Error(`Google Gemini（${selectedModel}）目前流量過高，系統已嘗試 ${attemptCount} 次仍未成功。請改選另一個 Gemini 模型或稍後再試`), { status: 503 });
     }
   } else {
     response = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "Content-Type": "application/json" }, body: JSON.stringify({ model: MODELS.anthropic, max_tokens: maxTokens, system, messages: [{ role: "user", content: prompt }] }) });
@@ -1074,7 +1125,7 @@ async function callProvider(provider: Provider, apiKey: string, system: string, 
       return { text: (payload?.content || []).filter((item: any) => item?.type === "text").map((item: any) => item.text).join("\n").trim(), model: MODELS.anthropic };
     }
   }
-  throw new Error(`AI 平台回應失敗：${String(payload?.error?.message || payload?.error?.status || `HTTP ${response.status}`).slice(0, 180)}`);
+  throw new Error(`AI 平台回應失敗：${String(payload?.error?.message || payload?.error?.status || `HTTP ${response?.status || "unknown"}`).slice(0, 180)}`);
 }
 
 function compactAiSource(source: any, queryContext: string) {
