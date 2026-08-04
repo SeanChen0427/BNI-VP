@@ -1193,9 +1193,10 @@ async function loadEngineSources() {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
-  const [renewalRows, activeMemberRows] = await Promise.all([
+  const [renewalRows, activeMemberRows, completedMidtermRows] = await Promise.all([
     db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
+    db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=eq.completed&completed_at=not.is.null&select=id,member_id,title,completed_at,source_reference&order=completed_at.desc"),
   ]);
   const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
   const renewalCompletions = (renewalRows || []).map((row: any) => ({
@@ -1206,6 +1207,11 @@ async function loadEngineSources() {
     source: row.source,
     confirmedAt: row.confirmed_at,
   })).filter((row: any) => row.name);
+  const midtermCompletions = (completedMidtermRows || []).map((row: any) => ({
+    name: renewalNames.get(row.member_id) || String(row.title || "").replace(/\s+/g, ""),
+    completedAt: row.completed_at,
+    sourceReference: row.source_reference,
+  })).filter((row: any) => row.name && row.completedAt);
   const sources = [half, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   return {
     engine: buildAnalysisFromParsed({
@@ -1217,6 +1223,7 @@ async function loadEngineSources() {
       auditMonth: combineAuditWeeks(audits),
       auditMonthName: expectedMonth.month,
       renewalCompletions,
+      midtermCompletions,
       sources,
     }),
   };
