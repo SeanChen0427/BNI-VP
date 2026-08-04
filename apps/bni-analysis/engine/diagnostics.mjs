@@ -214,15 +214,45 @@ export function yellowBreakthrough(scored, { monthWeeks = 4 } = {}) {
   };
 }
 
-// 期中關懷（入會 5–7 個月）與新會員追蹤（未滿 5 個月）
-export function lifecycleLists(activeScored, tenureByName, reportEnd) {
+function normalizedMemberName(value = "") {
+  return String(value).replace(/\s+/g, "").trim();
+}
+
+function dateOnly(value = "") {
+  const result = String(value).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(result) ? result : "";
+}
+
+// 期中關懷（入會 5–7 個月）與新會員追蹤（未滿 5 個月）。
+// 同一入會／復會週期已完成的正式期中任務不再列為待關懷；舊週期紀錄不能排除新週期。
+export function lifecycleLists(activeScored, tenureByName, reportEnd, { midtermCompletions = [], asOf = reportEnd } = {}) {
   const midterm = [];
   const newMembers = [];
+  const completedMidterm = [];
   for (const s of activeScored) {
     const t = memberTenure(tenureByName.get(s.name), reportEnd);
     if (t.months === null) continue;
-    if (t.months >= 5 && t.months <= 7) midterm.push({ name: s.name, startDate: t.startDate, months: t.months, rejoin: t.rejoin, total: s.total, light: s.light });
+    if (t.months >= 5 && t.months <= 7) {
+      const matchingCompletion = midtermCompletions
+        .filter((item) => {
+          const completedOn = dateOnly(item.completedAt);
+          return normalizedMemberName(item.name) === normalizedMemberName(s.name)
+            && completedOn >= t.startDate
+            && completedOn <= asOf;
+        })
+        .sort((left, right) => dateOnly(right.completedAt).localeCompare(dateOnly(left.completedAt)))[0];
+      if (matchingCompletion) {
+        completedMidterm.push({
+          name: s.name,
+          startDate: t.startDate,
+          completedAt: matchingCompletion.completedAt,
+          sourceReference: matchingCompletion.sourceReference || "",
+        });
+        continue;
+      }
+      midterm.push({ name: s.name, startDate: t.startDate, months: t.months, rejoin: t.rejoin, total: s.total, light: s.light });
+    }
     else if (t.months < 5) newMembers.push({ name: s.name, startDate: t.startDate, months: t.months, weeks: s.weeks, total: s.total, light: s.light });
   }
-  return { midterm, newMembers };
+  return { midterm, newMembers, completedMidterm };
 }

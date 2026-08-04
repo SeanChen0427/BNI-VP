@@ -78,6 +78,7 @@ export function buildAnalysisFromParsed({
   auditMonth = null,
   auditMonthName = null,
   renewalCompletions = [],
+  midtermCompletions = [],
   asOf = new Date().toISOString().slice(0, 10),
   sources = [],
 } = {}) {
@@ -145,7 +146,7 @@ export function buildAnalysisFromParsed({
   const breakthroughs = activeScored.map((s) => yellowBreakthrough(s)).filter(Boolean);
 
   // 期中關懷與新會員
-  const lifecycle = lifecycleLists(activeScored, tenureByName, palms.period.end);
+  const lifecycle = lifecycleLists(activeScored, tenureByName, palms.period.end, { midtermCompletions, asOf });
 
   // 審計（有當月資料才跑）
   let audit = null;
