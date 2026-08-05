@@ -223,9 +223,6 @@
     button.disabled = true;
     try {
       await window.FulianTaskStore.remove(id);
-      localStorage.removeItem(domain.workflowStorageKey(id));
-      const key = draftKey(task);
-      if (key) localStorage.removeItem(key);
       await deleteAttachment(id);
       closeDeleteDialog();
       render();
