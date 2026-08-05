@@ -6,7 +6,7 @@ import vm from "node:vm";
 const root = new URL("../../../", import.meta.url);
 const read = path => readFileSync(new URL(path, root), "utf8");
 
-test("所有排程頁面都載入最新版 Supabase task store", () => {
+test("所有排程頁面都載入最新版 Supabase task 與 case state store", () => {
   const pages = [
     "apps/vice-chair/index.html",
     "apps/vice-chair/case-board.html",
@@ -21,7 +21,13 @@ test("所有排程頁面都載入最新版 Supabase task store", () => {
     "apps/vice-chair/departure-form.html",
   ];
   for (const page of pages) {
-    assert.match(read(page), /assets\/js\/task-store\.js\?v=4/, `${page} 未載入 task-store v4`);
+    assert.match(read(page), /assets\/js\/task-store\.js\?v=5/, `${page} 未載入 task-store v5`);
+  }
+  for (const page of pages.filter(page => ![
+    "apps/vice-chair/member-care.html",
+    "apps/vice-chair/monthly-meeting.html",
+  ].includes(page))) {
+    assert.match(read(page), /assets\/js\/case-state-store\.js\?v=7/, `${page} 未載入 case-state-store v7`);
   }
 });
 
@@ -90,9 +96,25 @@ test("舊裝置更新單筆工作不會推斷刪除另一台的新工作", async
   assert.equal("deletedIds" in requests[0], false);
   assert.equal(JSON.stringify(context.window.FulianTaskStore.all().map(task => task.id)), '["task-a","task-b"]');
 
+  const deleteSequence = [];
+  context.window.FulianCaseStateStore = {
+    beforeTaskDelete: async task => { deleteSequence.push(`flush:${task.id}`); },
+    discardDeletedTask: task => { deleteSequence.push(`discard:${task.id}`); },
+  };
   await context.window.FulianTaskStore.remove("task-b");
   assert.equal(requests.at(-1).action, "delete");
+  assert.deepEqual(deleteSequence, ["flush:task-b", "discard:task-b"]);
   assert.equal(JSON.stringify(context.window.FulianTaskStore.all().map(task => task.id)), '["task-a"]');
+});
+
+test("刪除案件前先完成草稿同步，成功後才清除該案件本機狀態", () => {
+  const taskStore = read("apps/vice-chair/assets/js/task-store.js");
+  const caseStore = read("apps/vice-chair/assets/js/case-state-store.js");
+  assert.match(taskStore, /await window\.FulianCaseStateStore\?\.beforeTaskDelete\?\.\(task\)[\s\S]*api\(\{ action: "delete"/);
+  assert.match(taskStore, /api\(\{ action: "delete"[\s\S]*discardDeletedTask\?\.\(task\)/);
+  assert.match(caseStore, /function beforeTaskDelete\(task\)/);
+  assert.match(caseStore, /function discardDeletedTask\(task\)/);
+  assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
 });
 
 test("Edge API 使用版本衝突、交易 RPC 與明確刪除保護", () => {

@@ -188,7 +188,9 @@
       const task = cached().find(item => item.id === id);
       if (!task) return cached();
       try {
+        await window.FulianCaseStateStore?.beforeTaskDelete?.(task);
         const tasks = await api({ action: "delete", id, revision: task._revision });
+        window.FulianCaseStateStore?.discardDeletedTask?.(task);
         syncFailed = false;
         return tasks;
       } catch (error) {
