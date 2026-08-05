@@ -110,11 +110,16 @@ test("舊裝置更新單筆工作不會推斷刪除另一台的新工作", async
 test("刪除案件前先完成草稿同步，成功後才清除該案件本機狀態", () => {
   const taskStore = read("apps/vice-chair/assets/js/task-store.js");
   const caseStore = read("apps/vice-chair/assets/js/case-state-store.js");
+  const caseBoard = read("apps/vice-chair/assets/js/case-board.js");
   assert.match(taskStore, /await window\.FulianCaseStateStore\?\.beforeTaskDelete\?\.\(task\)[\s\S]*api\(\{ action: "delete"/);
   assert.match(taskStore, /api\(\{ action: "delete"[\s\S]*discardDeletedTask\?\.\(task\)/);
   assert.match(caseStore, /function beforeTaskDelete\(task\)/);
   assert.match(caseStore, /function discardDeletedTask\(task\)/);
   assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
+  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=7/);
+  const deleteHandler = caseBoard.match(/async function confirmDelete\(\)[\s\S]*?function bindDeleteDialog/)[0];
+  assert.match(deleteHandler, /await window\.FulianTaskStore\.remove\(id\)/);
+  assert.doesNotMatch(deleteHandler, /localStorage\.removeItem/);
 });
 
 test("Edge API 使用版本衝突、交易 RPC 與明確刪除保護", () => {
