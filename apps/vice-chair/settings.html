@@ -34,7 +34,7 @@
       <section class="card roles-card"><div class="section-title"><span>01</span><div><h2>三層權限</h2><p>權限固定，不追加更細角色</p></div></div><div class="role-list"><article><b>AD</b><div><strong>系統開發人員 Admin</strong><p>管理帳密、指定副主席、增減委員與系統維護。</p></div></article><article><b>VP</b><div><strong>副主席</strong><p>完整副主席功能，並可增減會員委員名單。</p></div></article><article><b>MC</b><div><strong>會員委員</strong><p>共用委員帳密；登入選姓名後填寫回饋、投票與執行任務。</p></div></article></div></section>
       <section class="card vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>只有 Admin 可以變更</p></div></div><label>從現有會員選擇副主席<div class="inline searchable-field"><input id="vpName" list="vpMemberOptions" autocomplete="off" placeholder="搜尋或點選會員姓名"><datalist id="vpMemberOptions"></datalist><button id="saveVp">儲存副主席</button></div></label><div class="picker-note">可直接點選欄位查看名單，也可以輸入姓名快速篩選。</div><div class="hint">更換後，副主席共用帳號登入會自動顯示新任姓名；舊副主席工作階段會失效。</div></section>
       <section class="card committee-card"><div class="section-title"><span>03</span><div><h2>會員委員名單</h2><p>Admin 與副主席皆可增減</p></div></div><div class="add-member searchable-field"><input id="newMember" list="committeeMemberOptions" autocomplete="off" placeholder="搜尋或點選現有會員"><datalist id="committeeMemberOptions"></datalist><button id="addMember">新增委員</button></div><div class="picker-note">只顯示尚未擔任副主席或會員委員的現有會員。</div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>共用帳號提醒</b><span>移除委員後，該姓名無法再以委員帳號登入；既有案件紀錄仍保留。</span></div></section>
-      <section class="card credentials-card" id="credentialsCard"><div class="section-title"><span>04</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
+      <section class="card credentials-card" id="credentialsCard" hidden><div class="section-title"><span>04</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
       <section class="card ai-card" id="personalAiSettings">
         <div class="section-title"><span>05</span><div><h2>我的 AI API 綁定</h2><p>只屬於目前登入的 <b data-auth-name></b>，不與其他委員共用</p></div></div>
         <div class="ai-overview">
@@ -72,9 +72,9 @@
         <div class="departure-history-head"><div><b>離會人員紀錄</b><span id="departureHistorySummary">正在載入…</span></div><button type="button" id="toggleDepartureHistory" aria-controls="departedList" aria-expanded="false" hidden>查看全部歷史紀錄</button></div>
         <div class="departure-list" id="departedList"></div>
       </section>
-      <section class="card audit-card"><div class="section-title"><span>08</span><div><h2>設定紀錄</h2><p>保存最近的人員與權限異動；不記錄 API Key 內容</p></div></div><ol id="auditLog"></ol></section>
+      <section class="card audit-card" id="auditCard" hidden><div class="section-title"><span>08</span><div><h2>設定紀錄</h2><p>保存最近的人員與權限異動；不記錄 API Key 內容</p></div></div><ol id="auditLog"></ol></section>
       <section class="card test-reset-card" id="testDataResetCard" hidden>
-        <div class="section-title"><span>09</span><div><h2>測試資料重置</h2><p>副主席／Admin 本機除錯工具</p></div></div>
+        <div class="section-title"><span>09</span><div><h2>測試資料重置</h2><p>系統開發人員 Admin 除錯工具</p></div></div>
         <div class="test-reset-intro">
           <p>需要重新跑完整流程時，可在這裡一次清空測試案件與月會紀錄。清除後無法復原，請先確認目前沒有要保留的正式紀錄。</p>
           <button type="button" class="test-reset-refresh" id="refreshTestDataSummary">重新統計</button>
@@ -101,6 +101,6 @@
       </section>
     </div>
   </main>
-  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=7"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/workspace-nav.js?v=1"></script>
+  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=8"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>

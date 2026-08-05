@@ -2140,7 +2140,9 @@ async function companyApi(url: URL) {
 }
 
 async function testResetApi(request: Request, context: Context) {
-  leadership(context);
+  if (context.role !== "admin") {
+    throw Object.assign(new Error("只有系統開發人員 Admin 可以清除測試資料"), { status: 403 });
+  }
   const [meetings, tasks, files] = await Promise.all([
     db("committee_meetings?select=id"),
     db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,revision`),
