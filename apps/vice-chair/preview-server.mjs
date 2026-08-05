@@ -173,7 +173,7 @@ async function testDataReset(req,url,res){
   try{
     const body=req.method==="POST"?await requestBody(req):{},identity=req.method==="GET"?url.searchParams.get("identity")||"":body.identity||"";
     if(!validIdentity(identity))return json(res,400,{message:"登入身份格式不正確"});
-    if(!["admin","vp"].includes(identityRole(identity)))return json(res,403,{message:"只有副主席或系統管理員可以清除測試資料"});
+    if(identityRole(identity)!=="admin")return json(res,403,{message:"只有系統開發人員 Admin 可以清除測試資料"});
     const store=await readMeetingStore();
     if(req.method==="GET")return json(res,200,{meetings:store.records.length});
     if(req.method!=="POST")return json(res,405,{message:"不支援的操作"});
