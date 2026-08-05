@@ -286,6 +286,39 @@
     return true;
   }
 
+  function taskStateKeys(task) {
+    return [
+      domain.workflowStorageKey(task.id),
+      domain.draftStorageKey(task),
+    ].filter(Boolean);
+  }
+
+  async function beforeTaskDelete(task) {
+    if (!task?.id) return;
+    try {
+      await queue;
+    } catch (error) {
+      if (error?.status !== 404) throw error;
+    }
+    taskStateKeys(task).forEach(key => failedSaves.delete(key));
+  }
+
+  function discardDeletedTask(task) {
+    if (!task?.id) return;
+    applyingServerState = true;
+    try {
+      taskStateKeys(task).forEach(key => nativeRemoveItem.call(localStorage, key));
+    } finally {
+      applyingServerState = false;
+    }
+    revisions.delete(task.id);
+    taskStateKeys(task).forEach(key => failedSaves.delete(key));
+    if (!failedSaves.size) {
+      syncFailed = false;
+      document.getElementById("caseSyncAlert")?.remove();
+    }
+  }
+
   const ready = initialize({ migrate: true }).catch(error => {
     console.error("Supabase case state bootstrap failed", error);
     showError(error.message);
@@ -297,6 +330,8 @@
     flush: () => queue,
     refresh,
     reconcileDraft,
+    beforeTaskDelete,
+    discardDeletedTask,
     saveFeedback: (taskId, value, authorName = "") => postAction(
       taskId,
       "feedback",
