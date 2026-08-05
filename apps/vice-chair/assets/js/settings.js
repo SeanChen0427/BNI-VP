@@ -2,6 +2,7 @@
 await window.FulianMemberDirectory.ready;
 const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1",memberDirectory=window.FulianMemberDirectory?.members||[];let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s);
 const taipeiDay=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 function toast(message){const t=$("#toast");t.textContent=message;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),1800)}
 function log(text){audit.unshift({text,time:new Date().toLocaleString("zh-TW")});audit=audit.slice(0,20);localStorage.setItem(AUDIT_KEY,JSON.stringify(audit));}
 function memberOptions(excluded=[]){const blocked=new Set(excluded);return memberDirectory.filter(name=>!blocked.has(name)).map(name=>`<option value="${name}"></option>`).join("")}
@@ -80,7 +81,8 @@ async function resetAllTestData(){
     $("#testResetConfirmation").value="";
     window.dispatchEvent(new CustomEvent("fulian:data-changed",{detail:{source:"test-data-reset"}}));
     await loadTestDataSummary();
-    $("#testResetResult").textContent=`清除完成：${serverResult.tasks} 筆伺服器案件、${browserResult.workflows} 筆本機流程、${browserResult.drafts} 份本機草稿、${serverResult.files} 份 Private Storage 附件、${serverResult.meetings} 筆月會紀錄。`;
+    const protectedNote=serverResult.protectedNewMemberCases?` 已保留 ${serverResult.protectedNewMemberCases} 筆新會員登錄及其來源結案。`:"";
+    $("#testResetResult").textContent=`清除完成：${serverResult.tasks} 筆伺服器案件、${browserResult.workflows} 筆本機流程、${browserResult.drafts} 份本機草稿、${serverResult.files} 份 Private Storage 附件、${serverResult.meetings} 筆月會紀錄。${protectedNote}`;
     toast("測試流程資料已全部清除");
   }catch(error){
     $("#testResetResult").textContent=`清除失敗：${error.message}`;
@@ -97,6 +99,84 @@ function initTestDataReset(){
   $("#testResetConfirmation").oninput=event=>{$("#resetTestData").disabled=event.target.value.trim()!==TEST_RESET_CONFIRMATION};
   $("#resetTestData").onclick=resetAllTestData;
   loadTestDataSummary();
+}
+const canManageNewMembers=["admin","vp"].includes(session.role);
+let newMemberRegistrationState={eligibleCases:[],registrations:[],officialCount:0,pendingCount:0,operationalCount:0};
+function newMemberIdentity(){return`${session.role}:${session.name}`}
+async function newMemberRegistrationApi(method="GET",payload=null){
+  const options={method,headers:{"content-type":"application/json"},cache:"no-store"};
+  if(payload)options.body=JSON.stringify({identity:newMemberIdentity(),...payload});
+  const suffix=method==="GET"?`?identity=${encodeURIComponent(newMemberIdentity())}`:"";
+  const response=await fetch(`/api/new-member-registration${suffix}`,options),data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.message||"新會員登錄服務無法使用");
+  return data;
+}
+function selectedNewMemberCase(){return newMemberRegistrationState.eligibleCases.find(item=>item.taskId===$("#newMemberCase").value)||null}
+function refreshNewMemberRegistrationForm(){
+  const selected=selectedNewMemberCase();
+  $("#newMemberRegistrationName").value=selected?.name||"";
+  if(document.activeElement!==$("#newMemberProfession"))$("#newMemberProfession").value=selected?.profession||"";
+  const confirmed=$("#newMemberConfirmName").value.trim().replace(/\s+/g,"")===String(selected?.name||"").replace(/\s+/g,"");
+  $("#registerNewMember").disabled=!(selected&&$("#newMemberProfession").value.trim()&&$("#newMemberJoinedOn").value&&confirmed);
+  const sameName=(newMemberRegistrationState.registrations||[]).filter(item=>item.status==="pending_palms"&&item.name===selected?.name);
+  $("#newMemberRegistrationNote").innerHTML=sameName.length
+    ?`<b>同名提醒：</b>目前另有 ${sameName.map(item=>escapeHtml(item.profession)).join("、")} 的同名待確認會員。本次不同專業別可登錄，但 PALMS 沒有專業別，下一次對帳將停止自動升格並要求人工確認，絕不猜測。`
+    :`<b>資料來源分工：</b>登錄後立即加入每週點名與 LINE 公告人數；不會進入續約、期中關懷、會員儀表板或正式分析。下一份半年 PALMS 能唯一對上姓名時，才升格正式會員；同名時系統不會猜測。`;
+}
+function renderNewMemberRegistrationState(){
+  const state=newMemberRegistrationState;
+  $("#officialMemberCount").textContent=state.officialCount;
+  $("#pendingMemberCount").textContent=state.pendingCount;
+  $("#operationalMemberCount").textContent=state.operationalCount;
+  $("#newMemberCase").innerHTML=`<option value="">請選擇已完成案件</option>${(state.eligibleCases||[]).map(item=>`<option value="${escapeHtml(item.taskId)}">${escapeHtml(item.name)}${item.profession?`・${escapeHtml(item.profession)}`:""}</option>`).join("")}`;
+  const labels={pending_palms:"待 PALMS",promoted:"已升格正式會員",cancelled:"已撤銷"};
+  $("#newMemberRegistrationList").innerHTML=(state.registrations||[]).length
+    ?state.registrations.map(item=>`<article><b>${escapeHtml(item.name)}</b><span>${escapeHtml(item.profession)}</span><span>入會 ${escapeHtml(item.joinedOn)}</span><em>${labels[item.status]||escapeHtml(item.status)}</em>${item.status==="pending_palms"?`<button type="button" data-cancel-new-member="${escapeHtml(item.id)}" data-name="${escapeHtml(item.name)}">撤銷誤登錄</button>`:""}</article>`).join("")
+    :`<article><span>目前沒有新會員登錄紀錄。</span></article>`;
+  document.querySelectorAll("[data-cancel-new-member]").forEach(button=>button.onclick=()=>cancelNewMemberRegistration(button.dataset.cancelNewMember,button.dataset.name));
+  refreshNewMemberRegistrationForm();
+}
+async function loadNewMemberRegistrationState(){
+  $("#newMemberRegistrationStatus").textContent="正在載入新會員案件…";
+  try{
+    newMemberRegistrationState=await newMemberRegistrationApi();
+    renderNewMemberRegistrationState();
+    $("#newMemberRegistrationStatus").textContent=newMemberRegistrationState.eligibleCases.length?"請選擇已完成案件":"目前沒有待登錄的已結案新會員案件";
+  }catch(error){$("#newMemberRegistrationStatus").textContent=`載入失敗：${error.message}`}
+}
+async function registerNewMemberFlow(){
+  const selected=selectedNewMemberCase();
+  if(!selected)return;
+  const profession=$("#newMemberProfession").value.trim();
+  if(!confirm(`最後確認：將「${selected.name}｜${profession}」加入每週點名名單？\n正式分析仍須等待 PALMS 對帳。`))return;
+  const button=$("#registerNewMember");button.disabled=true;$("#newMemberRegistrationStatus").textContent="登錄中…";
+  try{
+    const data=await newMemberRegistrationApi("POST",{action:"register",taskId:selected.taskId,profession,joinedOn:$("#newMemberJoinedOn").value,confirmName:$("#newMemberConfirmName").value.trim()});
+    newMemberRegistrationState=data.state;
+    $("#newMemberConfirmName").value="";
+    renderNewMemberRegistrationState();
+    $("#newMemberRegistrationStatus").textContent=data.message;
+    log(`${session.name}登錄新會員：${selected.name}｜${profession}`);toast("新會員已加入點名名單");
+  }catch(error){$("#newMemberRegistrationStatus").textContent=error.message;toast("新會員登錄失敗")}
+  refreshNewMemberRegistrationForm();
+}
+async function cancelNewMemberRegistration(id,name){
+  const typed=prompt(`撤銷「${name}」的新會員登錄：請重新輸入完整姓名確認`);
+  if(typed===null)return;
+  try{
+    const data=await newMemberRegistrationApi("POST",{action:"cancel",id,confirmName:typed.trim()});
+    newMemberRegistrationState=data.state;renderNewMemberRegistrationState();
+    $("#newMemberRegistrationStatus").textContent=data.message;log(`${session.name}撤銷新會員登錄：${name}`);toast("已撤銷新會員登錄");
+  }catch(error){$("#newMemberRegistrationStatus").textContent=error.message;toast("撤銷失敗")}
+}
+function initNewMemberRegistration(){
+  if(!canManageNewMembers)return;
+  $("#newMemberRegistrationCard").hidden=false;
+  $("#newMemberJoinedOn").value=taipeiDay();
+  $("#newMemberCase").onchange=()=>{$("#newMemberConfirmName").value="";refreshNewMemberRegistrationForm()};
+  ["newMemberProfession","newMemberJoinedOn","newMemberConfirmName"].forEach(id=>$("#"+id).addEventListener("input",refreshNewMemberRegistrationForm));
+  $("#registerNewMember").onclick=registerNewMemberFlow;
+  loadNewMemberRegistrationState();
 }
 const canManageDeparture=["admin","vp"].includes(session.role);
 const DEPARTURE_PREVIEW_LIMIT=5;
@@ -181,5 +261,5 @@ function initDeparture(){
   $("#toggleDepartureHistory").onclick=()=>{departureHistoryExpanded=!departureHistoryExpanded;renderDepartureState()};
   loadDepartureState();
 }
-if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initDeparture()}
+if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initNewMemberRegistration();initDeparture()}
 })();

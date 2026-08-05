@@ -47,6 +47,7 @@
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
+- `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
 - `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
@@ -59,7 +60,7 @@
 
 ## 本機測試資料重置
 
-設定頁的「測試資料重置」只提供副主席與 Admin 使用，範圍固定為：
+設定頁的「測試資料重置」只提供 Admin 使用，範圍固定為：
 
 - `fulian-work-plan-v1`
 - `fulian-case-workflow-v2-*`
@@ -67,7 +68,7 @@
 - IndexedDB `fulian-case-files`
 - Supabase `committee_meetings` 內的月會紀錄
 
-會員主檔、BNI／PALMS、登入與人員設定、個人 AI Key、出席、公告及課程進度不在清除範圍。
+會員主檔、待 PALMS 新會員及其來源結案、BNI／PALMS、登入與人員設定、個人 AI Key、出席、公告及課程進度不在清除範圍。
 
 ## 正式遷移原則
 

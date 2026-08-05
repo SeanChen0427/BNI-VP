@@ -6,7 +6,7 @@
   const HISTORY_MIGRATION_KEY="fulian-attendance-history-supabase-v1";
   const authSession=FulianAuth.getSession();
   const AttendanceDomain=window.FulianAttendanceDomain;
-  let names=[...(window.FulianMemberDirectory?.members||[])];
+  let members=[];
   let rows=[];
   let timer=null;
   let palmsReady=false;
@@ -18,10 +18,8 @@
   const priorProxy={};
   const priorAbsence={};
 
-  if(!names.length)throw new Error("會員名單尚未載入");
-
   function escapeHtml(text){return String(text??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))}
-  function defaultState(name){return{name,at630:false,at700:false,late:false,early:false,proxy:false,absent:false,speech:false,badge:false,pin:false,suit:false,camera:false,note:""}}
+  function defaultState(member){return{attendanceId:member.attendanceId,name:member.name,profession:member.profession||"",provisional:Boolean(member.provisional),at630:false,at700:false,late:false,early:false,proxy:false,absent:false,speech:false,badge:false,pin:false,suit:false,camera:false,note:""}}
   function isLeadership(){return["vp","admin"].includes(authSession.role)}
   function canFinalConfirm(){return isLeadership()}
   function toast(message){const node=$("#toast");node.textContent=message;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2600)}
@@ -48,7 +46,7 @@
   }
   function currentLate(row){return!row.absent&&!row.proxy&&(row.late||row.early)}
   function currentAbsence(row){return AttendanceDomain.isOperationalAbsence(row)}
-  function cumulative(row){return AttendanceDomain.cumulativeFor(row,{late:priorLate[row.name],proxy:priorProxy[row.name],absence:priorAbsence[row.name]})}
+  function cumulative(row){return AttendanceDomain.cumulativeFor(row,{late:priorLate[row.attendanceId],proxy:priorProxy[row.attendanceId],absence:priorAbsence[row.attendanceId]})}
   function proxyTotal(row){return cumulative(row).proxy}
   function absenceTotal(row){return cumulative(row).absence}
   function lateRemainder(row){return cumulative(row).lateRemainder}
@@ -115,7 +113,7 @@ ${groupedLines("缺席",absenceTotal)}
     });
   }
   function renderRows(){
-    $("#memberRows").innerHTML=rows.map((row,index)=>`<tr data-index="${index}"><td>${escapeHtml(row.name)}</td>${["at630","at700","late","early","proxy","absent","speech","badge","pin","suit","camera"].map(field=>`<td><input type="checkbox" data-field="${field}" ${row[field]?"checked":""} ${confirmed?"disabled":""} aria-label="${escapeHtml(row.name)} ${field}"></td>`).join("")}<td><input type="text" data-field="note" value="${escapeHtml(row.note)}" ${confirmed?"disabled":""} aria-label="${escapeHtml(row.name)}備註"></td></tr>`).join("");
+    $("#memberRows").innerHTML=rows.map((row,index)=>`<tr data-index="${index}"><td><b>${escapeHtml(row.name)}</b>${row.profession?`<small>${escapeHtml(row.profession)}</small>`:""}${row.provisional?`<em>新會員・待 PALMS</em>`:""}</td>${["at630","at700","late","early","proxy","absent","speech","badge","pin","suit","camera"].map(field=>`<td><input type="checkbox" data-field="${field}" ${row[field]?"checked":""} ${confirmed?"disabled":""} aria-label="${escapeHtml(row.name)} ${field}"></td>`).join("")}<td><input type="text" data-field="note" value="${escapeHtml(row.note)}" ${confirmed?"disabled":""} aria-label="${escapeHtml(row.name)}備註"></td></tr>`).join("");
     bindTable();
   }
   function bindTable(){
@@ -205,13 +203,13 @@ ${groupedLines("缺席",absenceTotal)}
     update();
   }
   function applyTotals(state){
-    for(const name of names){
-      const official=state.palms.official?.[name]||{};
-      const overlay=state.overlay.totals?.[name]||{};
+    for(const member of members){
+      const official=state.palms.official?.[member.attendanceId]||{};
+      const overlay=state.overlay.totals?.[member.attendanceId]||{};
       const merged=AttendanceDomain.mergeTotals(official,overlay);
-      priorLate[name]=merged.late;
-      priorProxy[name]=merged.proxy;
-      priorAbsence[name]=merged.absence;
+      priorLate[member.attendanceId]=merged.late;
+      priorProxy[member.attendanceId]=merged.proxy;
+      priorAbsence[member.attendanceId]=merged.absence;
     }
     palmsReady=Boolean(state.palms.ready);
     palmsPeriod=palmsReady
@@ -225,14 +223,14 @@ ${groupedLines("缺席",absenceTotal)}
     $("#saveTime").textContent=date;
     try{
       const state=await api("GET",null,date);
-      names=state.members.map(member=>member.name);
+      members=state.members||[];
       applyTotals(state);
       history=state.history||[];
       const session=state.session;
       confirmed=session?.status==="confirmed";
       storedAnnouncement=session?.announcementSnapshot||"";
-      const byName=new Map((session?.rows||[]).map(row=>[row.name,row]));
-      rows=names.map(name=>({...defaultState(name),...(byName.get(name)||{})}));
+      const byAttendanceId=new Map((session?.rows||[]).map(row=>[row.attendanceId,row]));
+      rows=members.map(member=>({...defaultState(member),...(byAttendanceId.get(member.attendanceId)||{})}));
       const canUseSessionName=[...$("#primaryRecorder").options].some(option=>option.value===authSession.name);
       $("#primaryRecorder").value=session?.primaryRecorder||(canUseSessionName?authSession.name:"");
       $("#assistantRecorder").value=session?.assistantRecorder||"";
@@ -248,7 +246,7 @@ ${groupedLines("缺席",absenceTotal)}
       palmsReady=false;
       palmsPeriod=`PALMS／週次讀取失敗：${error.message}`;
       $("#palmsPeriod").textContent=palmsPeriod;
-      rows=names.map(defaultState);
+      rows=members.map(defaultState);
       renderRows();
       $("#saveState").textContent="資料載入失敗";
       $("#saveTime").textContent=error.message;
@@ -360,7 +358,7 @@ ${groupedLines("缺席",absenceTotal)}
     $("#clearWeek").onclick=()=>{
       if(confirmed)return;
       if(confirm("要清除本週點名狀態嗎？PALMS 正式累計與其他已確認週次不會清除。")){
-        rows=names.map(defaultState);
+        rows=members.map(defaultState);
         renderRows();
         scheduleSave();
       }

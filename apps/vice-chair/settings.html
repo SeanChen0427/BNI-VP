@@ -24,6 +24,18 @@
 .departure-history-head{display:flex;align-items:center;gap:12px;margin:4px 0 10px;flex-wrap:wrap}
 .departure-history-head>div{display:flex;flex-direction:column}.departure-history-head>div span{font-size:12px;color:#6b7280}
 .departure-history-head>button{margin-left:auto;border:1px solid #d8c6c7;background:#fff;color:#8f171d;border-radius:9px;padding:9px 14px;font-weight:700;cursor:pointer;min-height:40px}
+.new-member-registration-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
+.new-member-registration-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#6b7280}
+.new-member-registration-form input,.new-member-registration-form select{border:1px solid #e7e5e0;border-radius:8px;padding:10px;font-size:14px;min-height:44px;background:#fff}
+.new-member-case-note{background:#f8f5f1;border-radius:8px;padding:10px 14px;font-size:13px;color:#6b7280;margin-bottom:12px}
+.new-member-case-note b{color:#1a1d21}
+.new-member-registration-actions{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.new-member-registration-actions button{background:#a5151b;color:#fff;border:0;border-radius:9px;padding:12px 20px;font-weight:700;cursor:pointer;min-height:44px}
+.new-member-registration-actions button:disabled{opacity:.45;cursor:not-allowed}
+.new-member-registration-actions span{font-size:13px;color:#6b7280}
+.new-member-counts{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px}
+.new-member-counts article{background:#f7f7f6;border-radius:8px;padding:10px;text-align:center}.new-member-counts strong{display:block;font-size:22px;color:#a5151b}.new-member-counts span{font-size:12px;color:#6b7280}
+.new-member-registration-list{display:flex;flex-direction:column;gap:8px}.new-member-registration-list article{display:flex;align-items:center;gap:10px;border:1px solid #e7e5e0;border-radius:8px;padding:10px 14px;flex-wrap:wrap}.new-member-registration-list article b{font-size:14px}.new-member-registration-list article span{font-size:13px;color:#6b7280}.new-member-registration-list article em{font-style:normal;background:#eef6fb;color:#25637d;border-radius:999px;padding:4px 8px;font-size:12px}.new-member-registration-list article button{margin-left:auto;border:1px solid #e7e5e0;background:#fff;border-radius:8px;padding:8px 14px;cursor:pointer;min-height:40px}
 @media(max-width:600px){.departure-history-head>button{width:100%;margin-left:0}.departure-list article button{width:100%;margin-left:0}}</style>
 </head>
 <body>
@@ -58,8 +70,23 @@
         </div>
         <p class="guide-footnote">API Key 等同密碼。不要貼到 LINE 群組、Google 文件、GitHub、截圖或交接文件；疑似外洩時請立即至原平台撤銷並重建。</p>
       </section>
+      <section class="card" id="newMemberRegistrationCard" hidden>
+        <div class="section-title"><span>07</span><div><h2>新會員登錄</h2><p>只有副主席與 Admin 可以操作；案件正式結案後才可加入點名</p></div></div>
+        <div class="new-member-counts"><article><strong id="officialMemberCount">—</strong><span>正式會員</span></article><article><strong id="pendingMemberCount">—</strong><span>待 PALMS 新會員</span></article><article><strong id="operationalMemberCount">—</strong><span>目前點名總人數</span></article></div>
+        <div class="new-member-registration-form">
+          <label>已完成新會員案件<select id="newMemberCase"><option value="">正在載入…</option></select></label>
+          <label>姓名<input id="newMemberRegistrationName" readonly placeholder="選擇案件後自動帶入"></label>
+          <label>專業別<input id="newMemberProfession" maxlength="200" placeholder="必填；系統化保存，供同名辨識"></label>
+          <label>入會確認日<input id="newMemberJoinedOn" type="date"></label>
+          <label>防呆確認：重新輸入完整姓名<input id="newMemberConfirmName" autocomplete="off" placeholder="再輸入一次會員姓名"></label>
+        </div>
+        <div class="new-member-case-note" id="newMemberRegistrationNote"><b>資料來源分工：</b>登錄後立即加入每週點名與 LINE 公告人數；不會進入續約、期中關懷、會員儀表板或正式分析。下一份半年 PALMS 能唯一對上姓名時，才升格正式會員；同名時系統不會猜測。</div>
+        <div class="new-member-registration-actions"><button type="button" id="registerNewMember" disabled>加入點名名單</button><span id="newMemberRegistrationStatus"></span></div>
+        <div class="departure-history-head"><div><b>新會員登錄紀錄</b><span>待 PALMS、已升格與已撤銷皆保留稽核</span></div></div>
+        <div class="new-member-registration-list" id="newMemberRegistrationList"></div>
+      </section>
       <section class="card departure-card" id="departureCard" hidden>
-        <div class="section-title"><span>07</span><div><h2>離會登記</h2><p>只有副主席與 Admin 可以操作；登記後分析自動排除該會員</p></div></div>
+        <div class="section-title"><span>08</span><div><h2>離會登記</h2><p>只有副主席與 Admin 可以操作；登記後分析自動排除該會員</p></div></div>
         <div class="departure-form">
           <label>離會會員<div class="searchable-field"><input id="departureName" list="departureMemberOptions" autocomplete="off" placeholder="搜尋或點選現任會員"><datalist id="departureMemberOptions"></datalist></div></label>
           <label>離會確認日<input id="departureDate" type="date"></label>
@@ -72,9 +99,9 @@
         <div class="departure-history-head"><div><b>離會人員紀錄</b><span id="departureHistorySummary">正在載入…</span></div><button type="button" id="toggleDepartureHistory" aria-controls="departedList" aria-expanded="false" hidden>查看全部歷史紀錄</button></div>
         <div class="departure-list" id="departedList"></div>
       </section>
-      <section class="card audit-card" id="auditCard" hidden><div class="section-title"><span>08</span><div><h2>設定紀錄</h2><p>保存最近的人員與權限異動；不記錄 API Key 內容</p></div></div><ol id="auditLog"></ol></section>
+      <section class="card audit-card" id="auditCard" hidden><div class="section-title"><span>09</span><div><h2>設定紀錄</h2><p>保存最近的人員與權限異動；不記錄 API Key 內容</p></div></div><ol id="auditLog"></ol></section>
       <section class="card test-reset-card" id="testDataResetCard" hidden>
-        <div class="section-title"><span>09</span><div><h2>測試資料重置</h2><p>系統開發人員 Admin 除錯工具</p></div></div>
+        <div class="section-title"><span>10</span><div><h2>測試資料重置</h2><p>系統開發人員 Admin 除錯工具</p></div></div>
         <div class="test-reset-intro">
           <p>需要重新跑完整流程時，可在這裡一次清空測試案件與月會紀錄。清除後無法復原，請先確認目前沒有要保留的正式紀錄。</p>
           <button type="button" class="test-reset-refresh" id="refreshTestDataSummary">重新統計</button>
@@ -101,6 +128,6 @@
       </section>
     </div>
   </main>
-  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=8"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/workspace-nav.js?v=1"></script>
+  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=9"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>

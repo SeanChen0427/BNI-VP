@@ -41,13 +41,14 @@ BNI 分析工具
 |---|---|---|
 | PALMS、到期日、會齡及審計原始報表 | Supabase Storage 私人 bucket：`raw-reports` | 副主席、Admin |
 | 會員姓名、專業類別、電話、Email、會籍資料 | PostgreSQL：`members` | 依角色及用途採 RLS |
+| 結案後、待 PALMS 確認的新會員 | PostgreSQL：`provisional_members` | 副主席、Admin 經 Edge API 登錄；僅供點名，不進正式分析 |
 | 身分證或本人佐證 | 原則上只現場核對、不留檔 | 若制度要求保存，另行確認最小欄位、遮罩與期限 |
 | 訪談 Word、申請書、佐證附件 | 私人 bucket：`case-files` | 副主席及受指派案件人員 |
 | 訪談確認截圖 | 私人 bucket：`case-confirmations` | 副主席及受指派案件人員 |
 | 委員回饋 | PostgreSQL：`case_feedback` | 當期有效委員，結案後鎖定 |
 | 投票資格、票向及時間 | PostgreSQL：`vote_snapshots`、`votes` | 依投票制度與查閱規則限制 |
 | 董事顧問確認 | PostgreSQL：`advisor_confirmations`＋必要附件 | 副主席、Admin；其他角色依案件顯示結果 |
-| 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可保存草稿，副主席／Admin 最終確認；只作 PALMS 截止日後的 LINE 公告暫時增量 |
+| 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可保存草稿，副主席／Admin 最終確認；正式與待 PALMS 會員均用內部 ID 記錄，只作 LINE 公告暫時增量 |
 | BNI 分析結果 | PostgreSQL：`analysis_snapshots` | 登入且有權限者 |
 | 完整分析交換檔 | 私人 Storage 或登入後即時 API | 不得部署為公開 JSON |
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |
