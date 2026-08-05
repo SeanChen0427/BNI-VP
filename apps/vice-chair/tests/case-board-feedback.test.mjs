@@ -25,7 +25,17 @@ assert.match(
 );
 assert.match(boardSource, /"你已回饋"/);
 assert.match(boardSource, /"待你回饋"/);
-assert.match(boardSource, /"填寫我的回饋"/);
+assert.match(boardSource, /填寫我的回饋/);
+assert.doesNotMatch(
+  boardSource,
+  /查看案件流程/,
+  "進行中案件不得顯示重複的查看案件流程按鈕"
+);
+assert.match(
+  boardSource,
+  /feedbackStarted\s*&&\s*participation\.status === "pending"/,
+  "只有登入者確實待回饋時才顯示回饋入口"
+);
 assert.match(
   boardSource,
   /midterm: \{[^}]+flow: false/,
@@ -93,6 +103,11 @@ assert.match(
   boardSource,
   /stage === "closed" && canViewArchive/,
   "結案資料入口只提供副主席"
+);
+assert.match(
+  readFileSync(new URL("../case-board.html", import.meta.url), "utf8"),
+  /assets\/js\/case-board\.js\?v=8/,
+  "案件中心必須載入移除重複流程按鈕的新版程式"
 );
 
 console.log("case-board feedback tests passed");
