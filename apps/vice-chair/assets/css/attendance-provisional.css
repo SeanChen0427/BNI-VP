@@ -1,0 +1,23 @@
+.attendance-table td:first-child {
+  min-width: 130px;
+}
+
+.attendance-table td:first-child b,
+.attendance-table td:first-child small,
+.attendance-table td:first-child em {
+  display: block;
+}
+
+.attendance-table td:first-child small {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.attendance-table td:first-child em {
+  margin-top: 3px;
+  color: #25637d;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 700;
+}

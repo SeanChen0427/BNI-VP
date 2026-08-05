@@ -279,10 +279,15 @@ async function latestAttendancePalms() {
   };
 }
 
-function apiAttendanceRow(record: any, memberById: Map<string, any>) {
-  const member = memberById.get(record.member_id);
+function apiAttendanceRow(record: any, officialById: Map<string, any>, provisionalById: Map<string, any>) {
+  const member = record.member_id
+    ? officialById.get(record.member_id)
+    : provisionalById.get(record.provisional_member_id);
   return {
+    attendanceId: member?.attendanceId || "",
     name: member?.name || "",
+    profession: member?.profession || "",
+    provisional: Boolean(member?.provisional),
     at630: Boolean(record.present_0630),
     at700: Boolean(record.present_0700),
     late: Boolean(record.late),
@@ -304,20 +309,34 @@ function operationalCounts(record: any) {
 
 async function attendanceState(meetingDate: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
-  const [baseline, memberRows, peopleRows, sessions] = await Promise.all([
+  const [baseline, memberRows, provisionalRows, peopleRows, sessions] = await Promise.all([
     latestAttendancePalms(),
     db("members?status=eq.active&select=id,profession,people!inner(id,display_name)&order=created_at.asc"),
+    db("provisional_members?status=eq.pending_palms&select=id,display_name,profession,joined_on&order=registered_at.asc"),
     db("people?status=eq.active&select=id,display_name"),
     db("attendance_sessions?select=*&order=meeting_date.desc&limit=30"),
   ]);
-  const members = memberRows.map((row: any) => ({
+  const officialMembers = memberRows.map((row: any) => ({
     id: row.id,
+    attendanceId: `member:${row.id}`,
     personId: row.people.id,
     name: String(row.people.display_name || "").replace(/\s+/g, ""),
     profession: row.profession || "",
+    provisional: false,
   }));
-  const memberById = new Map(members.map((member: any) => [member.id, member]));
-  const memberByName = new Map(members.map((member: any) => [member.name, member]));
+  const provisionalMembers = (provisionalRows || []).map((row: any) => ({
+    id: row.id,
+    attendanceId: `provisional:${row.id}`,
+    personId: null,
+    name: String(row.display_name || "").replace(/\s+/g, ""),
+    profession: row.profession || "",
+    joinedOn: row.joined_on,
+    provisional: true,
+  }));
+  const members = [...officialMembers, ...provisionalMembers];
+  const officialById = new Map(officialMembers.map((member: any) => [member.id, member]));
+  const provisionalById = new Map(provisionalMembers.map((member: any) => [member.id, member]));
+  const memberByAttendanceId = new Map(members.map((member: any) => [member.attendanceId, member]));
   const people = new Map(peopleRows.map((person: any) => [person.id, person.display_name]));
   const currentSession = sessions.find((session: any) => session.meeting_date === meetingDate) || null;
   const currentRecords = currentSession
@@ -329,26 +348,38 @@ async function attendanceState(meetingDate: string) {
     attendanceDomain.isUnreconciledMeeting(session.meeting_date, baseline.periodEnd, meetingDate)
   );
   const overlay: Record<string, { late: number; proxy: number; absence: number }> = {};
-  for (const member of members) overlay[member.name] = { late: 0, proxy: 0, absence: 0 };
+  for (const member of members) overlay[member.attendanceId] = { late: 0, proxy: 0, absence: 0 };
   for (const session of overlaySessions) {
     for (const record of session.attendance_records || []) {
-      const member = memberById.get(record.member_id);
+      const member = record.member_id
+        ? officialById.get(record.member_id)
+        : provisionalById.get(record.provisional_member_id);
       if (!member) continue;
       const counts = operationalCounts(record);
-      overlay[member.name].late += counts.late;
-      overlay[member.name].proxy += counts.proxy;
-      overlay[member.name].absence += counts.absence;
+      overlay[member.attendanceId].late += counts.late;
+      overlay[member.attendanceId].proxy += counts.proxy;
+      overlay[member.attendanceId].absence += counts.absence;
     }
   }
   const official: Record<string, { late: number; proxy: number; absence: number }> = {};
   const missing: string[] = [];
-  for (const member of members) {
+  for (const member of officialMembers) {
     const values: any = baseline.members.get(member.name);
     if (!values) missing.push(member.name);
-    official[member.name] = values || { late: 0, proxy: 0, absence: 0 };
+    official[member.attendanceId] = values || { late: 0, proxy: 0, absence: 0 };
+  }
+  for (const member of provisionalMembers) {
+    official[member.attendanceId] = { late: 0, proxy: 0, absence: 0 };
   }
   return {
-    members: members.map(({ id, name, profession }: any) => ({ id, name, profession })),
+    members: members.map(({ id, attendanceId, name, profession, provisional, joinedOn }: any) => ({
+      id,
+      attendanceId,
+      name,
+      profession,
+      provisional,
+      joinedOn: joinedOn || null,
+    })),
     palms: {
       ready: missing.length === 0,
       importId: baseline.importId,
@@ -376,7 +407,9 @@ async function attendanceState(meetingDate: string) {
       confirmedAt: currentSession.confirmed_at,
       confirmedBy: people.get(currentSession.confirmed_by) || "",
       announcementSnapshot: currentSession.announcement_snapshot || "",
-      rows: currentRecords.map((record: any) => apiAttendanceRow(record, memberById)).filter((row: any) => memberByName.has(row.name)),
+      rows: currentRecords
+        .map((record: any) => apiAttendanceRow(record, officialById, provisionalById))
+        .filter((row: any) => memberByAttendanceId.has(row.attendanceId)),
     } : null,
     history: sessions.map((session: any) => ({
       meetingDate: session.meeting_date,
@@ -400,13 +433,33 @@ async function saveAttendanceSession(body: any, context: Context, { confirm = fa
     leadership(context);
     if (!body.recorderConfirmed || !body.vpConfirmed) throw new Error("主要紀錄委員與副主席都必須完成確認");
   }
-  const [recorderRows, memberRows, baseline] = await Promise.all([
+  const [recorderRows, memberRows, provisionalRows, baseline] = await Promise.all([
     db("committee_terms?status=eq.active&select=person_id,people!inner(display_name)"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
+    db("provisional_members?status=eq.pending_palms&select=id,display_name"),
     latestAttendancePalms(),
   ]);
   const peopleByName = new Map(recorderRows.map((term: any) => [term.people.display_name, term.person_id]));
-  const membersByName = new Map(memberRows.map((member: any) => [String(member.people.display_name || "").replace(/\s+/g, ""), member.id]));
+  const attendanceMembers = [
+    ...memberRows.map((member: any) => ({
+      attendanceId: `member:${member.id}`,
+      memberId: member.id,
+      provisionalMemberId: null,
+      name: String(member.people.display_name || "").replace(/\s+/g, ""),
+    })),
+    ...(provisionalRows || []).map((member: any) => ({
+      attendanceId: `provisional:${member.id}`,
+      memberId: null,
+      provisionalMemberId: member.id,
+      name: String(member.display_name || "").replace(/\s+/g, ""),
+    })),
+  ];
+  const membersByAttendanceId = new Map(attendanceMembers.map((member: any) => [member.attendanceId, member]));
+  const membersByName = new Map<string, any[]>();
+  for (const member of attendanceMembers) {
+    if (!membersByName.has(member.name)) membersByName.set(member.name, []);
+    membersByName.get(member.name)!.push(member);
+  }
   const primaryRecorderId = peopleByName.get(body.primaryRecorder)
     || (peopleByName.get(context.name) ? context.personId : null);
   const assistantRecorderId = peopleByName.get(body.assistantRecorder) || null;
@@ -429,15 +482,22 @@ async function saveAttendanceSession(body: any, context: Context, { confirm = fa
     body: JSON.stringify(sessionPayload),
   });
   const session = sessionRows[0];
-  const recordsByMember = new Map<string, any>();
+  const officialRecords = new Map<string, any>();
+  const provisionalRecords = new Map<string, any>();
   for (const row of (Array.isArray(body.rows) ? body.rows : []).slice(0, 100)) {
-    const memberId = membersByName.get(String(row.name || "").replace(/\s+/g, ""));
-    if (!memberId) continue;
+    const attendanceId = String(row.attendanceId || "");
+    let member = membersByAttendanceId.get(attendanceId);
+    if (!member && !attendanceId) {
+      const legacyMatches = membersByName.get(String(row.name || "").replace(/\s+/g, "")) || [];
+      if (legacyMatches.length === 1) member = legacyMatches[0];
+    }
+    if (!member) continue;
     const absent = Boolean(row.absent) && !Boolean(row.proxy);
     const proxy = Boolean(row.proxy);
-    recordsByMember.set(memberId, {
+    const payload = {
       session_id: session.id,
-      member_id: memberId,
+      member_id: member.memberId,
+      provisional_member_id: member.provisionalMemberId,
       present_0630: absent ? false : Boolean(row.at630),
       present_0700: absent ? false : Boolean(row.at700),
       late: Boolean(row.late),
@@ -451,14 +511,22 @@ async function saveAttendanceSession(body: any, context: Context, { confirm = fa
       camera_on: Boolean(row.camera),
       notes: String(row.note || "").slice(0, 1000) || null,
       updated_by: context.personId,
-    });
+    };
+    if (member.memberId) officialRecords.set(member.memberId, payload);
+    else provisionalRecords.set(member.provisionalMemberId, payload);
   }
-  const records = [...recordsByMember.values()];
-  if (records.length) {
+  if (officialRecords.size) {
     await db("attendance_records?on_conflict=session_id,member_id", {
       method: "POST",
       headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(records),
+      body: JSON.stringify([...officialRecords.values()]),
+    });
+  }
+  if (provisionalRecords.size) {
+    await db("attendance_records?on_conflict=session_id,provisional_member_id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([...provisionalRecords.values()]),
     });
   }
   if (confirm) {
@@ -591,6 +659,7 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
   const monthly = monthWindow(-1, 1);
   const half = monthWindow(-1, 6);
   const annual = monthWindow(-1, 12);
+  const provisionalReconciliation = { promoted: [] as string[], blocked: [] as string[] };
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
     const bytes = decodeBase64(String(file?.dataBase64 || ""));
@@ -632,8 +701,23 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
       metadata: { category: body.type, originalFilename: file.name || "", uploadedBy: context.identity },
     });
     if (body.type === "monthly") await saveMonthlyAttendance(parsed, imported.id, storagePath);
+    if (body.type === "halfYear") {
+      const reconciled = await reconcileProvisionalMembersWithPalms(parsed, imported.id, context);
+      provisionalReconciliation.promoted.push(...reconciled.promoted);
+      provisionalReconciliation.blocked.push(...reconciled.blocked);
+    }
   }
-  return { message: "資料已驗證並安全上傳至 Supabase Private Storage", status: await monthlyDataStatus() };
+  const promotedMessage = provisionalReconciliation.promoted.length
+    ? `；${provisionalReconciliation.promoted.join("、")} 已由 PALMS 唯一對帳並升格正式會員`
+    : "";
+  const blockedMessage = provisionalReconciliation.blocked.length
+    ? `；${provisionalReconciliation.blocked.join("、")} 暫不升格，請人工確認來源識別碼`
+    : "";
+  return {
+    message: `資料已驗證並安全上傳至 Supabase Private Storage${promotedMessage}${blockedMessage}`,
+    provisionalReconciliation,
+    status: await monthlyDataStatus(),
+  };
 }
 
 function meetingToApi(row: any, names: Map<string, string>) {
@@ -844,6 +928,179 @@ async function committeeMeetingsApi(request: Request, context: Context) {
     body: JSON.stringify(payload),
   });
   return { record: meetingToApi(rows[0], names) };
+}
+
+function normalizedIdentityPart(value: unknown) {
+  return String(value || "").normalize("NFKC").replace(/\s+/g, "").toLocaleLowerCase("zh-TW");
+}
+
+async function newMemberRegistrationState() {
+  const [taskRows, stateRows, registrationRows, officialRows, peopleRows] = await Promise.all([
+    db(`tasks?source=eq.${TASK_SOURCE}&category=eq.new&status=eq.completed&select=id,source_reference,title,result_summary,completed_at&order=completed_at.desc`),
+    db("task_case_states?select=task_id,workflow"),
+    db("provisional_members?select=*&order=registered_at.desc"),
+    db("members?status=eq.active&select=id,profession,people!inner(display_name)"),
+    db("people?select=id,display_name"),
+  ]);
+  const states = new Map((stateRows || []).map((row: any) => [row.task_id, row.workflow || {}]));
+  const registeredTasks = new Set((registrationRows || [])
+    .filter((row: any) => row.status !== "cancelled")
+    .map((row: any) => row.source_task_id));
+  const people = new Map((peopleRows || []).map((row: any) => [row.id, row.display_name]));
+  const eligibleCases = (taskRows || [])
+    .filter((row: any) => Boolean(states.get(row.id)?.closed) && !registeredTasks.has(row.id))
+    .map((row: any) => {
+      const meta = parseTaskJson(row.result_summary);
+      return {
+        taskId: row.source_reference,
+        name: String(row.title || "").replace(/\s+/g, ""),
+        profession: String(meta.profession || "").trim(),
+        completedAt: row.completed_at,
+      };
+    });
+  const registrations = (registrationRows || []).map((row: any) => ({
+    id: row.id,
+    taskId: row.source_task_id,
+    name: row.display_name,
+    profession: row.profession,
+    joinedOn: row.joined_on,
+    status: row.status,
+    registeredBy: people.get(row.registered_by) || "",
+    registeredAt: row.registered_at,
+    promotedAt: row.promoted_at,
+    cancelledAt: row.cancelled_at,
+  }));
+  const pendingCount = registrations.filter((row: any) => row.status === "pending_palms").length;
+  return {
+    eligibleCases,
+    registrations,
+    officialCount: (officialRows || []).length,
+    operationalCount: (officialRows || []).length + pendingCount,
+    pendingCount,
+  };
+}
+
+async function newMemberRegistrationApi(request: Request, context: Context) {
+  leadership(context);
+  if (request.method === "GET") return newMemberRegistrationState();
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "register") {
+    const taskReference = String(body.taskId || "").trim();
+    const profession = String(body.profession || "").trim().replace(/\s+/g, " ").slice(0, 200);
+    const joinedOn = String(body.joinedOn || "");
+    if (!taskReference) throw new Error("請選擇已完成的新會員案件");
+    if (!profession) throw new Error("專業別必須填寫，供同名會員辨識與後續主檔使用");
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedOn) || joinedOn > taipeiDay()) throw new Error("入會確認日不正確或在未來");
+    const taskRows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(taskReference)}&category=eq.new&status=eq.completed&select=id,title,result_summary&limit=1`);
+    const task = taskRows?.[0];
+    if (!task) throw new Error("此新會員案件尚未完成正式確認，不能登錄");
+    const stateRows = await db(`task_case_states?task_id=eq.${task.id}&select=workflow&limit=1`);
+    if (!stateRows?.[0]?.workflow?.closed) throw new Error("此新會員案件尚未正式結案，不能登錄");
+    const name = String(task.title || "").normalize("NFKC").replace(/\s+/g, "").slice(0, 100);
+    if (!name || normalizedIdentityPart(body.confirmName) !== normalizedIdentityPart(name)) {
+      throw new Error("確認姓名不一致：請重新輸入完整姓名");
+    }
+    const [registrations, officialMembers] = await Promise.all([
+      db("provisional_members?status=eq.pending_palms&select=display_name,profession,source_task_id"),
+      db("members?status=eq.active&select=profession,people!inner(display_name)"),
+    ]);
+    const duplicatePending = (registrations || []).some((row: any) =>
+      normalizedIdentityPart(row.display_name) === normalizedIdentityPart(name)
+      && normalizedIdentityPart(row.profession) === normalizedIdentityPart(profession)
+    );
+    const duplicateOfficial = (officialMembers || []).some((row: any) =>
+      normalizedIdentityPart(row.people?.display_name) === normalizedIdentityPart(name)
+      && normalizedIdentityPart(row.profession) === normalizedIdentityPart(profession)
+    );
+    if (duplicatePending || duplicateOfficial) throw new Error("相同姓名與專業別已存在，不可重複登錄");
+    const existingTask = (registrations || []).some((row: any) => row.source_task_id === task.id);
+    if (existingTask) throw new Error("此新會員案件已完成登錄");
+    await db("provisional_members", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        source_task_id: task.id,
+        display_name: name,
+        profession,
+        joined_on: joinedOn,
+        registered_by: context.personId,
+      }),
+    });
+    return {
+      message: `${name} 已加入點名名單；正式分析仍等待下一份 PALMS 唯一對帳`,
+      state: await newMemberRegistrationState(),
+    };
+  }
+  if (body.action === "cancel") {
+    const id = String(body.id || "");
+    if (!/^[0-9a-f-]{36}$/i.test(id)) throw new Error("新會員登錄編號不正確");
+    const rows = await db(`provisional_members?id=eq.${encodeURIComponent(id)}&status=eq.pending_palms&select=id,display_name&limit=1`);
+    const registration = rows?.[0];
+    if (!registration) throw new Error("此登錄已更新或已由 PALMS 升格，請重新整理");
+    if (normalizedIdentityPart(body.confirmName) !== normalizedIdentityPart(registration.display_name)) {
+      throw new Error("確認姓名不一致：未取消登錄");
+    }
+    await db(`provisional_members?id=eq.${registration.id}&status=eq.pending_palms`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "cancelled",
+        cancelled_by: context.personId,
+        cancelled_at: new Date().toISOString(),
+        cancellation_note: String(body.note || "副主席撤銷誤登錄").trim().slice(0, 500),
+      }),
+    });
+    return {
+      message: `${registration.display_name} 已移出後續點名名單；既有已確認週次仍保留`,
+      state: await newMemberRegistrationState(),
+    };
+  }
+  throw new Error("不支援的動作");
+}
+
+async function reconcileProvisionalMembersWithPalms(parsed: any, importId: string, context: Context) {
+  const [pendingRows, officialRows] = await Promise.all([
+    db("provisional_members?status=eq.pending_palms&select=id,display_name,profession"),
+    db("members?status=eq.active&select=people!inner(display_name)"),
+  ]);
+  const reportCounts = new Map<string, number>();
+  for (const member of parsed?.members || []) {
+    const key = normalizedIdentityPart(member.name);
+    reportCounts.set(key, (reportCounts.get(key) || 0) + 1);
+  }
+  const pendingCounts = new Map<string, number>();
+  for (const member of pendingRows || []) {
+    const key = normalizedIdentityPart(member.display_name);
+    pendingCounts.set(key, (pendingCounts.get(key) || 0) + 1);
+  }
+  const officialNames = new Set((officialRows || []).map((row: any) => normalizedIdentityPart(row.people?.display_name)));
+  const promoted: string[] = [];
+  const blocked: string[] = [];
+  for (const member of pendingRows || []) {
+    const key = normalizedIdentityPart(member.display_name);
+    if (!reportCounts.has(key)) continue;
+    if (reportCounts.get(key) !== 1 || pendingCounts.get(key) !== 1 || officialNames.has(key)) {
+      blocked.push(`${member.display_name}（同名資料無法由 PALMS 唯一辨識）`);
+      continue;
+    }
+    try {
+      await db("rpc/edge_promote_provisional_member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_provisional_member_id: member.id,
+          p_report_import_id: importId,
+          p_actor: context.personId,
+        }),
+      });
+      promoted.push(member.display_name);
+    } catch (error) {
+      console.error("provisional PALMS promotion", member.id, error);
+      blocked.push(`${member.display_name}（自動升格未完成，原登錄與點名紀錄保持不變）`);
+    }
+  }
+  return { promoted, blocked };
 }
 
 async function memberDepartureState() {
@@ -2143,17 +2400,27 @@ async function testResetApi(request: Request, context: Context) {
   if (context.role !== "admin") {
     throw Object.assign(new Error("只有系統開發人員 Admin 可以清除測試資料"), { status: 403 });
   }
-  const [meetings, tasks, files] = await Promise.all([
+  const [meetings, tasks, files, protectedRegistrations] = await Promise.all([
     db("committee_meetings?select=id"),
     db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,revision`),
-    db("task_case_files?select=object_path"),
+    db("task_case_files?select=task_id,object_path"),
+    db("provisional_members?status=in.(pending_palms,promoted)&select=source_task_id"),
   ]);
-  if (request.method === "GET") return { meetings: meetings.length, tasks: tasks.length, files: files.length };
+  const protectedTaskIds = new Set((protectedRegistrations || []).map((row: any) => row.source_task_id));
+  const resettableTasks = (tasks || []).filter((task: any) => !protectedTaskIds.has(task.id));
+  const resettableTaskIds = new Set(resettableTasks.map((task: any) => task.id));
+  const resettableFiles = (files || []).filter((file: any) => resettableTaskIds.has(file.task_id));
+  if (request.method === "GET") return {
+    meetings: meetings.length,
+    tasks: resettableTasks.length,
+    files: resettableFiles.length,
+    protectedNewMemberCases: protectedTaskIds.size,
+  };
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   if (body.confirmation !== "RESET_FULIAN_TEST_DATA") throw new Error("缺少測試資料清除確認");
   await db("committee_meetings?id=not.is.null", { method: "DELETE" });
-  for (const task of tasks || []) {
+  for (const task of resettableTasks) {
     await db("rpc/edge_delete_task", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -2163,13 +2430,14 @@ async function testResetApi(request: Request, context: Context) {
       }),
     });
   }
-  for (const file of files || []) {
+  for (const file of resettableFiles) {
     await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
   }
   return {
     meetings: meetings.length,
-    tasks: tasks.length,
-    files: files.length,
+    tasks: resettableTasks.length,
+    files: resettableFiles.length,
+    protectedNewMemberCases: protectedTaskIds.size,
     message: "Supabase 月會、案件、草稿與附件測試資料已清除",
   };
 }
@@ -2186,6 +2454,7 @@ Deno.serve(async (request) => {
     let result;
     if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);
+    else if (path === "/api/new-member-registration") result = await newMemberRegistrationApi(request, context);
     else if (path === "/api/member-departure") result = await memberDepartureApi(request, context);
     else if (path === "/api/ai-settings") result = await aiSettingsApi(request, context);
     else if (path === "/api/ai-chat") result = await aiChatApi(request, context);
