@@ -153,12 +153,11 @@
     const archiveAction = stage === "closed" && canViewArchive
       ? `<a class="main" href="case-archive.html?case=${encodeURIComponent(task.id)}">查看結案資料</a>`
       : "";
-    const flowAction = type.flow && stage !== "closed"
-      ? `<a class="main" href="${flow}${feedbackStarted && participation.status === "pending" ? "#feedbackSection" : ""}">${
-          feedbackStarted && participation.status === "pending"
-            ? "填寫我的回饋"
-            : "查看案件流程"
-        }</a>`
+    const feedbackAction = type.flow
+      && stage !== "closed"
+      && feedbackStarted
+      && participation.status === "pending"
+      ? `<a class="main" href="${flow}#feedbackSection">填寫我的回饋</a>`
       : "";
     return `<article class="case-card">
       <div class="case-main"><span class="type-icon">${type.icon}</span><div><strong>${esc(task.member)}</strong><small>${type.label}・${esc(task.profession || "專業類別待補")}</small></div></div>
@@ -167,7 +166,7 @@
       <div class="deadline ${deadline.overdue ? "overdue" : ""}"><time>${deadline.label}</time><small>${deadline.overdue ? "已逾期" : "排定時間"}</small></div>
       <div class="actions">
         ${formAction}
-        ${flowAction}
+        ${feedbackAction}
         ${archiveAction}
         ${canDelete ? `<button type="button" data-delete="${esc(task.id)}">刪除</button>` : ""}
       </div>
