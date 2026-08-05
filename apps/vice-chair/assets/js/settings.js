@@ -98,13 +98,29 @@ function initTestDataReset(){
   loadTestDataSummary();
 }
 const canManageDeparture=["admin","vp"].includes(session.role);
+const DEPARTURE_PREVIEW_LIMIT=5;
 let departureState={currentMembers:[],departed:[]};
+let departureHistoryExpanded=false;
 function departureIdentity(){return`${session.role}:${session.name}`}
+function sortedDepartures(){
+  return departureState.departed
+    .map((record,index)=>({...record,_sourceIndex:index}))
+    .sort((a,b)=>String(b.confirmedAt||"").localeCompare(String(a.confirmedAt||""))||a._sourceIndex-b._sourceIndex);
+}
 function renderDepartureState(){
+  const departed=sortedDepartures();
+  const visible=departureHistoryExpanded?departed:departed.slice(0,DEPARTURE_PREVIEW_LIMIT);
   $("#departureMemberOptions").innerHTML=departureState.currentMembers.map(m=>`<option value="${m.name}">${m.profession||""}</option>`).join("");
-  $("#departedList").innerHTML=departureState.departed.length
-    ?departureState.departed.map(d=>`<article><b>${d.name}</b><span>離會確認日 ${d.confirmedAt}</span><span>${d.note||"—"}</span><button data-undo-departure="${d.name}">撤銷</button></article>`).join("")
+  $("#departedList").innerHTML=visible.length
+    ?visible.map(d=>`<article><b>${d.name}</b><span>離會確認日 ${d.confirmedAt}</span><span>${d.note||"—"}</span><button data-undo-departure="${d.name}">撤銷</button></article>`).join("")
     :`<article><span>目前離會名單沒有紀錄。</span></article>`;
+  $("#departureHistorySummary").textContent=departed.length>DEPARTURE_PREVIEW_LIMIT&&!departureHistoryExpanded
+    ?`顯示最近 ${DEPARTURE_PREVIEW_LIMIT} 人・共 ${departed.length} 人`
+    :`共 ${departed.length} 人`;
+  const toggle=$("#toggleDepartureHistory");
+  toggle.hidden=departed.length<=DEPARTURE_PREVIEW_LIMIT;
+  toggle.textContent=departureHistoryExpanded?"收合歷史紀錄":`查看全部歷史紀錄（${departed.length} 人）`;
+  toggle.setAttribute("aria-expanded",String(departureHistoryExpanded));
   document.querySelectorAll("[data-undo-departure]").forEach(button=>button.onclick=()=>undoDepartureFlow(button.dataset.undoDeparture));
 }
 async function loadDepartureState(){
@@ -161,6 +177,7 @@ function initDeparture(){
   $("#departureDate").value=taipeiDay();
   ["departureName","departureConfirmName","departureDate"].forEach(id=>{$("#"+id).addEventListener("input",refreshDepartureForm)});
   $("#registerDeparture").onclick=registerDepartureFlow;
+  $("#toggleDepartureHistory").onclick=()=>{departureHistoryExpanded=!departureHistoryExpanded;renderDepartureState()};
   loadDepartureState();
 }
 if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initDeparture()}
