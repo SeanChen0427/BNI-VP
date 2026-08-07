@@ -52,6 +52,7 @@ BNI 分析工具
 | BNI 分析結果 | PostgreSQL：`analysis_snapshots` | 登入且有權限者 |
 | 完整分析交換檔 | 私人 Storage 或登入後即時 API | 不得部署為公開 JSON |
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |
+| LINE 群組目標與點名公告發送紀錄 | PostgreSQL：`line_group_targets`、`attendance_line_deliveries` | 只由 Edge Function/service role 讀寫；前端只取得去識別狀態與群組顯示名稱 |
 | 個人 AI API Key | 後端加密欄位／Vault（按使用者隔離） | 前端只讀取綁定狀態與末四碼；完整 Key 不可讀回 |
 | 富聯共用系統 Secret（若未來需要） | Supabase Edge Function Secrets | 前端與資料庫一般角色不可讀取 |
 | 正式帳號與密碼 | Supabase Auth | 系統不得保存明碼密碼 |
@@ -152,7 +153,7 @@ BNI 分析工具
 - 委員票向是否記名及哪些角色可以查閱。
 - 個人 AI Key 已完成 Edge AES-GCM 加密；仍待建立加密 secret 輪替、離任撤銷及使用量提示流程。
 - （2026-07-19 已決策：不建立一人一帳號，維持共用帳號）共用帳號下個人 Key 依所選姓名隔離，屬信任機制；仍待確認：離任時更換共用密碼與撤銷 Key 的執行責任人與流程。
-- LINE Bot 使用哪個官方帳號、群組及管理權交接方式。
+- LINE Bot 已確認使用現有官方帳號並先於假公告群驗收；正式群選定、第二管理者及換屆交接仍待確認。
 
 ## 十、官方技術參考
 

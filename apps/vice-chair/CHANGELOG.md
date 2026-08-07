@@ -1,5 +1,13 @@
 # 變更紀錄
 
+## 2026-08-08－每週點名 LINE Bot 測試群發送
+
+- 點名公告預覽的人工複製旁新增 LINE Bot 按鈕；副主席／Admin 可先核對 Webhook 發現的假公告群，之後僅能發送已鎖定的公告快照。
+- 新增不驗證 Supabase JWT、但必須驗證 LINE HMAC-SHA256 簽章的 `line-webhook` Edge Function；Webhook 忽略並不儲存群組聊天內容。
+- 新增 service-only 群組目標與發送稽核資料表，記錄公告 SHA-256、操作人、目標群、LINE request ID 與成敗，並以唯一鍵及 `X-Line-Retry-Key` 阻擋重複發送。
+- Channel Secret 與 Channel Access Token 只從 Supabase Edge Function Secrets 讀取；未完成憑證設定、未核對群組或未確認週次時，發送按鈕會明確停用。
+- 設定頁新增 LINE Bot 群組管理，可確認最多三個用途群組、區分測試／正式環境並停用舊目標；點名頁只使用後台指定的「每週出席公告」群，不再於功能頁臨時綁定。
+
 ## 2026-08-07－進行中案件恢復決議階段入口
 
 - 修正移除通用「查看案件流程」後，已進入回饋或投票的案件失去操作入口。

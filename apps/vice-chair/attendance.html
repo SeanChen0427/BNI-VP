@@ -16,7 +16,7 @@
   <link rel="stylesheet" href="assets/css/attendance.css">
   <link rel="stylesheet" href="assets/css/attendance-provisional.css?v=1">
   <link rel="stylesheet" href="assets/css/attendance-permissions.css?v=2">
-  <link rel="stylesheet" href="assets/css/attendance-usability.css?v=1">
+  <link rel="stylesheet" href="assets/css/attendance-usability.css?v=2">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
 </head>
 <body>
@@ -39,14 +39,14 @@
       </section>
 
       <aside class="preview-column">
-        <section class="form-card preview-card"><div class="section-head"><span>03</span><div><h2>LINE公告預覽</h2><p>本週資料取自現場勾選；累計＝最新 PALMS 正式基準＋報表截止日之後已確認的每週點名</p><small id="palmsPeriod">正在讀取最新 PALMS…</small></div></div><pre id="announcementPreview"></pre><div class="preview-actions"><button type="button" class="ghost" id="copyAnnouncement">複製公告貼到 LINE</button></div></section>
+        <section class="form-card preview-card"><div class="section-head"><span>03</span><div><h2>LINE公告預覽</h2><p>本週資料取自現場勾選；累計＝最新 PALMS 正式基準＋報表截止日之後已確認的每週點名</p><small id="palmsPeriod">正在讀取最新 PALMS…</small></div></div><pre id="announcementPreview"></pre><div class="preview-actions"><button type="button" class="ghost" id="copyAnnouncement">複製公告貼到 LINE</button><button type="button" class="line-send" id="sendLineAnnouncement" hidden disabled>等待 LINE 公告群</button></div><small class="line-connection-state" id="lineConnectionState" aria-live="polite" hidden></small></section>
         <section class="form-card approval-card"><div class="section-head"><span>04</span><div><h2>確認本週紀錄</h2><p>點名只協助產生 LINE 公告；下月 PALMS 上傳後，累計一律改以 PALMS 為準。</p></div></div><label><input type="checkbox" id="recorderConfirmed" data-save>主要紀錄委員已確認資料 <em>委員與副主席皆可</em></label><label class="vp-confirm" id="vpConfirmLabel"><input type="checkbox" id="vpConfirmed" data-save>副主席已完成最終確認 <em id="vpPermissionNote">僅副主席可操作</em></label><div class="send-state" id="sendState"><i></i><span>尚未達到確認條件</span></div><button type="button" class="ghost reopen-button" id="reopenWeek" hidden>重新開啟並修改本週紀錄</button><button type="button" class="primary send-button" id="confirmWeek" disabled>確認並鎖定本週紀錄</button><small>確認後會保存本週資料與公告快照；若內容有誤，副主席可重新開啟、修正並再次確認。</small></section>
       </aside>
     </div>
   </main>
   <div id="toast"></div>
   <script src="core/attendance-domain.js?v=1"></script>
-  <script src="assets/js/attendance.js?v=10"></script>
+  <script src="assets/js/attendance.js?v=11"></script>
   <script src="assets/js/workspace-nav.js?v=1"></script>
 </body>
 </html>

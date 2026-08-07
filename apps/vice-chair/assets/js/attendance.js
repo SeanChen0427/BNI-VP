@@ -14,6 +14,8 @@
   let confirmed=false;
   let storedAnnouncement="";
   let history=[];
+  let lineState={visible:false};
+  let lineBusy=false;
   const priorLate={};
   const priorProxy={};
   const priorAbsence={};
@@ -161,6 +163,57 @@ ${groupedLines("缺席",absenceTotal)}
         :ready
           ?"雙重確認完成，可以鎖定本週紀錄"
           :"尚未達到確認條件";
+    renderLineState();
+  }
+
+  function lineTime(value){
+    return value?new Date(value).toLocaleString("zh-TW"):"";
+  }
+  function renderLineState(){
+    const button=$("#sendLineAnnouncement"),state=$("#lineConnectionState");
+    const visible=isLeadership()&&lineState.visible!==false;
+    button.hidden=!visible;
+    state.hidden=!visible;
+    if(!visible)return;
+    const discovered=Array.isArray(lineState.discoveredTargets)?lineState.discoveredTargets:[];
+    const delivery=lineState.delivery;
+    button.disabled=true;
+    if(lineBusy){
+      button.textContent="LINE 處理中…";
+      state.textContent="請勿關閉或重複按下發送。";
+      return;
+    }
+    if(!lineState.configured){
+      button.textContent="LINE Bot 尚未設定";
+      state.textContent="後端尚未安全設定 Channel Access Token。";
+      return;
+    }
+    if(!lineState.target){
+      button.disabled=false;
+      button.textContent="前往後台設定群組";
+      state.textContent=discovered.length
+        ?`已偵測 ${discovered.length} 個待確認群組，請到系統設定指定「每週出席公告」。`
+        :"請先邀請 Bot 進入群組並傳一則普通訊息，再到系統設定確認用途。";
+      return;
+    }
+    const targetName=lineState.target.displayName||"LINE 公告群";
+    if(delivery?.status==="sent"){
+      button.textContent="已發送到 LINE 公告群";
+      state.textContent=`${targetName}・${lineTime(delivery.sentAt)}・同一公告版本已阻擋重複發送`;
+      return;
+    }
+    if(delivery?.status==="processing"){
+      button.textContent="LINE 發送處理中";
+      state.textContent=`${targetName}・正在確認 LINE 平台回應`;
+      return;
+    }
+    button.textContent="發送到 LINE 公告群";
+    button.disabled=!confirmed;
+    state.textContent=delivery?.status==="failed"
+      ?`${targetName}・上次發送失敗：${delivery.errorMessage||"原因不明"}，可再次嘗試`
+      :confirmed
+        ?`${targetName}・只會發送已鎖定的公告快照`
+        :`${targetName}・完成本週最終確認後才可發送`;
   }
   function payload(){
     return{
@@ -226,6 +279,7 @@ ${groupedLines("缺席",absenceTotal)}
       members=state.members||[];
       applyTotals(state);
       history=state.history||[];
+      lineState=state.line||{visible:false};
       const session=state.session;
       confirmed=session?.status==="confirmed";
       storedAnnouncement=session?.announcementSnapshot||"";
@@ -247,6 +301,7 @@ ${groupedLines("缺席",absenceTotal)}
       palmsPeriod=`PALMS／週次讀取失敗：${error.message}`;
       $("#palmsPeriod").textContent=palmsPeriod;
       rows=members.map(defaultState);
+      lineState={visible:isLeadership(),configured:false,discoveredTargets:[]};
       renderRows();
       $("#saveState").textContent="資料載入失敗";
       $("#saveTime").textContent=error.message;
@@ -329,6 +384,27 @@ ${groupedLines("缺席",absenceTotal)}
     }
     toast(confirmed?"已複製確認版公告，可貼到 LINE 群組":"公告已複製；本週尚未由副主席確認");
   }
+  async function handleLineAnnouncement(){
+    if(!isLeadership()||lineBusy)return;
+    if(!lineState.target){
+      location.href="settings.html#lineBotGroups";
+      return;
+    }
+    if(!confirmed||!lineState.ready)return;
+    const targetName=lineState.target.displayName||"LINE 公告群";
+    if(!confirm(`確定將 ${dateLabel()} 已鎖定的點名公告發送到「${targetName}」？\n\nLINE 訊息發送後無法由系統收回，同一版本會阻擋重複發送。`))return;
+    lineBusy=true;renderLineState();
+    try{
+      const result=await api("POST",{action:"send-line",meetingDate:$("#meetingDate").value});
+      toast(result.message);
+      await loadDate($("#meetingDate").value);
+    }catch(error){
+      toast(error.message);
+      await loadDate($("#meetingDate").value).catch(()=>{});
+    }finally{
+      lineBusy=false;renderLineState();
+    }
+  }
   async function init(){
     const now=new Date(),pad=value=>String(value).padStart(2,"0");
     configureIdentity();
@@ -364,6 +440,7 @@ ${groupedLines("缺席",absenceTotal)}
       }
     };
     $("#copyAnnouncement").onclick=copyAnnouncement;
+    $("#sendLineAnnouncement").onclick=handleLineAnnouncement;
     $("#reopenWeek").onclick=reopenWeek;
     $("#confirmWeek").onclick=confirmWeek;
     update();

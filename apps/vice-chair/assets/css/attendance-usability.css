@@ -17,6 +17,41 @@
   justify-content: center;
 }
 
+.preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+
+.preview-actions .line-send {
+  border: 1px solid #06a949;
+  background: #06c755;
+  color: #fff;
+  border-radius: 9px;
+  padding: 8px 12px;
+  font: 700 11px inherit;
+  cursor: pointer;
+}
+
+.preview-actions .line-send:hover:not(:disabled) {
+  background: #05b94e;
+}
+
+.preview-actions .line-send:disabled {
+  border-color: #d8d5d1;
+  background: #e9e7e4;
+  color: #8b8884;
+  cursor: not-allowed;
+}
+
+.line-connection-state {
+  display: block;
+  margin-top: 9px;
+  color: #666;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
 .reopen-button {
   margin-bottom: 10px;
   border: 1px solid #c98d91;

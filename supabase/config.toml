@@ -123,6 +123,9 @@ verify_jwt = false
 [functions.app-api]
 verify_jwt = true
 
+[functions.line-webhook]
+verify_jwt = false
+
 # Uncomment to configure local storage buckets
 # [storage.buckets.images]
 # public = false

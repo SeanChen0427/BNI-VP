@@ -15,5 +15,9 @@ assert.match(style, /\.preview-card,\n\.approval-card \{\n  position: static;/);
 assert.match(style, /max-height: none;\n  overflow: visible;/);
 assert.match(script, /navigator\.clipboard\?\.writeText/);
 assert.match(script, /document\.execCommand\("copy"\)/);
+assert.match(html, /id="sendLineAnnouncement"/);
+assert.match(script, /settings\.html#lineBotGroups/);
+assert.match(script, /action:"send-line"/);
+assert.match(style, /\.preview-actions \.line-send/);
 
 console.log("attendance UI tests passed");

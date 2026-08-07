@@ -261,5 +261,54 @@ function initDeparture(){
   $("#toggleDepartureHistory").onclick=()=>{departureHistoryExpanded=!departureHistoryExpanded;renderDepartureState()};
   loadDepartureState();
 }
-if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initNewMemberRegistration();initDeparture()}
+const canManageLineGroups=["admin","vp"].includes(session.role);
+const LINE_ROUTE_LABELS={attendance:"每週出席公告",committee:"會員委員會通知",leadership:"三長／董顧通知"};
+let lineGroupsState={configured:false,targets:[]};
+function lineGroupIdentity(){return`${session.role}:${session.name}`}
+async function lineGroupsApi(method="GET",payload=null){
+  const options={method,headers:{"content-type":"application/json"},cache:"no-store"};
+  if(payload)options.body=JSON.stringify({identity:lineGroupIdentity(),...payload});
+  const suffix=method==="GET"?`?identity=${encodeURIComponent(lineGroupIdentity())}`:"";
+  const response=await fetch(`/api/line-groups${suffix}`,options),data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.message||"LINE 群組服務無法使用");
+  return data;
+}
+function renderLineGroups(){
+  const targets=lineGroupsState.targets||[];
+  const active=targets.filter(item=>item.status==="active");
+  const discovered=targets.filter(item=>item.status==="discovered");
+  $("#lineGroupRoutes").innerHTML=Object.entries(LINE_ROUTE_LABELS).map(([routeKey,label])=>{
+    const target=active.find(item=>item.routeKey===routeKey);
+    return target
+      ?`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>${escapeHtml(target.displayName)}</small></div><em>${target.environment==="test"?"測試群":"正式群"}</em><button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button></article>`
+      :`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>尚未指定群組</small></div><em>未啟用</em></article>`;
+  }).join("");
+  $("#lineGroupDiscovered").innerHTML=discovered.length?discovered.map(item=>`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途"><option value="attendance">每週出席公告</option><option value="committee">會員委員會通知</option><option value="leadership">三長／董顧通知</option></select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">確認加入</button></article>`).join(""):`<div class="line-group-empty">目前沒有待確認群組。邀請 Bot 後，請在群內傳一則普通訊息。</div>`;
+  document.querySelectorAll("[data-assign-line-group]").forEach(button=>button.onclick=()=>assignLineGroup(button.dataset.assignLineGroup,button.dataset.name));
+  document.querySelectorAll("[data-disable-line-group]").forEach(button=>button.onclick=()=>disableLineGroup(button.dataset.disableLineGroup,button.dataset.name));
+  $("#lineGroupStatus").textContent=lineGroupsState.configured?`目前已啟用 ${active.length}/3 個群組用途。` : "LINE Bot 機密尚未在後端完成設定。";
+}
+async function loadLineGroups(){
+  $("#lineGroupStatus").textContent="正在讀取 LINE Bot 狀態…";
+  try{lineGroupsState=await lineGroupsApi();renderLineGroups()}catch(error){$("#lineGroupStatus").textContent=`載入失敗：${error.message}`}
+}
+async function assignLineGroup(id,name){
+  const routeKey=document.querySelector(`[data-line-route="${id}"]`)?.value||"";
+  const environment=document.querySelector(`[data-line-environment="${id}"]`)?.value||"test";
+  const label=LINE_ROUTE_LABELS[routeKey]||routeKey;
+  if(!confirm(`確認將「${name}」指定為「${label}」${environment==="test"?"測試群":"正式群"}？\n\n同一用途原有群組會被停用，避免誤發。`))return;
+  $("#lineGroupStatus").textContent="正在向 LINE 核對群組…";
+  try{const result=await lineGroupsApi("POST",{action:"assign",targetId:id,routeKey,environment});log(`${session.name}確認 LINE 群組：${name}｜${label}`);toast(result.message);await loadLineGroups()}catch(error){$("#lineGroupStatus").textContent=error.message;toast("LINE 群組確認失敗")}
+}
+async function disableLineGroup(id,name){
+  if(!confirm(`停用「${name}」的系統發送權限？\n\nBot 不會被踢出 LINE 群組，但系統將無法再發送到該群。`))return;
+  $("#lineGroupStatus").textContent="正在停用群組…";
+  try{const result=await lineGroupsApi("POST",{action:"disable",targetId:id});log(`${session.name}停用 LINE 群組：${name}`);toast(result.message);await loadLineGroups()}catch(error){$("#lineGroupStatus").textContent=error.message;toast("停用失敗")}
+}
+function initLineGroups(){
+  if(!canManageLineGroups)return;
+  $("#lineBotGroups").hidden=false;
+  loadLineGroups();
+}
+if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initNewMemberRegistration();initDeparture();initLineGroups()}
 })();

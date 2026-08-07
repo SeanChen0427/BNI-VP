@@ -64,6 +64,10 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
+function lineAccessToken() {
+  return Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
+}
+
 async function serviceFetch(path: string, options: RequestInit = {}) {
   const response = await fetch(`${supabaseUrl}${path}`, {
     ...options,
@@ -307,7 +311,280 @@ function operationalCounts(record: any) {
   return attendanceDomain.operationalCounts(record);
 }
 
-async function attendanceState(meetingDate: string) {
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+async function lineRequest(path: string, options: RequestInit = {}) {
+  const token = lineAccessToken();
+  if (!token) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  const response = await fetch(`https://api.line.me${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      ...(options.headers || {}),
+    },
+  });
+  return response;
+}
+
+function publicLineTarget(row: any) {
+  return {
+    id: row.id,
+    displayName: row.display_name || "待確認 LINE 群組",
+    environment: row.purpose || null,
+    routeKey: row.route_key || null,
+    status: row.status,
+    lastEventAt: row.last_event_at,
+    verifiedAt: row.verified_at || null,
+  };
+}
+
+async function refreshLineGroupName(row: any) {
+  if (!lineAccessToken() || (row.display_name && row.display_name !== "待確認 LINE 群組")) return row;
+  try {
+    const response = await lineRequest(`/v2/bot/group/${encodeURIComponent(row.line_group_id)}/summary`);
+    if (!response.ok) return row;
+    const summary = await response.json().catch(() => ({}));
+    const displayName = String(summary.groupName || "").trim().slice(0, 200);
+    if (!displayName) return row;
+    await db(`line_group_targets?id=eq.${row.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ display_name: displayName }),
+    });
+    return { ...row, display_name: displayName };
+  } catch {
+    return row;
+  }
+}
+
+async function lineAttendanceState(currentSession: any, context: Context) {
+  if (!["admin", "vp"].includes(context.role)) return { visible: false };
+  const targetRows = await db("line_group_targets?status=in.(discovered,active)&select=*&order=last_event_at.desc");
+  const targets = await Promise.all((targetRows || []).map(refreshLineGroupName));
+  const activeTarget = targets.find((target: any) => target.status === "active" && target.route_key === "attendance") || null;
+  let delivery = null;
+  if (currentSession?.id && currentSession?.announcement_snapshot && activeTarget) {
+    const announcementHash = await sha256(String(currentSession.announcement_snapshot));
+    const deliveryRows = await db(
+      `attendance_line_deliveries?attendance_session_id=eq.${currentSession.id}&group_target_id=eq.${activeTarget.id}&announcement_sha256=eq.${announcementHash}&select=status,attempt_count,requested_at,sent_at,failed_at,error_message&limit=1`,
+    );
+    const row = deliveryRows?.[0];
+    if (row) delivery = {
+      status: row.status,
+      attemptCount: row.attempt_count,
+      requestedAt: row.requested_at,
+      sentAt: row.sent_at,
+      failedAt: row.failed_at,
+      errorMessage: row.error_message || "",
+    };
+  }
+  return {
+    visible: true,
+    configured: Boolean(lineAccessToken()),
+    target: activeTarget ? publicLineTarget(activeTarget) : null,
+    discoveredTargets: targets.filter((target: any) => target.status === "discovered").map(publicLineTarget),
+    delivery,
+    ready: Boolean(lineAccessToken() && activeTarget && currentSession?.status === "confirmed" && currentSession?.announcement_snapshot && delivery?.status !== "sent"),
+  };
+}
+
+const LINE_ROUTE_KEYS = new Set(["attendance", "committee", "leadership"]);
+const LINE_ENVIRONMENTS = new Set(["test", "production"]);
+
+async function assignLineTarget(targetId: string, routeKey: string, environment: string, context: Context) {
+  leadership(context);
+  if (!/^[0-9a-f-]{36}$/i.test(targetId)) throw new Error("LINE 群組識別資料不正確");
+  if (!LINE_ROUTE_KEYS.has(routeKey)) throw new Error("LINE 群組用途不正確");
+  if (!LINE_ENVIRONMENTS.has(environment)) throw new Error("LINE 群組環境不正確");
+  const rows = await db(`line_group_targets?id=eq.${encodeURIComponent(targetId)}&status=in.(discovered,active,disabled)&select=*&limit=1`);
+  let target = rows?.[0];
+  if (!target) throw Object.assign(new Error("這個 LINE 群組已更新，請重新整理後再操作"), { status: 409 });
+  const summaryResponse = await lineRequest(`/v2/bot/group/${encodeURIComponent(target.line_group_id)}/summary`);
+  const summary = await summaryResponse.json().catch(() => ({}));
+  if (!summaryResponse.ok) {
+    throw Object.assign(new Error("LINE Bot 目前無法確認此群組，請確認 Bot 仍在測試群中"), { status: 502 });
+  }
+  const now = new Date().toISOString();
+  await db(`line_group_targets?status=eq.active&route_key=eq.${routeKey}&id=neq.${target.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "disabled", purpose: null, route_key: null, verified_by: null, verified_at: null }),
+  });
+  const activated = await db(`line_group_targets?id=eq.${target.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      display_name: String(summary.groupName || target.display_name || "LINE 測試群").trim().slice(0, 200),
+      purpose: environment,
+      route_key: routeKey,
+      status: "active",
+      verified_by: context.personId,
+      verified_at: now,
+      left_at: null,
+    }),
+  });
+  if (!activated?.[0]) throw Object.assign(new Error("群組連結狀態已變更，請重新整理"), { status: 409 });
+  return { message: `已確認「${activated[0].display_name}」的 LINE 群組用途`, target: publicLineTarget(activated[0]) };
+}
+
+async function disableLineTarget(targetId: string, context: Context) {
+  leadership(context);
+  if (!/^[0-9a-f-]{36}$/i.test(targetId)) throw new Error("LINE 群組識別資料不正確");
+  const updated = await db(`line_group_targets?id=eq.${encodeURIComponent(targetId)}&status=eq.active`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({ status: "disabled", purpose: null, route_key: null, verified_by: null, verified_at: null }),
+  });
+  if (!updated?.[0]) throw Object.assign(new Error("群組設定已更新，請重新整理"), { status: 409 });
+  return { message: `已停用「${updated[0].display_name}」`, target: publicLineTarget(updated[0]) };
+}
+
+async function lineGroupsApi(request: Request, context: Context) {
+  leadership(context);
+  if (request.method === "GET") {
+    const rows = await db("line_group_targets?select=*&order=last_event_at.desc&limit=30");
+    const targets = await Promise.all((rows || []).map(refreshLineGroupName));
+    return { configured: Boolean(lineAccessToken()), targets: targets.map(publicLineTarget) };
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "assign") {
+    return assignLineTarget(String(body.targetId || ""), String(body.routeKey || ""), String(body.environment || "production"), context);
+  }
+  if (body.action === "disable") return disableLineTarget(String(body.targetId || ""), context);
+  throw new Error("LINE 群組操作不正確");
+}
+
+async function beginLineDelivery(session: any, target: any, announcementHash: string, context: Context) {
+  const existingRows = await db(
+    `attendance_line_deliveries?attendance_session_id=eq.${session.id}&group_target_id=eq.${target.id}&announcement_sha256=eq.${announcementHash}&select=*&limit=1`,
+  );
+  const existing = existingRows?.[0];
+  if (existing?.status === "sent") {
+    throw Object.assign(new Error("這個版本的公告已發送到 LINE 群組，系統已阻擋重複發送"), { status: 409 });
+  }
+  if (existing?.status === "processing" && Date.now() - new Date(existing.requested_at).getTime() < 5 * 60 * 1000) {
+    throw Object.assign(new Error("LINE 公告正在發送，請勿重複操作"), { status: 409 });
+  }
+  const now = new Date().toISOString();
+  if (existing) {
+    const updated = await db(`attendance_line_deliveries?id=eq.${existing.id}&status=neq.sent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "processing",
+        attempt_count: Number(existing.attempt_count || 0) + 1,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+        sent_at: null,
+        failed_at: null,
+        line_request_id: null,
+        line_message_id: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+    if (!updated?.[0]) throw Object.assign(new Error("LINE 公告狀態已更新，請重新整理"), { status: 409 });
+    return updated[0];
+  }
+  try {
+    const inserted = await db("attendance_line_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        attendance_session_id: session.id,
+        group_target_id: target.id,
+        announcement_sha256: announcementHash,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+      }),
+    });
+    return inserted[0];
+  } catch (error) {
+    if (String((error as Error)?.message || error).includes("duplicate key")) {
+      throw Object.assign(new Error("LINE 公告正在發送或已發送，請勿重複操作"), { status: 409 });
+    }
+    throw error;
+  }
+}
+
+async function finishLineDelivery(deliveryId: string, patch: any) {
+  await db(`attendance_line_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function sendLineAttendance(meetingDate: string, context: Context) {
+  leadership(context);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  const [sessionRows, targetRows] = await Promise.all([
+    db(`attendance_sessions?meeting_date=eq.${meetingDate}&status=eq.confirmed&select=id,meeting_date,status,announcement_snapshot&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.attendance&select=*&limit=1"),
+  ]);
+  const session = sessionRows?.[0];
+  const target = targetRows?.[0];
+  if (!session?.announcement_snapshot) throw Object.assign(new Error("本週尚未完成最終確認，不能發送到 LINE"), { status: 409 });
+  if (!target) throw Object.assign(new Error("尚未在後台設定每週出席公告群"), { status: 409 });
+  const announcement = String(session.announcement_snapshot);
+  if (announcement.length > 5000) throw Object.assign(new Error("LINE 公告超過 5,000 字，請先調整公告內容"), { status: 413 });
+  const announcementHash = await sha256(announcement);
+  const delivery = await beginLineDelivery(session, target, announcementHash, context);
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Line-Retry-Key": delivery.retry_key,
+      },
+      body: JSON.stringify({ to: target.line_group_id, messages: [{ type: "text", text: announcement }] }),
+    });
+  } catch (error) {
+    const message = String((error as Error)?.message || error).slice(0, 1000);
+    await finishLineDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: message });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${message}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const message = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishLineDelivery(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      error_code: `HTTP_${response.status}`,
+      error_message: message,
+      line_request_id: response.headers.get("x-line-request-id") || null,
+    });
+    throw Object.assign(new Error(`LINE 發送失敗：${message}`), { status: 502 });
+  }
+  const sentAt = new Date().toISOString();
+  const requestId = response.headers.get("x-line-request-id") || acceptedRequestId || null;
+  await finishLineDelivery(delivery.id, {
+    status: "sent",
+    sent_at: sentAt,
+    failed_at: null,
+    error_code: null,
+    error_message: null,
+    line_request_id: requestId,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  await db(`attendance_sessions?id=eq.${session.id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ announcement_sent_at: sentAt }),
+  });
+  return { message: `公告已發送到「${target.display_name}」`, sentAt, target: publicLineTarget(target) };
+}
+
+async function attendanceState(meetingDate: string, context: Context) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
   const [baseline, memberRows, provisionalRows, peopleRows, sessions] = await Promise.all([
     latestAttendancePalms(),
@@ -371,6 +648,7 @@ async function attendanceState(meetingDate: string) {
   for (const member of provisionalMembers) {
     official[member.attendanceId] = { late: 0, proxy: 0, absence: 0 };
   }
+  const line = await lineAttendanceState(currentSession, context);
   return {
     members: members.map(({ id, attendanceId, name, profession, provisional, joinedOn }: any) => ({
       id,
@@ -416,6 +694,7 @@ async function attendanceState(meetingDate: string) {
       status: session.status,
       confirmedAt: session.confirmed_at,
     })),
+    line,
   };
 }
 
@@ -548,7 +827,7 @@ async function saveAttendanceSession(body: any, context: Context, { confirm = fa
 async function attendanceApi(request: Request, url: URL, context: Context) {
   if (request.method === "GET") {
     const meetingDate = url.searchParams.get("date") || taipeiDay();
-    return attendanceState(meetingDate);
+    return attendanceState(meetingDate, context);
   }
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
@@ -559,6 +838,12 @@ async function attendanceApi(request: Request, url: URL, context: Context) {
   if (body.action === "confirm") {
     const session = await saveAttendanceSession(body, context, { confirm: true });
     return { message: "本週點名已由副主席確認；後續週次將納入 LINE 公告暫時累計", session };
+  }
+  if (body.action === "activate-line-test-group") {
+    return assignLineTarget(String(body.targetId || ""), "attendance", "test", context);
+  }
+  if (body.action === "send-line") {
+    return sendLineAttendance(String(body.meetingDate || ""), context);
   }
   if (body.action === "reopen") {
     leadership(context);
@@ -2472,6 +2757,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/task-file") result = await taskFileApi(request, url, context);
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
+    else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
     else throw Object.assign(new Error("找不到指定的應用服務"), { status: 404 });
     return respond(request, 200, result);
