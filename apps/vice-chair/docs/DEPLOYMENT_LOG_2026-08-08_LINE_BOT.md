@@ -2,7 +2,7 @@
 
 日期：2026-08-08  
 專案：Supabase `fahrblkukuhgveiptufn`  
-階段：LINE Secrets 與 Webhook 已設定；正在升級三群組用途管理，等待假公告群事件、實送及前端發布。
+階段：LINE Secrets、Webhook、三群組用途管理、測試群綁定、GitHub Pages 與第一次實送均已完成。
 
 ## 已部署
 
@@ -30,10 +30,14 @@
 - 公開 Webhook 以偽造簽章實測回傳 HTTP 401 `Invalid signature`，確認函式上線且簽章防護生效。
 - 首次發布後發現 `app-api` 內既有二進位 `sha256` 與新增文字指紋函式同名，造成 Edge Function `BOOT_ERROR`；已將新增函式改名為 `sha256Text`、加入重複宣告回歸檢查並重新部署。正式 OPTIONS 健康檢查已恢復 HTTP 200。
 
-## 尚未完成
+## 正式測試結果
 
-- 已先將 LINE 官方帳號加入假公告群；Webhook 啟用後需在群內再發一則訊息，才會產生可核對的群組事件。
-- GitHub Pages 尚未發布本次 LINE 按鈕，等待後端與假群驗證後再發布。
+- LINE Webhook 已成功發現群組「公告群（測試）」。
+- 副主席設定頁已將該群組啟用為「每週出席公告／測試群」；目前啟用 1/3 個用途槽位。
+- GitHub Pages 已發布設定頁群組管理功能與出席頁「發送到 LINE 公告群」按鈕。
+- 以 2026-08-04 已鎖定的公告快照完成第一次 LINE Bot 實送。
+- 遠端資料庫唯讀查核顯示 `attendance_line_deliveries` 有 1 筆 `sent`，無 `failed`；發送時間為 2026-08-08 02:08（Asia/Taipei）。
+- 重複操作仍受公告 SHA-256、資料庫唯一鍵與 LINE retry key 三層保護。
 
 ## 驗證結果
 
@@ -44,3 +48,4 @@
 - `supabase db push --dry-run`：僅列出本次 LINE migration。
 - 正式 `db push`：migration 已套用；CLI 因本機無 Docker 無法快取 pg-delta catalog，但遠端回傳 `Finished supabase db push`，不影響已套用結果。
 - `app-api`、`line-webhook` 均以 server-side bundling 部署成功。
+- GitHub `main` 已發布；提交：`bf74908`（LINE 群組路由）、`6c9bcb8`（修復 app-api 啟動衝突）。
