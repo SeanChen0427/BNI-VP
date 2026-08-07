@@ -338,6 +338,7 @@ function publicLineTarget(row: any) {
     environment: row.purpose || null,
     routeKey: row.route_key || null,
     status: row.status,
+    availableForAssignment: row.status === "discovered" || (row.status === "disabled" && !row.left_at),
     lastEventAt: row.last_event_at,
     verifiedAt: row.verified_at || null,
   };

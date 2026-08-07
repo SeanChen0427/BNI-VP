@@ -2,6 +2,7 @@
 
 ## 2026-08-08－每週點名 LINE Bot 測試群發送
 
+- 修正人工停用群組後從指定清單消失：Bot 仍在群內時，停用群組會保留為「可直接重新指定」；Bot 已離群則維持阻擋。
 - LINE Bot 點名公告改用 Messaging API `textV2` 全群 mention，訊息開頭會真正觸發「@所有人」；訊息格式版本同步納入防重複指紋。
 - 點名公告預覽的人工複製旁新增 LINE Bot 按鈕；副主席／Admin 可先核對 Webhook 發現的假公告群，之後僅能發送已鎖定的公告快照。
 - 新增不驗證 Supabase JWT、但必須驗證 LINE HMAC-SHA256 簽章的 `line-webhook` Edge Function；Webhook 忽略並不儲存群組聊天內容。

@@ -54,6 +54,7 @@ assert.match(edge, /messages: \[lineMessage\]/);
 assert.equal((edge.match(/async function sha256\(/g) || []).length, 1);
 assert.match(edge, /async function sha256Text\(/);
 assert.match(edge, /route_key=eq\.attendance/);
+assert.match(edge, /availableForAssignment: row\.status === "discovered" \|\| \(row\.status === "disabled" && !row\.left_at\)/);
 assert.match(edge, /path === "\/api\/line-groups"/);
 assert.match(edge, /body\.action === "send-line"/);
 assert.doesNotMatch(edge, /LINE_CHANNEL_ACCESS_TOKEN\s*=\s*["'][^"']+["']/);
@@ -64,5 +65,8 @@ assert.match(script, /settings\.html#lineBotGroups/);
 assert.match(settingsHtml, /id="lineBotGroups"/);
 assert.match(settingsScript, /LINE_ROUTE_LABELS=\{attendance:/);
 assert.match(settingsScript, /action:"assign"/);
+assert.match(settingsScript, /item\.availableForAssignment&&item\.status!=="active"/);
+assert.match(settingsScript, /已停用，可直接重新指定/);
+assert.match(settingsHtml, /已停用群組可直接重新啟用/);
 
 console.log("LINE attendance delivery tests passed");
