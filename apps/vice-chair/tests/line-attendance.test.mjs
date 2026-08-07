@@ -40,6 +40,8 @@ assert.match(routingMigration, /'attendance', 'committee', 'leadership'/);
 assert.match(routingMigration, /line_group_targets_one_active_route/);
 assert.match(edge, /status=eq\.confirmed&select=id,meeting_date,status,announcement_snapshot/);
 assert.match(edge, /X-Line-Retry-Key/);
+assert.equal((edge.match(/async function sha256\(/g) || []).length, 1);
+assert.match(edge, /async function sha256Text\(/);
 assert.match(edge, /route_key=eq\.attendance/);
 assert.match(edge, /path === "\/api\/line-groups"/);
 assert.match(edge, /body\.action === "send-line"/);

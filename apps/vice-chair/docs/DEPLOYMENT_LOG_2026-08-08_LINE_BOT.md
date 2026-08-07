@@ -28,6 +28,7 @@
 - 依 Sean 最新決策擴充三個用途槽位：每週出席公告、會員委員會通知、三長／董顧通知；由副主席／Admin 在設定頁確認群組。
 - Migration `20260808124500_line_group_routing.sql` 已套用；更新後的 `app-api` 與 `line-webhook` 已部署。
 - 公開 Webhook 以偽造簽章實測回傳 HTTP 401 `Invalid signature`，確認函式上線且簽章防護生效。
+- 首次發布後發現 `app-api` 內既有二進位 `sha256` 與新增文字指紋函式同名，造成 Edge Function `BOOT_ERROR`；已將新增函式改名為 `sha256Text`、加入重複宣告回歸檢查並重新部署。正式 OPTIONS 健康檢查已恢復 HTTP 200。
 
 ## 尚未完成
 

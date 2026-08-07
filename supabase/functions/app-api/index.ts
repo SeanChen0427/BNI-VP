@@ -311,7 +311,7 @@ function operationalCounts(record: any) {
   return attendanceDomain.operationalCounts(record);
 }
 
-async function sha256(value: string) {
+async function sha256Text(value: string) {
   const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -368,7 +368,7 @@ async function lineAttendanceState(currentSession: any, context: Context) {
   const activeTarget = targets.find((target: any) => target.status === "active" && target.route_key === "attendance") || null;
   let delivery = null;
   if (currentSession?.id && currentSession?.announcement_snapshot && activeTarget) {
-    const announcementHash = await sha256(String(currentSession.announcement_snapshot));
+    const announcementHash = await sha256Text(String(currentSession.announcement_snapshot));
     const deliveryRows = await db(
       `attendance_line_deliveries?attendance_session_id=eq.${currentSession.id}&group_target_id=eq.${activeTarget.id}&announcement_sha256=eq.${announcementHash}&select=status,attempt_count,requested_at,sent_at,failed_at,error_message&limit=1`,
     );
@@ -535,7 +535,7 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
   if (!target) throw Object.assign(new Error("尚未在後台設定每週出席公告群"), { status: 409 });
   const announcement = String(session.announcement_snapshot);
   if (announcement.length > 5000) throw Object.assign(new Error("LINE 公告超過 5,000 字，請先調整公告內容"), { status: 413 });
-  const announcementHash = await sha256(announcement);
+  const announcementHash = await sha256Text(announcement);
   const delivery = await beginLineDelivery(session, target, announcementHash, context);
   let response: Response;
   try {
