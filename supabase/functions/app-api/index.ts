@@ -5,6 +5,7 @@ import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashbo
 import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
+import { buildLineAttendanceMessage, lineAttendanceFingerprintSource } from "./line-message.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -368,7 +369,7 @@ async function lineAttendanceState(currentSession: any, context: Context) {
   const activeTarget = targets.find((target: any) => target.status === "active" && target.route_key === "attendance") || null;
   let delivery = null;
   if (currentSession?.id && currentSession?.announcement_snapshot && activeTarget) {
-    const announcementHash = await sha256Text(String(currentSession.announcement_snapshot));
+    const announcementHash = await sha256Text(lineAttendanceFingerprintSource(currentSession.announcement_snapshot));
     const deliveryRows = await db(
       `attendance_line_deliveries?attendance_session_id=eq.${currentSession.id}&group_target_id=eq.${activeTarget.id}&announcement_sha256=eq.${announcementHash}&select=status,attempt_count,requested_at,sent_at,failed_at,error_message&limit=1`,
     );
@@ -534,8 +535,13 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
   if (!session?.announcement_snapshot) throw Object.assign(new Error("本週尚未完成最終確認，不能發送到 LINE"), { status: 409 });
   if (!target) throw Object.assign(new Error("尚未在後台設定每週出席公告群"), { status: 409 });
   const announcement = String(session.announcement_snapshot);
-  if (announcement.length > 5000) throw Object.assign(new Error("LINE 公告超過 5,000 字，請先調整公告內容"), { status: 413 });
-  const announcementHash = await sha256Text(announcement);
+  let lineMessage;
+  try {
+    lineMessage = buildLineAttendanceMessage(announcement);
+  } catch (error) {
+    throw Object.assign(error as Error, { status: 413 });
+  }
+  const announcementHash = await sha256Text(lineAttendanceFingerprintSource(announcement));
   const delivery = await beginLineDelivery(session, target, announcementHash, context);
   let response: Response;
   try {
@@ -545,7 +551,7 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
         "Content-Type": "application/json",
         "X-Line-Retry-Key": delivery.retry_key,
       },
-      body: JSON.stringify({ to: target.line_group_id, messages: [{ type: "text", text: announcement }] }),
+      body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
     });
   } catch (error) {
     const message = String((error as Error)?.message || error).slice(0, 1000);

@@ -38,6 +38,8 @@
 - 以 2026-08-04 已鎖定的公告快照完成第一次 LINE Bot 實送。
 - 遠端資料庫唯讀查核顯示 `attendance_line_deliveries` 有 1 筆 `sent`，無 `failed`；發送時間為 2026-08-08 02:08（Asia/Taipei）。
 - 重複操作仍受公告 SHA-256、資料庫唯一鍵與 LINE retry key 三層保護。
+- 後續依 Sean 驗收補上 LINE `textV2` 全群 mention；公告會真正通知「@所有人」，且格式版本已納入防重複指紋，可與第一次未 mention 的測試紀錄區分。
+- 新版已部署並以同一份 2026-08-04 鎖定快照完成第二次實送；LINE API 接受訊息，遠端稽核累計 2 筆 `sent`、0 筆 `failed`，新版發送時間為 2026-08-08 02:20（Asia/Taipei）。
 
 ## 驗證結果
 

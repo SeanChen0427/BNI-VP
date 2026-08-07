@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { collectGroupEvents, verifyLineSignature } from "../../../supabase/functions/line-webhook/domain.mjs";
+import { buildLineAttendanceMessage, lineAttendanceFingerprintSource } from "../../../supabase/functions/app-api/line-message.mjs";
 
 const read = path => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
 const migration = read("supabase/migrations/20260808113000_line_attendance_delivery.sql");
@@ -30,6 +31,15 @@ assert.deepEqual(collectGroupEvents(JSON.parse(body)), [{
 }]);
 assert.doesNotMatch(JSON.stringify(collectGroupEvents(JSON.parse(body))), /不得儲存這句訊息/);
 
+assert.deepEqual(buildLineAttendanceMessage("點名公告"), {
+  type: "textV2",
+  text: "{all}\n點名公告",
+  substitution: { all: { type: "mention", mentionee: { type: "all" } } },
+});
+assert.equal(buildLineAttendanceMessage("內容 {請確認}").text, "{all}\n內容 {{請確認}}");
+assert.match(lineAttendanceFingerprintSource("點名公告"), /^text-v2-mention-all-v1\n/);
+assert.throws(() => buildLineAttendanceMessage("字".repeat(5000)), /@所有人後超過 5,000 字/);
+
 assert.match(webhook, /x-line-signature/);
 assert.match(webhook, /verifyLineSignature\(rawBody/);
 assert.match(webhook, /User message content is ignored/);
@@ -40,6 +50,7 @@ assert.match(routingMigration, /'attendance', 'committee', 'leadership'/);
 assert.match(routingMigration, /line_group_targets_one_active_route/);
 assert.match(edge, /status=eq\.confirmed&select=id,meeting_date,status,announcement_snapshot/);
 assert.match(edge, /X-Line-Retry-Key/);
+assert.match(edge, /messages: \[lineMessage\]/);
 assert.equal((edge.match(/async function sha256\(/g) || []).length, 1);
 assert.match(edge, /async function sha256Text\(/);
 assert.match(edge, /route_key=eq\.attendance/);
