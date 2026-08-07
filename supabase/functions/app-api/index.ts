@@ -1863,13 +1863,17 @@ async function tasksApi(request: Request, context: Context) {
     if (!id) throw new Error("缺少要刪除的案件編號");
     const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,case_id,revision&limit=1`);
     const row = rows?.[0];
-    if (!row) return taskResponse(context);
-    const files = await db(`task_case_files?task_id=eq.${row.id}&select=object_path`);
+    const files = row
+      ? await db(`task_case_files?task_id=eq.${row.id}&select=object_path`)
+      : [];
     try {
       await db("rpc/edge_delete_task", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ p_source_reference: id, p_expected_revision: Number(body.revision) }),
+        body: JSON.stringify({
+          p_source_reference: id,
+          p_expected_revision: row ? Number(body.revision) : null,
+        }),
       });
     } catch (error) {
       if (String((error as any)?.message).includes("TASK_CONFLICT")) {
@@ -1890,6 +1894,9 @@ async function tasksApi(request: Request, context: Context) {
       try {
         await saveLeadershipTask(body.action === "import" ? { ...task, _legacyImport: true } : task, context, directory);
       } catch (error) {
+        if (String((error as any)?.message).includes("TASK_DELETED")) {
+          continue;
+        }
         if (String((error as any)?.message).includes("TASK_CONFLICT")) {
           throw Object.assign(new Error("這項工作已在其他裝置更新，已重新載入最新資料，請重新操作"), { status: 409 });
         }

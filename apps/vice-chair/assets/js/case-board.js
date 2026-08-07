@@ -8,6 +8,7 @@
   const committee = [authConfig.vpName, ...authConfig.committee];
   const canDelete = session.role === "vp" || session.role === "admin";
   const canViewArchive = session.role === "vp";
+  const canManageDecision = session.role === "vp";
   const typeMap = {
     renewal: { label: "續約", icon: "續", form: "terminal-form.html", flow: true },
     new: { label: "新會員", icon: "新", form: "new-member-form.html", flow: true },
@@ -153,11 +154,29 @@
     const archiveAction = stage === "closed" && canViewArchive
       ? `<a class="main" href="case-archive.html?case=${encodeURIComponent(task.id)}">查看結案資料</a>`
       : "";
-    const feedbackAction = type.flow
-      && stage !== "closed"
+    const decisionStage = type.flow && ["feedback", "vote", "advisor"].includes(stage);
+    const decisionAnchor = stage === "feedback"
+      ? "#feedbackSection"
+      : stage === "vote"
+        ? "#voteSection"
+        : "#resultSection";
+    const decisionLabel = stage === "feedback"
+      ? participation.status === "pending"
+        ? "填寫我的回饋"
+        : canManageDecision
+          ? "處理委員回饋"
+          : "查看回饋進度"
+      : stage === "vote"
+        ? canManageDecision
+          ? "處理委員投票"
+          : participation.status === "recused"
+            ? "查看委員投票"
+            : "進入委員投票"
+        : "處理董顧確認";
+    const decisionAction = decisionStage
       && feedbackStarted
-      && participation.status === "pending"
-      ? `<a class="main" href="${flow}#feedbackSection">填寫我的回饋</a>`
+      && (stage !== "advisor" || canManageDecision)
+      ? `<a class="main" href="${flow}${decisionAnchor}">${decisionLabel}</a>`
       : "";
     return `<article class="case-card">
       <div class="case-main"><span class="type-icon">${type.icon}</span><div><strong>${esc(task.member)}</strong><small>${type.label}・${esc(task.profession || "專業類別待補")}</small></div></div>
@@ -166,7 +185,7 @@
       <div class="deadline ${deadline.overdue ? "overdue" : ""}"><time>${deadline.label}</time><small>${deadline.overdue ? "已逾期" : "排定時間"}</small></div>
       <div class="actions">
         ${formAction}
-        ${feedbackAction}
+        ${decisionAction}
         ${archiveAction}
         ${canDelete ? `<button type="button" data-delete="${esc(task.id)}">刪除</button>` : ""}
       </div>

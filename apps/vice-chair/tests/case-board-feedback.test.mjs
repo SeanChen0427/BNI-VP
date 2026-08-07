@@ -26,6 +26,10 @@ assert.match(
 assert.match(boardSource, /"你已回饋"/);
 assert.match(boardSource, /"待你回饋"/);
 assert.match(boardSource, /填寫我的回饋/);
+assert.match(boardSource, /處理委員回饋/);
+assert.match(boardSource, /處理委員投票/);
+assert.match(boardSource, /進入委員投票/);
+assert.match(boardSource, /處理董顧確認/);
 assert.doesNotMatch(
   boardSource,
   /查看案件流程/,
@@ -33,8 +37,13 @@ assert.doesNotMatch(
 );
 assert.match(
   boardSource,
-  /feedbackStarted\s*&&\s*participation\.status === "pending"/,
-  "只有登入者確實待回饋時才顯示回饋入口"
+  /\["feedback", "vote", "advisor"\]\.includes\(stage\)/,
+  "只有進入回饋、投票或董顧階段的案件才顯示決議流程入口"
+);
+assert.match(
+  boardSource,
+  /stage !== "advisor" \|\| canManageDecision/,
+  "董顧確認入口只提供副主席"
 );
 assert.match(
   boardSource,
@@ -106,8 +115,8 @@ assert.match(
 );
 assert.match(
   readFileSync(new URL("../case-board.html", import.meta.url), "utf8"),
-  /assets\/js\/case-board\.js\?v=8/,
-  "案件中心必須載入移除重複流程按鈕的新版程式"
+  /assets\/js\/case-board\.js\?v=9/,
+  "案件中心必須載入階段式決議入口的新版程式"
 );
 
 console.log("case-board feedback tests passed");
