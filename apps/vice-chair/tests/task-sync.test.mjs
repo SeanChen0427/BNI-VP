@@ -116,7 +116,7 @@ test("刪除案件前先完成草稿同步，成功後才清除該案件本機�
   assert.match(caseStore, /function beforeTaskDelete\(task\)/);
   assert.match(caseStore, /function discardDeletedTask\(task\)/);
   assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
-  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=8/);
+  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=9/);
   const deleteHandler = caseBoard.match(/async function confirmDelete\(\)[\s\S]*?function bindDeleteDialog/)[0];
   assert.match(deleteHandler, /await window\.FulianTaskStore\.remove\(id\)/);
   assert.doesNotMatch(deleteHandler, /localStorage\.removeItem/);
@@ -126,12 +126,15 @@ test("Edge API 使用版本衝突、交易 RPC 與明確刪除保護", () => {
   const source = read("supabase/functions/app-api/index.ts");
   const migration = read("supabase/migrations/20260724170000_case_cloud_sync_and_task_hardening.sql");
   const transactionMigration = read("supabase/migrations/20260725150000_transactional_case_operations.sql");
+  const tombstoneMigration = read("supabase/migrations/20260805183000_task_delete_tombstones.sql");
   assert.match(source, /path === "\/api\/tasks"/);
   assert.match(source, /body\.action === "delete"/);
   assert.match(source, /row\.lead_person_id !== context\.personId/);
   assert.match(source, /TASK_CONFLICT/);
   assert.match(source, /rpc\/edge_save_task/);
   assert.match(source, /rpc\/edge_delete_task/);
+  assert.match(source, /TASK_DELETED/);
+  assert.doesNotMatch(source, /if \(!row\) return taskResponse\(context\)/);
   assert.match(source, /rpc\/edge_save_case_state/);
   assert.match(source, /rpc\/edge_open_task_vote/);
   assert.match(migration, /for update/);
@@ -139,6 +142,10 @@ test("Edge API 使用版本衝突、交易 RPC 與明確刪除保護", () => {
   assert.match(transactionMigration, /create or replace function public\.edge_delete_task/);
   assert.match(transactionMigration, /delete from public\.vote_snapshots/);
   assert.match(transactionMigration, /delete from public\.cases/);
+  assert.match(tombstoneMigration, /create table if not exists public\.deleted_task_references/);
+  assert.match(tombstoneMigration, /create trigger prevent_deleted_task_resurrection/);
+  assert.match(tombstoneMigration, /raise exception using message = 'TASK_DELETED'/);
+  assert.match(tombstoneMigration, /insert into public\.deleted_task_references[\s\S]*delete from public\.tasks/);
 });
 
 test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {

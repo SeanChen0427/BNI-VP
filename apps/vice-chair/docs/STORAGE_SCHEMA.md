@@ -49,6 +49,7 @@
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
 - `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
+- `deleted_task_references`：副主席／Admin 明確刪除案件後的識別碼封存標記；只保存來源、案件編號、原任務 UUID 與刪除時間，阻止舊裝置把 localStorage 殘影再次匯回，不保存會員內容或訪談資料。
 - `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
 - `cases`＋`tasks.case_id`：工作台決議案件與正式案件主檔的對照。
