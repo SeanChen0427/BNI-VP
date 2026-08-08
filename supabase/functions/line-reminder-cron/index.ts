@@ -1,5 +1,5 @@
 import { buildLineMentionAllMessage } from "../app-api/line-message.mjs";
-import { isRuleDue, ruleDueDate } from "../_shared/line-reminder-domain.mjs";
+import { isRuleDue, reminderRouteKey, ruleDueDate } from "../_shared/line-reminder-domain.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -132,14 +132,21 @@ Deno.serve(async request => {
   try {
     const [rules, targets] = await Promise.all([
       db("line_reminder_rules?enabled=eq.true&select=*&order=reminder_key.asc"),
-      db("line_group_targets?status=eq.active&route_key=eq.exchange&select=*&limit=1"),
+      db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
     ]);
-    const target = targets?.[0];
-    if (!target) return response(200, { checked: rules?.length || 0, sent: 0, message: "No active exchange group" });
+    const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, target]));
     const now = new Date();
     const dueRules = (rules || []).filter((rule: any) => isRuleDue(rule, now));
     const outcomes = [];
-    for (const rule of dueRules) outcomes.push({ reminderKey: rule.reminder_key, outcome: await sendReminder(rule, target, now) });
+    for (const rule of dueRules) {
+      const routeKey = reminderRouteKey(rule.reminder_key);
+      const target = targetByRoute[routeKey];
+      outcomes.push({
+        reminderKey: rule.reminder_key,
+        routeKey,
+        outcome: target ? await sendReminder(rule, target, now) : "missing-target",
+      });
+    }
     return response(200, { checked: rules?.length || 0, due: dueRules.length, sent: outcomes.filter(item => item.outcome === "sent").length, outcomes });
   } catch (error) {
     console.error("line-reminder-cron", error);

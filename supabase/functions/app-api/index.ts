@@ -6,7 +6,7 @@ import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import { buildLineAttendanceMessage, buildLineMentionAllMessage, lineAttendanceFingerprintSource } from "./line-message.mjs";
-import { LINE_REMINDER_KEYS, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
+import { LINE_REMINDER_KEYS, nextRuleOccurrence, reminderRouteKey, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -463,6 +463,7 @@ async function lineGroupsApi(request: Request, context: Context) {
 }
 
 function publicLineReminderRule(row: any) {
+  const next = nextRuleOccurrence(row);
   return {
     reminderKey: row.reminder_key,
     displayName: row.display_name,
@@ -473,6 +474,7 @@ function publicLineReminderRule(row: any) {
     daysBefore: row.days_before,
     messageTemplate: row.message_template,
     mentionAll: Boolean(row.mention_all),
+    nextScheduledLocal: next?.localDateTime || null,
     updatedAt: row.updated_at,
   };
 }
@@ -493,14 +495,18 @@ function publicLineReminderDelivery(row: any) {
 async function lineRemindersState() {
   const [rules, targets, deliveries] = await Promise.all([
     db("line_reminder_rules?select=*&order=reminder_key.asc"),
-    db("line_group_targets?status=eq.active&route_key=eq.exchange&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
     db("line_reminder_deliveries?select=reminder_key,trigger_source,local_due_date,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
   ]);
-  const target = targets?.[0] || null;
+  const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, publicLineTarget(target)]));
   return {
     configured: Boolean(lineAccessToken()),
     schedulerReady: Boolean(Deno.env.get("LINE_REMINDER_CRON_SECRET")),
-    target: target ? publicLineTarget(target) : null,
+    target: targetByRoute.exchange || null,
+    targets: {
+      exchange: targetByRoute.exchange || null,
+      committee: targetByRoute.committee || null,
+    },
     rules: (rules || []).map(publicLineReminderRule),
     deliveries: (deliveries || []).map(publicLineReminderDelivery),
   };
@@ -517,14 +523,15 @@ async function finishLineReminderDelivery(deliveryId: string, patch: any) {
 async function sendLineReminderTest(reminderKey: string, context: Context) {
   if (!LINE_REMINDER_KEYS.includes(reminderKey)) throw new Error("提醒類型不正確");
   if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  const routeKey = reminderRouteKey(reminderKey);
   const [rules, targets] = await Promise.all([
     db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(reminderKey)}&select=*&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.exchange&select=*&limit=1"),
+    db(`line_group_targets?status=eq.active&route_key=eq.${encodeURIComponent(routeKey)}&select=*&limit=1`),
   ]);
   const rule = rules?.[0];
   const target = targets?.[0];
   if (!rule) throw Object.assign(new Error("找不到指定提醒"), { status: 404 });
-  if (!target) throw Object.assign(new Error("尚未在後台指定交流群"), { status: 409 });
+  if (!target) throw Object.assign(new Error(`尚未在後台指定${routeKey === "committee" ? "會員委員會群" : "交流群"}`), { status: 409 });
   const content = String(rule.message_template || "").trim();
   const message = rule.mention_all ? buildLineMentionAllMessage(content) : { type: "text", text: content };
   const id = crypto.randomUUID();
@@ -588,8 +595,11 @@ async function lineRemindersApi(request: Request, context: Context) {
   const updates = body.rules.map(validateReminderUpdate);
   if (updates.some((rule: any) => rule.enabled)) {
     if (!Deno.env.get("LINE_REMINDER_CRON_SECRET")) throw Object.assign(new Error("Supabase 排程尚未啟用，請先保持提醒關閉"), { status: 409 });
-    const targets = await db("line_group_targets?status=eq.active&route_key=eq.exchange&select=id&limit=1");
-    if (!targets?.length) throw Object.assign(new Error("啟用提醒前，請先在系統設定指定交流群"), { status: 409 });
+    const requiredRoutes = new Set(updates.filter((rule: any) => rule.enabled).map((rule: any) => reminderRouteKey(rule.reminder_key)));
+    const targets = await db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=route_key");
+    const activeRoutes = new Set((targets || []).map((target: any) => target.route_key));
+    const missingRoute = [...requiredRoutes].find(route => !activeRoutes.has(route));
+    if (missingRoute) throw Object.assign(new Error(`啟用提醒前，請先在系統設定指定${missingRoute === "committee" ? "會員委員會群" : "交流群"}`), { status: 409 });
   }
   for (const rule of updates) {
     await db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(rule.reminder_key)}`, {

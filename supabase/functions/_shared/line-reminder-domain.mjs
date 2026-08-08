@@ -1,4 +1,4 @@
-export const LINE_REMINDER_KEYS = ["weekly_meeting_alarm", "monthly_data_entry"];
+export const LINE_REMINDER_KEYS = ["weekly_meeting_alarm", "monthly_data_entry", "monthly_committee_meeting"];
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"];
 
@@ -27,6 +27,13 @@ export function lastIsoWeekdayOfMonth(year, month, isoWeekday) {
   return last.toISOString().slice(0, 10);
 }
 
+export function firstIsoWeekdayOfMonth(year, month, isoWeekday) {
+  const first = new Date(Date.UTC(Number(year), Number(month) - 1, 1));
+  const current = first.getUTCDay() || 7;
+  first.setUTCDate(first.getUTCDate() + ((Number(isoWeekday) - current + 7) % 7));
+  return first.toISOString().slice(0, 10);
+}
+
 export function addUtcDays(isoDate, days) {
   const date = new Date(`${isoDate}T00:00:00Z`);
   date.setUTCDate(date.getUTCDate() + Number(days));
@@ -43,6 +50,18 @@ export function ruleDueDate(rule, now = new Date()) {
     const due = addUtcDays(lastMeeting, -Number(rule.days_before));
     return due === local.date ? due : null;
   }
+  if (rule.reminder_key === "monthly_committee_meeting") {
+    const currentMonth = { year: Number(local.year), month: Number(local.month) };
+    const next = currentMonth.month === 12
+      ? { year: currentMonth.year + 1, month: 1 }
+      : { year: currentMonth.year, month: currentMonth.month + 1 };
+    for (const period of [currentMonth, next]) {
+      const firstMeeting = firstIsoWeekdayOfMonth(period.year, period.month, Number(rule.meeting_weekday));
+      const due = addUtcDays(firstMeeting, -Number(rule.days_before));
+      if (due === local.date) return due;
+    }
+    return null;
+  }
   return null;
 }
 
@@ -57,6 +76,52 @@ export function isRuleDue(rule, now = new Date(), graceMinutes = 360) {
 
 export function weekdayLabel(isoWeekday) {
   return WEEKDAYS[Number(isoWeekday) % 7] || "—";
+}
+
+export function reminderRouteKey(reminderKey) {
+  return reminderKey === "monthly_committee_meeting" ? "committee" : "exchange";
+}
+
+function shiftedYearMonth(year, month, offset) {
+  const zeroBased = Number(year) * 12 + Number(month) - 1 + Number(offset);
+  return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
+}
+
+export function nextRuleOccurrence(rule, now = new Date()) {
+  const sendTime = String(rule?.send_time || "").slice(0, 5);
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return null;
+  const local = taipeiDateParts(now);
+  const nowLocal = `${local.date}T${local.hour}:${local.minute}`;
+  const candidates = [];
+  if (rule.reminder_key === "weekly_meeting_alarm") {
+    const weekday = Number(rule.send_weekday);
+    if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7) return null;
+    let due = addUtcDays(local.date, (weekday - Number(local.weekday) + 7) % 7);
+    if (`${due}T${sendTime}` < nowLocal) due = addUtcDays(due, 7);
+    candidates.push(due);
+  } else if (["monthly_data_entry", "monthly_committee_meeting"].includes(rule.reminder_key)) {
+    const weekday = Number(rule.meeting_weekday);
+    const daysBefore = Number(rule.days_before);
+    if (!Number.isInteger(weekday) || weekday < 1 || weekday > 7 || !Number.isInteger(daysBefore)) return null;
+    for (let offset = 0; offset <= 18; offset += 1) {
+      const period = shiftedYearMonth(local.year, local.month, offset);
+      const meeting = rule.reminder_key === "monthly_data_entry"
+        ? lastIsoWeekdayOfMonth(period.year, period.month, weekday)
+        : firstIsoWeekdayOfMonth(period.year, period.month, weekday);
+      candidates.push(addUtcDays(meeting, -daysBefore));
+    }
+  } else {
+    return null;
+  }
+  const date = [...new Set(candidates)].sort().find(candidate => `${candidate}T${sendTime}` >= nowLocal);
+  if (!date) return null;
+  return {
+    date,
+    time: sendTime,
+    localDateTime: `${date}T${sendTime}`,
+    timezone: "Asia/Taipei",
+    weekday: new Date(`${date}T00:00:00Z`).getUTCDay() || 7,
+  };
 }
 
 export function validateReminderUpdate(input) {
@@ -78,7 +143,7 @@ export function validateReminderUpdate(input) {
     return { ...result, send_weekday: sendWeekday, meeting_weekday: null, days_before: null };
   }
   const meetingWeekday = Number(input.meetingWeekday);
-  const daysBefore = Number(input.daysBefore);
+  const daysBefore = result.reminder_key === "monthly_committee_meeting" ? 1 : Number(input.daysBefore);
   if (!Number.isInteger(meetingWeekday) || meetingWeekday < 1 || meetingWeekday > 7) throw new Error("例會星期設定不正確");
   if (!Number.isInteger(daysBefore) || daysBefore < 0 || daysBefore > 7) throw new Error("提前天數必須為 0 至 7 天");
   return { ...result, send_weekday: null, meeting_weekday: meetingWeekday, days_before: daysBefore };

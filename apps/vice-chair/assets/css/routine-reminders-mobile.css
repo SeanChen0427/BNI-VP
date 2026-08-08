@@ -95,6 +95,61 @@
   text-overflow: ellipsis;
 }
 
+.target-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.target-list .target-state {
+  min-width: 0;
+}
+
+.schedule-note {
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5f1ed;
+  color: #726d67;
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.next-reminder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  margin: -4px 0 14px;
+  padding: 11px 13px;
+  border: 1px solid #b9d9ca;
+  border-radius: 11px;
+  background: #f1f8f4;
+}
+
+.next-reminder small,
+.next-reminder span {
+  color: #65736c;
+  font-size: 10px;
+}
+
+.next-reminder strong {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  color: #236d4e;
+  font-size: 13px;
+  text-align: right;
+}
+
+.next-reminder.disabled {
+  border-color: #ddd7d1;
+  background: #f7f5f2;
+}
+
+.next-reminder.disabled strong {
+  color: #5f5b57;
+}
+
 @media (max-width: 680px) {
   body {
     background: #f4f2ef;
@@ -259,6 +314,22 @@
 
   .target-state {
     padding: 15px;
+  }
+
+  .target-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .next-reminder {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+
+  .next-reminder strong {
+    grid-column: 1;
+    grid-row: auto;
+    font-size: 15px;
+    text-align: left;
   }
 
   .action-card {
