@@ -1,0 +1,253 @@
+/* Page-specific safeguards against the shared interview-form input rules. */
+.reminder-card .toggle-row {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  min-height: 76px;
+}
+
+.reminder-card .toggle-row > span {
+  display: grid;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+
+.reminder-card .toggle-row b,
+.reminder-card .toggle-row small {
+  display: block;
+  white-space: normal;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+.reminder-card .toggle-row input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  flex: 0 0 46px;
+  width: 46px;
+  height: 26px;
+  min-width: 46px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #cbc8c4;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .05);
+  cursor: pointer;
+  position: relative;
+  transition: background .2s ease;
+}
+
+.reminder-card .toggle-row input[type="checkbox"]::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .2);
+  transition: transform .2s ease;
+}
+
+.reminder-card .toggle-row input[type="checkbox"]:checked {
+  background: var(--green);
+}
+
+.reminder-card .toggle-row input[type="checkbox"]:checked::after {
+  transform: translateX(20px);
+}
+
+.reminder-card .toggle-row input[type="checkbox"]:focus-visible {
+  outline: 3px solid rgba(39, 129, 90, .22);
+  outline-offset: 2px;
+}
+
+.rule-fields,
+.rule-fields > label,
+.reminder-card input,
+.reminder-card select,
+.reminder-card textarea {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.reminder-card input,
+.reminder-card select,
+.reminder-card textarea {
+  display: block;
+  margin-top: 6px;
+}
+
+.topbar label {
+  min-width: 0;
+}
+
+.topbar #loginIdentity {
+  width: auto;
+  max-width: 220px;
+  margin: 0;
+  padding: 8px 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 680px) {
+  body {
+    background: #f4f2ef;
+  }
+
+  .topbar > label {
+    display: none !important;
+  }
+
+  main {
+    padding: 14px 12px 72px;
+  }
+
+  .reminder-hero {
+    margin: 0 0 14px;
+    padding: 22px 20px;
+    border-radius: 20px;
+  }
+
+  .reminder-hero::after {
+    right: -8px;
+    top: -25px;
+    font-size: 130px;
+  }
+
+  .reminder-hero h1 {
+    margin: 5px 0 6px;
+    font-size: 28px;
+    line-height: 1.25;
+  }
+
+  .reminder-hero p {
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .reminder-hero .save-state {
+    min-width: 0;
+    margin-top: 16px;
+    padding: 12px 14px;
+  }
+
+  .form-card {
+    padding: 18px 16px;
+    border-radius: 18px;
+  }
+
+  .section-head {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr);
+    align-items: start;
+    gap: 12px;
+    margin-bottom: 18px;
+    padding-bottom: 18px;
+  }
+
+  .section-head > span {
+    width: 42px;
+    height: 42px;
+  }
+
+  .section-head h2 {
+    font-size: 20px;
+    line-height: 1.35;
+  }
+
+  .section-head p {
+    margin-top: 5px;
+    font-size: 12px;
+    line-height: 1.65;
+  }
+
+  .reminder-grid {
+    gap: 14px;
+  }
+
+  .reminder-card .toggle-row {
+    min-height: 74px;
+    padding: 14px;
+    gap: 14px;
+    border: 1px solid #ebe5df;
+  }
+
+  .reminder-card .toggle-row b {
+    font-size: 15px;
+  }
+
+  .reminder-card .toggle-row small {
+    font-size: 11px;
+    line-height: 1.55;
+  }
+
+  .rule-fields,
+  .rule-fields.three {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+
+  .reminder-card input:not([type="checkbox"]),
+  .reminder-card select,
+  .reminder-card textarea {
+    width: 100%;
+    min-height: 50px;
+    padding: 12px;
+    font-size: 16px;
+  }
+
+  .reminder-card textarea {
+    min-height: 130px;
+    line-height: 1.65;
+  }
+
+  .message-preview {
+    margin: 14px 0;
+    padding: 14px;
+    border-radius: 14px;
+  }
+
+  .message-preview pre {
+    max-height: 220px;
+    overflow: auto;
+    font-size: 12px;
+  }
+
+  .test-button,
+  .action-card button,
+  .target-state a {
+    width: 100%;
+    min-height: 48px;
+    display: grid;
+    place-items: center;
+    text-align: center;
+  }
+
+  .target-state {
+    padding: 15px;
+  }
+
+  .action-card {
+    padding: 18px 16px;
+    gap: 14px;
+  }
+
+  .delivery-list article {
+    gap: 5px;
+    padding: 13px;
+  }
+
+  #toast {
+    left: 12px;
+    right: 12px;
+    bottom: 18px;
+    text-align: center;
+  }
+}
