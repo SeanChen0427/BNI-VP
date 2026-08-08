@@ -36,6 +36,11 @@
   font-size: 10px;
 }
 
+.renewal-extra[hidden],
+.annual-data-source[hidden] {
+  display: none !important;
+}
+
 .workspace-grid.committee-view {
   grid-template-columns: minmax(0, 1fr);
 }

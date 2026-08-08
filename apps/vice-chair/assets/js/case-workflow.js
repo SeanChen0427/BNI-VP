@@ -416,7 +416,7 @@ async function init(){
         $("#saveState").textContent="年度 PALMS 已自動帶入";
         $("#saveTime").textContent=`最後儲存 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
       }
-    }catch{$("#annualDataSource").hidden=false;$("#annualDataSource").textContent="年度 PALMS 載入失敗，請重新整理或人工確認。";}
+    }catch{if($("#caseType").value==="renewal"){$("#annualDataSource").hidden=false;$("#annualDataSource").textContent="年度 PALMS 載入失敗，請重新整理或人工確認。";}}
   }
   try{$("#downloadWord").disabled=!(await getWord());}catch{$("#downloadWord").disabled=true;}
   bindEvents();

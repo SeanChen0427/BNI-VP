@@ -44,6 +44,18 @@ test("正式 LINE 訊息使用真正全群 mention 並納入格式指紋", () =>
   assert.match(caseVoteNoticeFingerprintSource("內容"), /^case-vote-text-v2-mention-all-v1\n/);
 });
 
+test("年度培訓與來賓欄位只在續約案件顯示", () => {
+  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
+  const html = read("apps/vice-chair/case-workflow.html");
+  const css = read("apps/vice-chair/assets/css/case-workflow-extra.css");
+
+  assert.match(html, /id="renewalExtra" hidden/);
+  assert.match(html, /case-workflow-extra\.css\?v=3/);
+  assert.match(workflow, /\$\("#renewalExtra"\)\.hidden=\$\("#caseType"\)\.value!=="renewal"/);
+  assert.match(workflow, /catch\{if\(\$\("#caseType"\)\.value==="renewal"\)/);
+  assert.match(css, /\.renewal-extra\[hidden\],[\s\S]*?\.annual-data-source\[hidden\][\s\S]*?display: none !important/);
+});
+
 test("後端只以正式案件、正式委員會群與投票快照發送", () => {
   const edge = read("supabase/functions/app-api/index.ts");
   const migration = read("supabase/migrations/20260808211500_case_vote_line_delivery.sql");
