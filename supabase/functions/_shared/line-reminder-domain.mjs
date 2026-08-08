@@ -73,7 +73,9 @@ export function validateReminderUpdate(input) {
     mention_all: input.mentionAll !== false,
   };
   if (result.reminder_key === "weekly_meeting_alarm") {
-    return { ...result, send_weekday: 1, meeting_weekday: null, days_before: null };
+    const sendWeekday = Number(input.sendWeekday);
+    if (!Number.isInteger(sendWeekday) || sendWeekday < 1 || sendWeekday > 7) throw new Error("每週發送日設定不正確");
+    return { ...result, send_weekday: sendWeekday, meeting_weekday: null, days_before: null };
   }
   const meetingWeekday = Number(input.meetingWeekday);
   const daysBefore = Number(input.daysBefore);

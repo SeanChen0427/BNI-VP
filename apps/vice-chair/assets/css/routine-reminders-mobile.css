@@ -194,6 +194,12 @@
     margin: 16px 0;
   }
 
+  .rule-fields > label {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
   .reminder-card input:not([type="checkbox"]),
   .reminder-card select,
   .reminder-card textarea {
@@ -206,6 +212,27 @@
   .reminder-card textarea {
     min-height: 130px;
     line-height: 1.65;
+  }
+
+  .reminder-card input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    inline-size: 100% !important;
+    width: 100% !important;
+    max-inline-size: 100% !important;
+    max-width: 100% !important;
+    min-inline-size: 0 !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  @supports (width: -webkit-fill-available) {
+    .reminder-card input[type="time"] {
+      inline-size: -webkit-fill-available !important;
+      width: -webkit-fill-available !important;
+      max-inline-size: -webkit-fill-available !important;
+      max-width: -webkit-fill-available !important;
+    }
   }
 
   .message-preview {

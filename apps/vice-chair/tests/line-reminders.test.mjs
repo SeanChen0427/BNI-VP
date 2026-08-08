@@ -41,10 +41,11 @@ assert.equal(ruleDueDate(monthly, new Date("2026-08-24T12:00:00Z")), "2026-08-24
 assert.equal(ruleDueDate(monthly, new Date("2026-08-17T12:00:00Z")), null);
 assert.equal(isRuleDue(monthly, new Date("2026-08-24T12:05:00Z")), true);
 
-assert.deepEqual(validateReminderUpdate({ reminderKey: "weekly_meeting_alarm", enabled: false, sendTime: "18:30", messageTemplate: "提醒", mentionAll: true }), {
+assert.deepEqual(validateReminderUpdate({ reminderKey: "weekly_meeting_alarm", enabled: false, sendWeekday: 5, sendTime: "18:30", messageTemplate: "提醒", mentionAll: true }), {
   reminder_key: "weekly_meeting_alarm", enabled: false, send_time: "18:30", message_template: "提醒", mention_all: true,
-  send_weekday: 1, meeting_weekday: null, days_before: null,
+  send_weekday: 5, meeting_weekday: null, days_before: null,
 });
+assert.throws(() => validateReminderUpdate({ reminderKey: "weekly_meeting_alarm", sendWeekday: 0, sendTime: "20:00", messageTemplate: "提醒" }), /每週發送日/);
 assert.throws(() => validateReminderUpdate({ reminderKey: "monthly_data_entry", sendTime: "25:00", messageTemplate: "提醒", meetingWeekday: 2, daysBefore: 1 }), /發送時間/);
 assert.throws(() => validateReminderUpdate({ reminderKey: "monthly_data_entry", sendTime: "20:00", messageTemplate: "", meetingWeekday: 2, daysBefore: 1 }), /提醒文案/);
 assert.equal(buildLineMentionAllMessage("明天例會").text, "{all}\n明天例會");
@@ -73,16 +74,19 @@ assert.match(settings, /exchange:"交流群常態通知"/);
 assert.match(nav, /"常態通知", "routine-reminders\.html", "vp"/);
 assert.match(index, /class="nav-item vp-only" href="routine-reminders\.html"/);
 assert.match(html, /id="weeklyEnabled"/);
+assert.match(html, /id="weeklyWeekday"/);
 assert.match(html, /id="monthlyEnabled"/);
 assert.match(html, /id="deliveryList"/);
-assert.match(html, /routine-reminders-mobile\.css\?v=1/);
+assert.match(html, /routine-reminders-mobile\.css\?v=2/);
 assert.match(mobileCss, /\.reminder-card \.toggle-row input\[type="checkbox"\]/);
 assert.match(mobileCss, /flex: 0 0 46px/);
 assert.match(mobileCss, /\.topbar > label[\s\S]*?display: none !important/);
 assert.match(mobileCss, /grid-template-columns: minmax\(0, 1fr\)/);
+assert.match(mobileCss, /input\[type="time"\][\s\S]*?width: -webkit-fill-available !important/);
 assert.match(script, /action:"save"/);
 assert.match(script, /action:"test"/);
 assert.match(script, /測試訊息會真的 @所有人/);
 assert.match(script, /const escapeHtml=/);
+assert.match(script, /sendWeekday:Number\(\$\("#weeklyWeekday"\)\.value\)/);
 
 console.log("LINE recurring reminder tests passed");

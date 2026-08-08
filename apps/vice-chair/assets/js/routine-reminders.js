@@ -24,7 +24,7 @@
   }
   function render(){
     const weekly=rule("weekly_meeting_alarm"),monthly=rule("monthly_data_entry");
-    $("#weeklyEnabled").checked=Boolean(weekly.enabled);$("#weeklyTime").value=weekly.sendTime||"20:00";$("#weeklyMessage").value=weekly.messageTemplate||"";
+    $("#weeklyEnabled").checked=Boolean(weekly.enabled);$("#weeklyWeekday").value=String(weekly.sendWeekday||1);$("#weeklyTime").value=weekly.sendTime||"20:00";$("#weeklyMessage").value=weekly.messageTemplate||"";
     $("#monthlyEnabled").checked=Boolean(monthly.enabled);$("#monthlyTime").value=monthly.sendTime||"20:00";$("#monthlyMessage").value=monthly.messageTemplate||"";$("#meetingWeekday").value=String(monthly.meetingWeekday||2);$("#daysBefore").value=String(monthly.daysBefore??1);
     const target=$("#targetState");
     target.className=`target-state ${state.target?"ready":"missing"}`;
@@ -37,7 +37,7 @@
     preview();
   }
   function collect(){return[
-    {reminderKey:"weekly_meeting_alarm",enabled:$("#weeklyEnabled").checked,sendTime:$("#weeklyTime").value,messageTemplate:$("#weeklyMessage").value,mentionAll:true},
+    {reminderKey:"weekly_meeting_alarm",enabled:$("#weeklyEnabled").checked,sendWeekday:Number($("#weeklyWeekday").value),sendTime:$("#weeklyTime").value,messageTemplate:$("#weeklyMessage").value,mentionAll:true},
     {reminderKey:"monthly_data_entry",enabled:$("#monthlyEnabled").checked,sendTime:$("#monthlyTime").value,meetingWeekday:Number($("#meetingWeekday").value),daysBefore:Number($("#daysBefore").value),messageTemplate:$("#monthlyMessage").value,mentionAll:true},
   ]}
   async function load(){

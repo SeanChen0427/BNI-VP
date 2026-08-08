@@ -22,11 +22,15 @@ const midtermHtml = readFileSync(
   new URL("../midterm-form.html", import.meta.url),
   "utf8"
 );
+const workPlannerJs = readFileSync(
+  new URL("../assets/js/work-planner.js", import.meta.url),
+  "utf8"
+);
 
 assert.match(
   mobileCss,
-  /\.cases-panel \.case-row\{[\s\S]*?min-width:0;[\s\S]*?grid-template-columns:1fr;/,
-  "手機首頁的優先待辦必須改為單欄案件卡，不能保留桌面表格寬度"
+  /\.cases-panel \.case-row\{[\s\S]*?grid-template-columns:minmax\(0,1fr\) minmax\(124px,auto\);[\s\S]*?"progress schedule"[\s\S]*?"people actions";/,
+  "手機首頁的優先案件必須使用左右分區，不能把所有資料擠在左側"
 );
 assert.match(
   mobileCss,
@@ -43,6 +47,18 @@ assert.match(
   /min-height:44px/,
   "手機主要操作必須保留至少 44px 的觸控高度"
 );
+assert.match(
+  mobileCss,
+  /\.cases-panel \.case-schedule\{[\s\S]*?justify-self:end;[\s\S]*?text-align:right;/,
+  "手機案件時程必須靠右顯示"
+);
+assert.match(
+  mobileCss,
+  /\.ai-launcher b\{\s*display:none;/,
+  "手機版 AI 啟動按鈕必須收斂為小型圖示，避免遮住案件"
+);
+assert.match(workPlannerJs, /class="case-identity"/);
+assert.match(workPlannerJs, /class="case-schedule /);
 assert.match(
   mobileCss,
   /\.performance-scroll\{[\s\S]*?width:100%;[\s\S]*?overflow-x:auto;/,
@@ -65,7 +81,7 @@ for (const [name, html] of [
 ]) {
   assert.match(
     html,
-    /mobile-polish\.css\?v=1/,
+    /mobile-polish\.css\?v=[12]/,
     `${name}必須載入手機版修正樣式`
   );
 }
