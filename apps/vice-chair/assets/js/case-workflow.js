@@ -11,10 +11,10 @@ const committee=[authConfig.vpName,...authConfig.committee];
 const roles=Object.fromEntries(committee.map(name=>[name,name===authConfig.vpName?"副主席":"會員委員"]));
 const steps = ["保存 Word", "通知回饋", "委員回饋", "回饋達標", "開啟投票", "通知投票", "形成決議", "三長群", "董顧確認", "結案存檔"];
 const typeConfig = {
-  renewal:{label:"續約", approve:"同意續約", reject:"不同意續約", prefix:"RE"},
-  new:{label:"新申請", approve:"同意入會", reject:"不同意入會", prefix:"NM"},
+  renewal:{label:"續約", voteLabel:"續約", approve:"同意續約", reject:"不同意續約", prefix:"RE"},
+  new:{label:"新申請", voteLabel:"新申請", approve:"同意入會", reject:"不同意入會", prefix:"NM"},
   midterm:{label:"期中輔導", approve:"通過輔導建議", reject:"退回補充輔導", prefix:"MC"},
-  industry:{label:"轉專業別", approve:"同意轉換", reject:"不同意轉換", prefix:"IC"},
+  industry:{label:"轉專業別", voteLabel:"轉換行業別", approve:"同意轉換", reject:"不同意轉換", prefix:"IC"},
   departure:{label:"離會訪談", approve:"確認離會程序", reject:"退回補充資料", prefix:"DP"}
 };
 
@@ -27,6 +27,9 @@ const initialState = {
   feedbackMeta:{},
   votingOpen:false,
   voteNoticeSent:false,
+  voteNoticeSentAt:"",
+  voteNoticeTargetName:"",
+  voteNoticeDeliveryId:"",
   voterSnapshot:[],
   votes:{},
   leadersSent:false,
@@ -61,6 +64,17 @@ function selectedFeedbackAuthor(){
 function voteEntries(){return Object.entries(state.votes).filter(([name])=>state.voterSnapshot.includes(name));}
 function nowLabel(){return new Date().toLocaleString("zh-TW",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false});}
 function dateLabel(value){if(!value)return"未設定";const d=new Date(value);return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
+function voteDeadlineLineLabel(value,now=new Date()){
+  const deadline=new Date(value);
+  if(!Number.isFinite(deadline.getTime()))return"截止時間尚未設定";
+  const dateKey=date=>`${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
+  const tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
+  const hour=deadline.getHours(),minute=deadline.getMinutes(),period=hour<12?"上午":hour===12?"中午":hour<18?"下午":"晚上",displayHour=hour===0?12:hour>12?hour-12:hour;
+  const time=`${period}${displayHour}${minute?`:${String(minute).padStart(2,"0")}`:"點"}`;
+  if(dateKey(deadline)===dateKey(tomorrow))return`明天${time}`;
+  if(dateKey(deadline)===dateKey(now))return`今天${time}`;
+  return`${deadline.getFullYear()}/${deadline.getMonth()+1}/${deadline.getDate()} ${time}`;
+}
 function config(){return typeConfig[$("#caseType").value];}
 function escapeHtml(text){return String(text).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));}
 function toast(message){const show=text=>{const node=$("#toast");node.textContent=text;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2200)};if(/已(儲存|保存|開啟|記錄|結案)|狀態已|已模擬/.test(message)){lastPersist.then(()=>show(message)).catch(error=>show(error.message||"Supabase 保存失敗"));return}show(message);}
@@ -107,7 +121,7 @@ function feedbackNotice(){
 }
 
 function voteNotice(){
-  return `@All 【 ${config().label}投票 】\n申請者: ${$("#applicant").value}\n專業別: ${$("#profession").value}\n\n請各位委員針對表述回饋及相關文件,開始進行投票!\n截止至${dateLabel($("#voteDeadline").value)}前\n會員委員及副主席擁有各一票投票權,董事顧問有最終裁量權。\n攸關團隊品質,請委員們參閱回饋務必投下這一票!\n***完成投票請tag回覆「已投」`;
+  return `@All 【${config().voteLabel||config().label}投票】\n申請者：${$("#applicant").value}\n專業別：${$("#profession").value}\n\n請各位委員針對表述回饋及相關文件，開始進行投票！\n截止至${voteDeadlineLineLabel($("#voteDeadline").value)}前\n會員委員及副主席擁有各一票投票權，董事顧問有最終裁量權。\n攸關團隊品質，請委員們參閱回饋務必投下這一票！\n***完成投票請 tag 回覆「已投」`;
 }
 
 function leadersMessage(){
@@ -211,13 +225,24 @@ function renderVote(){
   else if(!eligible)hint.textContent="你不在本案投票資格快照中。";
   else if(!deadline.valid)hint.textContent="請副主席先設定有效的投票截止時間。";
   else if(deadline.expired)hint.textContent="投票期限已截止；請副主席先在案件基本資料更新截止時間，再重新通知委員。";
-  else if(!state.voteNoticeSent)hint.textContent="請副主席先按上方「模擬 LINE Bot 通知投票」，通知完成後才會開放送出票。";
+  else if(!state.voteNoticeSent)hint.textContent="請副主席先使用正式 LINE OA 通知委員；LINE 確認送達後才會開放送出票。";
   else hint.textContent="請選擇一個投票選項，再按「確認送出票」。";
   hint.classList.toggle("warning",!canVote);
   const own=state.votes[currentUser()]||"";
   $$("input[name=vote]").forEach(input=>input.checked=input.value===own);
+  $("#voteNoticePreview").textContent=voteNotice();
+  $("#copyVoteNotice").disabled=!(isVp()&&state.votingOpen&&!state.closed&&deadline.valid);
   $("#sendVoteNotice").disabled=!(isVp()&&state.votingOpen&&!state.voteNoticeSent&&!state.closed&&deadline.valid&&!deadline.expired);
-  $("#sendVoteNotice").textContent=state.voteNoticeSent?"已通知委員":"模擬 LINE Bot 通知投票";
+  $("#sendVoteNotice").textContent=state.voteNoticeSent
+    ? state.voteNoticeSentAt?"已由正式 LINE OA 通知":"已有通知紀錄"
+    : "通知委員（正式 LINE OA）";
+  const lineState=$("#voteLineState");
+  lineState.classList.toggle("sent",Boolean(state.voteNoticeSent));
+  lineState.textContent=state.voteNoticeSent
+    ? state.voteNoticeSentAt
+      ? `已於 ${dateLabel(state.voteNoticeSentAt)} 發送至「${state.voteNoticeTargetName||"會員委員會群"}」，系統已阻擋同一版本重複發送。`
+      : "案件已有先前的委員通知紀錄；為避免舊案件重複發送，系統不會自動補送。"
+    : "將使用正式 LINE OA 發送至後台指定的會員委員會正式群，並真正 @所有人。";
 }
 
 function renderResult(){
@@ -337,6 +362,9 @@ function bindEvents(){
   $("#voteDeadline").addEventListener("change",()=>{
     if(!state.voteNoticeSent)return;
     state.voteNoticeSent=false;
+    delete state.voteNoticeSentAt;
+    delete state.voteNoticeTargetName;
+    delete state.voteNoticeDeliveryId;
     addLog("投票截止時間已更新，需重新通知委員");
     persistNow();
     toast("截止時間已更新，請重新通知委員投票");
@@ -347,7 +375,8 @@ function bindEvents(){
   $("#sendFeedbackNotice").addEventListener("click",()=>{if(!isVp())return;state.feedbackNotified=true;addLog("已模擬發送委員回饋通知至會員委員會群");persistNow();toast("已模擬通知委員");});
   $("#saveFeedback").addEventListener("click",async()=>{const text=$("#myFeedback").value.trim(),user=currentUser(),target=selectedFeedbackAuthor(),proxy=isVp()&&target!==user;if(!text)return toast("請先填寫回饋內容");if(!user)return toast("登入身份載入失敗，請重新登入後再試");if(!eligibleMembers().includes(target))return toast(`${target||user}是本案申請者，依規則須迴避回饋與投票`);if(target!==user&&!isVp())return toast("只有副主席可以代填會員委員回饋");$("#saveState").textContent=proxy?`正在代填 ${target} 的回饋…`:"正在保存你的回饋…";lastPersist=window.FulianCaseStateStore.saveFeedback(CASE_ID,text,target);try{await lastPersist;feedbackDirty=false;state=loadState();render();$("#saveState").textContent=proxy?`${target} 的代填回饋已保存至 Supabase`:"你的回饋已保存至 Supabase";toast(proxy?`已代填 ${target} 的回饋`:"回饋已儲存")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"回饋保存失敗")}});
   $("#openVote").addEventListener("click",async()=>{if(!isVp()||!feedbackReady())return;const deadline=voteDeadlineStatus();if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止，請先更新截止時間");const proposed={...state,form:collectForm(),votingOpen:true};$("#saveState").textContent="正在建立投票資格快照…";lastPersist=window.FulianCaseStateStore.openVote(CASE_ID,proposed);try{await lastPersist;state=loadState();render();$("#saveState").textContent="投票已開啟並保存資格快照";toast("系統投票已開啟")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"投票開啟失敗")}});
-  $("#sendVoteNotice").addEventListener("click",async()=>{if(!isVp())return;const deadline=voteDeadlineStatus();if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止，請先更新截止時間");await navigator.clipboard.writeText(voteNotice());state.voteNoticeSent=true;addLog("已模擬 LINE Bot 通知委員投票");persistNow();toast("投票通知已模擬發送並複製");});
+  $("#copyVoteNotice").addEventListener("click",async()=>{await navigator.clipboard.writeText(voteNotice());toast("投票通知文案已複製");});
+  $("#sendVoteNotice").addEventListener("click",async()=>{if(!isVp())return;const deadline=voteDeadlineStatus();if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止，請先更新截止時間");if(!confirm(`即將透過正式 LINE OA 發送到後台指定的會員委員會正式群，並 @所有人。\n\n${voteNotice()}\n\n確定立即發送？`))return;const button=$("#sendVoteNotice");button.disabled=true;button.textContent="正式 LINE 發送中…";$("#saveState").textContent="正在等待 LINE 確認送達…";lastPersist=window.FulianCaseStateStore.sendVoteNotice(CASE_ID);try{const result=await lastPersist;state=loadState();render();$("#saveState").textContent="投票通知已送達並保存至 Supabase";toast(result.message||"投票通知已由正式 LINE OA 發送")}catch(error){state=loadState();render();$("#saveState").textContent="LINE 投票通知尚未完成";toast(error.message||"投票通知發送失敗")}});
   $("#submitVote").addEventListener("click",async()=>{const deadline=voteDeadlineStatus();if(!state.voteNoticeSent)return toast("請先通知委員投票");if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止");const selected=$("input[name=vote]:checked");if(!selected)return toast("請選擇投票選項");if(!state.voterSnapshot.includes(currentUser()))return toast("你不在本案投票資格快照中");$("#saveState").textContent="正在送出你的投票…";lastPersist=window.FulianCaseStateStore.saveVote(CASE_ID,selected.value);try{await lastPersist;state=loadState();render();$("#saveState").textContent="你的投票已安全記錄";toast("投票已記錄")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"投票失敗")}});
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
   $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});

@@ -5,7 +5,13 @@ import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashbo
 import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
-import { buildLineAttendanceMessage, buildLineMentionAllMessage, lineAttendanceFingerprintSource } from "./line-message.mjs";
+import {
+  buildCaseVoteNoticeText,
+  buildLineAttendanceMessage,
+  buildLineMentionAllMessage,
+  caseVoteNoticeFingerprintSource,
+  lineAttendanceFingerprintSource,
+} from "./line-message.mjs";
 import { LINE_REMINDER_KEYS, nextRuleOccurrence, reminderRouteKey, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
@@ -514,6 +520,79 @@ async function lineRemindersState() {
 
 async function finishLineReminderDelivery(deliveryId: string, patch: any) {
   await db(`line_reminder_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function findCaseVoteLineDelivery(task: any, snapshot: any, target: any, messageHash: string) {
+  const rows = await db(
+    `case_vote_line_deliveries?task_id=eq.${task.id}`
+      + `&snapshot_id=eq.${snapshot.id}`
+      + `&group_target_id=eq.${target.id}`
+      + `&notification_type=eq.vote_open`
+      + `&deadline_at=eq.${encodeURIComponent(snapshot.deadline_at)}`
+      + `&message_sha256=eq.${messageHash}`
+      + "&select=*&limit=1",
+  );
+  return rows?.[0] || null;
+}
+
+async function beginCaseVoteLineDelivery(task: any, snapshot: any, target: any, messageHash: string, context: Context) {
+  const existing = await findCaseVoteLineDelivery(task, snapshot, target, messageHash);
+  if (existing?.status === "sent") return { delivery: existing, alreadySent: true };
+  if (existing?.status === "processing" && Date.now() - new Date(existing.requested_at).getTime() < 5 * 60 * 1000) {
+    throw Object.assign(new Error("LINE 投票通知正在發送，請勿重複操作"), { status: 409 });
+  }
+  const now = new Date().toISOString();
+  if (existing) {
+    const updated = await db(`case_vote_line_deliveries?id=eq.${existing.id}&status=neq.sent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "processing",
+        attempt_count: Number(existing.attempt_count || 0) + 1,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+        sent_at: null,
+        failed_at: null,
+        line_request_id: null,
+        line_message_id: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+    if (!updated?.[0]) throw Object.assign(new Error("LINE 投票通知狀態已更新，請重新整理"), { status: 409 });
+    return { delivery: updated[0], alreadySent: false };
+  }
+  try {
+    const inserted = await db("case_vote_line_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        task_id: task.id,
+        snapshot_id: snapshot.id,
+        group_target_id: target.id,
+        notification_type: "vote_open",
+        deadline_at: snapshot.deadline_at,
+        message_sha256: messageHash,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+      }),
+    });
+    return { delivery: inserted[0], alreadySent: false };
+  } catch (error) {
+    if (String((error as Error)?.message || error).includes("duplicate key")) {
+      throw Object.assign(new Error("LINE 投票通知正在發送或已送達，請勿重複操作"), { status: 409 });
+    }
+    throw error;
+  }
+}
+
+async function finishCaseVoteLineDelivery(deliveryId: string, patch: any) {
+  await db(`case_vote_line_deliveries?id=eq.${deliveryId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify(patch),
@@ -2356,7 +2435,7 @@ async function tasksApi(request: Request, context: Context) {
 }
 
 async function taskAccess(sourceReference: string, context: Context) {
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,case_id,member_id,title,source_reference,category,lead_person_id,revision&limit=1`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,case_id,member_id,title,source_reference,category,lead_person_id,revision,result_summary&limit=1`);
   const task = rows?.[0];
   if (!task) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
   const assignments = await db(`task_assignments?task_id=eq.${task.id}&select=person_id`);
@@ -2566,6 +2645,129 @@ async function openVoteSnapshot(access: any, existing: any, workflow: any, conte
   return current[0];
 }
 
+async function markCaseVoteNoticeSent(access: any, delivery: any, snapshot: any, target: any, sentAt: string, context: Context) {
+  await db("rpc/edge_mark_task_vote_notice_sent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_task_id: access.task.id,
+      p_actor: context.personId,
+      p_actor_auth_user_id: context.userId,
+      p_delivery_id: delivery.id,
+      p_deadline: snapshot.deadline_at,
+      p_target_name: target.display_name,
+      p_sent_at: sentAt,
+    }),
+  });
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  return caseStateResponse(access, latestRows?.[0], context);
+}
+
+async function sendCaseVoteNotice(access: any, existing: any, context: Context) {
+  leadership(context);
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員投票通知"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (!workflow.votingOpen || workflow.closed) {
+    throw Object.assign(new Error("投票尚未開啟或案件已結案"), { status: 409 });
+  }
+  if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
+  const [snapshotRows, targetRows] = await Promise.all([
+    db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1"),
+  ]);
+  const snapshot = snapshotRows?.[0];
+  const target = targetRows?.[0];
+  if (!snapshot) throw Object.assign(new Error("本案沒有進行中的正式投票快照"), { status: 409 });
+  if (!snapshot.deadline_at || new Date(snapshot.deadline_at).getTime() <= Date.now()) {
+    throw Object.assign(new Error("投票期限已截止，請先更新截止時間"), { status: 409 });
+  }
+  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會 LINE 群"), { status: 409 });
+  if (target.purpose !== "production") {
+    throw Object.assign(new Error("會員委員會 LINE 群目前不是正式群，請先到系統設定重新指定"), { status: 409 });
+  }
+  const taskMeta = parseTaskJson(access.task.result_summary);
+  const content = buildCaseVoteNoticeText({
+    caseType: access.task.category,
+    applicant: access.task.title,
+    profession: taskMeta.profession || workflow.form?.profession || "",
+    deadlineAt: snapshot.deadline_at,
+  });
+  let lineMessage;
+  try {
+    lineMessage = buildLineMentionAllMessage(content);
+  } catch (error) {
+    throw Object.assign(error as Error, { status: 413 });
+  }
+  const messageHash = await sha256Text(caseVoteNoticeFingerprintSource(content));
+  const prior = await findCaseVoteLineDelivery(access.task, snapshot, target, messageHash);
+  if (workflow.voteNoticeSent && prior?.status !== "sent") {
+    throw Object.assign(new Error("本案已存在先前的委員通知紀錄；為避免重複發送，請先確認案件歷程"), { status: 409 });
+  }
+  if (prior?.status === "sent") {
+    const sentAt = prior.sent_at || new Date().toISOString();
+    const state = await markCaseVoteNoticeSent(access, prior, snapshot, target, sentAt, context);
+    return {
+      ...state,
+      message: `投票通知先前已送達「${target.display_name}」，系統已阻擋重複發送`,
+      lineTarget: publicLineTarget(target),
+      lineSentAt: sentAt,
+      alreadySent: true,
+    };
+  }
+  const { delivery } = await beginCaseVoteLineDelivery(access.task, snapshot, target, messageHash, context);
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
+      body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
+    });
+  } catch (error) {
+    const message = String((error as Error)?.message || error).slice(0, 1000);
+    await finishCaseVoteLineDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: message });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${message}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const message = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishCaseVoteLineDelivery(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      error_code: `HTTP_${response.status}`,
+      error_message: message,
+      line_request_id: response.headers.get("x-line-request-id") || null,
+    });
+    throw Object.assign(new Error(`LINE 投票通知發送失敗：${message}`), { status: 502 });
+  }
+  const sentAt = new Date().toISOString();
+  await finishCaseVoteLineDelivery(delivery.id, {
+    status: "sent",
+    sent_at: sentAt,
+    failed_at: null,
+    error_code: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  let state;
+  try {
+    state = await markCaseVoteNoticeSent(access, delivery, snapshot, target, sentAt, context);
+  } catch (error) {
+    throw Object.assign(new Error(`LINE 已送達「${target.display_name}」，但案件剛由其他裝置更新；請重新整理確認，勿立即重送`), { status: 409, cause: error });
+  }
+  return {
+    ...state,
+    message: `投票通知已由正式 LINE OA 發送到「${target.display_name}」`,
+    lineTarget: publicLineTarget(target),
+    lineSentAt: sentAt,
+    alreadySent: false,
+  };
+}
+
 async function caseStatesApi(request: Request, context: Context) {
   if (request.method === "GET") {
     const [tasks, assignments, states] = await Promise.all([
@@ -2593,6 +2795,10 @@ async function caseStatesApi(request: Request, context: Context) {
   const expectedRevision = Number(body.revision || 0);
   const currentWorkflow = existing?.workflow || {};
   const currentDraft = existing?.draft || {};
+
+  if (body.kind === "vote-notice") {
+    return sendCaseVoteNotice(access, existing, context);
+  }
 
   if (body.kind === "feedback") {
     if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能提交委員回饋"), { status: 403 });
@@ -2671,7 +2877,11 @@ async function caseStatesApi(request: Request, context: Context) {
   let voteDeadlineUpdate = "";
 
   if (body.kind === "open-vote") {
-    const proposed = body.value && typeof body.value === "object" ? body.value : {};
+    const proposed = body.value && typeof body.value === "object" ? { ...body.value } : {};
+    proposed.voteNoticeSent = false;
+    delete proposed.voteNoticeSentAt;
+    delete proposed.voteNoticeTargetName;
+    delete proposed.voteNoticeDeliveryId;
     await openVoteSnapshot(access, existing, proposed, context);
     const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
     return caseStateResponse(access, latestRows?.[0], context);
@@ -2704,6 +2914,11 @@ async function caseStatesApi(request: Request, context: Context) {
   } else if (body.kind === "workflow") {
     const proposed = body.value && typeof body.value === "object" ? body.value : {};
     if (access.leadership) {
+      const deadlineChanged = Boolean(
+        currentWorkflow.votingOpen
+        && proposed.form?.voteDeadline
+        && proposed.form.voteDeadline !== currentWorkflow.form?.voteDeadline
+      );
       workflow = {
         ...proposed,
         form: {
@@ -2715,11 +2930,18 @@ async function caseStatesApi(request: Request, context: Context) {
         votes: currentWorkflow.votes || {},
         voterSnapshot: currentWorkflow.voterSnapshot || [],
       };
-      if (
-        currentWorkflow.votingOpen
-        && proposed.form?.voteDeadline
-        && proposed.form.voteDeadline !== currentWorkflow.form?.voteDeadline
-      ) {
+      if (!currentWorkflow.voteNoticeSent || deadlineChanged) {
+        workflow.voteNoticeSent = false;
+        delete workflow.voteNoticeSentAt;
+        delete workflow.voteNoticeTargetName;
+        delete workflow.voteNoticeDeliveryId;
+      } else {
+        workflow.voteNoticeSent = true;
+        workflow.voteNoticeSentAt = currentWorkflow.voteNoticeSentAt || "";
+        workflow.voteNoticeTargetName = currentWorkflow.voteNoticeTargetName || "";
+        workflow.voteNoticeDeliveryId = currentWorkflow.voteNoticeDeliveryId || "";
+      }
+      if (deadlineChanged) {
         voteDeadlineUpdate = normalizedDeadline(proposed.form.voteDeadline);
       }
     } else {
