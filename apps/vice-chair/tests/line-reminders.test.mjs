@@ -16,6 +16,7 @@ const appApi = read("supabase/functions/app-api/index.ts");
 const cron = read("supabase/functions/line-reminder-cron/index.ts");
 const settings = read("apps/vice-chair/assets/js/settings.js");
 const nav = read("apps/vice-chair/assets/js/workspace-nav.js");
+const index = read("apps/vice-chair/index.html");
 const html = read("apps/vice-chair/routine-reminders.html");
 const script = read("apps/vice-chair/assets/js/routine-reminders.js");
 const config = read("supabase/config.toml");
@@ -69,6 +70,7 @@ assert.match(cron, /status: "processing",[\s\S]*?attempt_count: Number\(existing
 assert.match(config, /\[functions\.line-reminder-cron\]\nverify_jwt = false/);
 assert.match(settings, /exchange:"交流群常態通知"/);
 assert.match(nav, /"常態通知", "routine-reminders\.html", "vp"/);
+assert.match(index, /class="nav-item vp-only" href="routine-reminders\.html"/);
 assert.match(html, /id="weeklyEnabled"/);
 assert.match(html, /id="monthlyEnabled"/);
 assert.match(html, /id="deliveryList"/);
