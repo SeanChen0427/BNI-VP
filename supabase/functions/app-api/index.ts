@@ -5,7 +5,8 @@ import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashbo
 import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
-import { buildLineAttendanceMessage, lineAttendanceFingerprintSource } from "./line-message.mjs";
+import { buildLineAttendanceMessage, buildLineMentionAllMessage, lineAttendanceFingerprintSource } from "./line-message.mjs";
+import { LINE_REMINDER_KEYS, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -394,7 +395,7 @@ async function lineAttendanceState(currentSession: any, context: Context) {
   };
 }
 
-const LINE_ROUTE_KEYS = new Set(["attendance", "committee", "leadership"]);
+const LINE_ROUTE_KEYS = new Set(["attendance", "committee", "leadership", "exchange"]);
 const LINE_ENVIRONMENTS = new Set(["test", "production"]);
 
 async function assignLineTarget(targetId: string, routeKey: string, environment: string, context: Context) {
@@ -459,6 +460,145 @@ async function lineGroupsApi(request: Request, context: Context) {
   }
   if (body.action === "disable") return disableLineTarget(String(body.targetId || ""), context);
   throw new Error("LINE 群組操作不正確");
+}
+
+function publicLineReminderRule(row: any) {
+  return {
+    reminderKey: row.reminder_key,
+    displayName: row.display_name,
+    enabled: Boolean(row.enabled),
+    sendWeekday: row.send_weekday,
+    sendTime: String(row.send_time || "").slice(0, 5),
+    meetingWeekday: row.meeting_weekday,
+    daysBefore: row.days_before,
+    messageTemplate: row.message_template,
+    mentionAll: Boolean(row.mention_all),
+    updatedAt: row.updated_at,
+  };
+}
+
+function publicLineReminderDelivery(row: any) {
+  return {
+    reminderKey: row.reminder_key,
+    triggerSource: row.trigger_source,
+    localDueDate: row.local_due_date,
+    status: row.status,
+    requestedAt: row.requested_at,
+    sentAt: row.sent_at,
+    failedAt: row.failed_at,
+    errorMessage: row.error_message || "",
+  };
+}
+
+async function lineRemindersState() {
+  const [rules, targets, deliveries] = await Promise.all([
+    db("line_reminder_rules?select=*&order=reminder_key.asc"),
+    db("line_group_targets?status=eq.active&route_key=eq.exchange&select=*&limit=1"),
+    db("line_reminder_deliveries?select=reminder_key,trigger_source,local_due_date,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
+  ]);
+  const target = targets?.[0] || null;
+  return {
+    configured: Boolean(lineAccessToken()),
+    schedulerReady: Boolean(Deno.env.get("LINE_REMINDER_CRON_SECRET")),
+    target: target ? publicLineTarget(target) : null,
+    rules: (rules || []).map(publicLineReminderRule),
+    deliveries: (deliveries || []).map(publicLineReminderDelivery),
+  };
+}
+
+async function finishLineReminderDelivery(deliveryId: string, patch: any) {
+  await db(`line_reminder_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function sendLineReminderTest(reminderKey: string, context: Context) {
+  if (!LINE_REMINDER_KEYS.includes(reminderKey)) throw new Error("提醒類型不正確");
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  const [rules, targets] = await Promise.all([
+    db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(reminderKey)}&select=*&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.exchange&select=*&limit=1"),
+  ]);
+  const rule = rules?.[0];
+  const target = targets?.[0];
+  if (!rule) throw Object.assign(new Error("找不到指定提醒"), { status: 404 });
+  if (!target) throw Object.assign(new Error("尚未在後台指定交流群"), { status: 409 });
+  const content = String(rule.message_template || "").trim();
+  const message = rule.mention_all ? buildLineMentionAllMessage(content) : { type: "text", text: content };
+  const id = crypto.randomUUID();
+  const retryKey = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const deliveryRows = await db("line_reminder_deliveries", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      delivery_key: `manual:${reminderKey}:${id}`,
+      reminder_key: reminderKey,
+      group_target_id: target.id,
+      trigger_source: "manual_test",
+      local_due_date: taipeiDay(),
+      message_sha256: await sha256Text(content),
+      retry_key: retryKey,
+      requested_by: context.personId,
+      requested_by_auth_user_id: context.userId,
+      requested_at: now,
+    }),
+  });
+  const delivery = deliveryRows?.[0];
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-Retry-Key": retryKey },
+      body: JSON.stringify({ to: target.line_group_id, messages: [message] }),
+    });
+  } catch (error) {
+    const errorMessage = String((error as Error)?.message || error).slice(0, 1000);
+    await finishLineReminderDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: errorMessage });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${errorMessage}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const errorMessage = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishLineReminderDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: `HTTP_${response.status}`, error_message: errorMessage });
+    throw Object.assign(new Error(`LINE 測試發送失敗：${errorMessage}`), { status: 502 });
+  }
+  await finishLineReminderDelivery(delivery.id, {
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  return { message: `測試提醒已發送到「${target.display_name}」`, state: await lineRemindersState() };
+}
+
+async function lineRemindersApi(request: Request, context: Context) {
+  leadership(context);
+  if (request.method === "GET") return lineRemindersState();
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "test") return sendLineReminderTest(String(body.reminderKey || ""), context);
+  if (body.action !== "save") throw new Error("常態通知操作不正確");
+  if (!Array.isArray(body.rules) || body.rules.length !== LINE_REMINDER_KEYS.length) throw new Error("提醒設定不完整");
+  const submittedKeys = new Set(body.rules.map((rule: any) => String(rule?.reminderKey || "")));
+  if (submittedKeys.size !== LINE_REMINDER_KEYS.length || !LINE_REMINDER_KEYS.every(key => submittedKeys.has(key))) throw new Error("提醒設定類型不完整");
+  const updates = body.rules.map(validateReminderUpdate);
+  if (updates.some((rule: any) => rule.enabled)) {
+    if (!Deno.env.get("LINE_REMINDER_CRON_SECRET")) throw Object.assign(new Error("Supabase 排程尚未啟用，請先保持提醒關閉"), { status: 409 });
+    const targets = await db("line_group_targets?status=eq.active&route_key=eq.exchange&select=id&limit=1");
+    if (!targets?.length) throw Object.assign(new Error("啟用提醒前，請先在系統設定指定交流群"), { status: 409 });
+  }
+  for (const rule of updates) {
+    await db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(rule.reminder_key)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ ...rule, updated_by: context.personId }),
+    });
+  }
+  return { message: "常態通知設定已保存", state: await lineRemindersState() };
 }
 
 async function beginLineDelivery(session: any, target: any, announcementHash: string, context: Context) {
@@ -2765,6 +2905,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
+    else if (path === "/api/line-reminders") result = await lineRemindersApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
     else throw Object.assign(new Error("找不到指定的應用服務"), { status: 404 });
     return respond(request, 200, result);

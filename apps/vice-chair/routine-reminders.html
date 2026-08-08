@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>常態通知｜富聯分會</title>
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=7"></script>
+  <script src="assets/js/supabase-data.js?v=2"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/routine-reminders.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
+</head>
+<body>
+  <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・LINE 常態通知</span></div><label>目前登入身份<input id="loginIdentity" readonly></label></header>
+  <main>
+    <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>交流群常態通知</h1><p>管理固定提醒、文案與測試發送。訊息只會送到後台指定的「交流群」，並保留每次成功或失敗紀錄。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
+
+    <section class="form-card target-card">
+      <div class="section-head"><span>01</span><div><h2>交流群連線</h2><p>先將官方帳號加入交流群、在群內傳一則訊息，再由副主席於設定頁指定用途</p></div></div>
+      <div class="target-state" id="targetState"><div><small>目前目標</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">前往 LINE 群組管理</a></div>
+    </section>
+
+    <div class="reminder-grid">
+      <section class="form-card reminder-card" data-rule="weekly_meeting_alarm">
+        <div class="section-head"><span>02</span><div><h2>每週例會鬧鐘提醒</h2><p>每週一固定時間，提醒夥伴隔天例會並設定鬧鐘</p></div></div>
+        <label class="toggle-row"><span><b>啟用每週提醒</b><small>關閉時只保存設定，不會排程發送</small></span><input id="weeklyEnabled" type="checkbox"></label>
+        <div class="rule-fields"><label>發送日<input value="每週一" readonly></label><label>發送時間<input id="weeklyTime" type="time" required></label></div>
+        <label>提醒文案<textarea id="weeklyMessage" rows="5" maxlength="4500"></textarea></label>
+        <div class="message-preview"><small>LINE 預覽</small><pre id="weeklyPreview"></pre></div>
+        <button type="button" class="test-button" data-test="weekly_meeting_alarm">測試發送到交流群</button>
+      </section>
+
+      <section class="form-card reminder-card" data-rule="monthly_data_entry">
+        <div class="section-head"><span>03</span><div><h2>月底數據 Key in 提醒</h2><p>依每月最後一次例會計算提醒日，不用每個月重新設定日期</p></div></div>
+        <label class="toggle-row"><span><b>啟用月底提醒</b><small>預設以週二例會、提前一天計算</small></span><input id="monthlyEnabled" type="checkbox"></label>
+        <div class="rule-fields three"><label>固定例會日<select id="meetingWeekday"><option value="1">週一</option><option value="2">週二</option><option value="3">週三</option><option value="4">週四</option><option value="5">週五</option><option value="6">週六</option><option value="7">週日</option></select></label><label>提前幾天<select id="daysBefore"><option value="0">當天</option><option value="1">提前 1 天</option><option value="2">提前 2 天</option><option value="3">提前 3 天</option></select></label><label>發送時間<input id="monthlyTime" type="time" required></label></div>
+        <label>提醒文案<textarea id="monthlyMessage" rows="5" maxlength="4500"></textarea></label>
+        <div class="message-preview"><small>LINE 預覽</small><pre id="monthlyPreview"></pre></div>
+        <button type="button" class="test-button" data-test="monthly_data_entry">測試發送到交流群</button>
+      </section>
+    </div>
+
+    <section class="form-card action-card"><div><b>啟用前請先測試</b><span>測試發送會立即送到目前指定的交流群；保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
+
+    <section class="form-card history-card">
+      <div class="section-head"><span>04</span><div><h2>最近發送紀錄</h2><p>排程與人工測試都會留下結果，方便確認是否成功送達</p></div></div>
+      <div class="delivery-list" id="deliveryList"><article>尚無發送紀錄</article></div>
+    </section>
+  </main>
+  <div id="toast"></div>
+  <script src="assets/js/routine-reminders.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=4"></script>
+</body>
+</html>

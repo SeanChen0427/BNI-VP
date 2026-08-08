@@ -262,7 +262,7 @@ function initDeparture(){
   loadDepartureState();
 }
 const canManageLineGroups=["admin","vp"].includes(session.role);
-const LINE_ROUTE_LABELS={attendance:"每週出席公告",committee:"會員委員會通知",leadership:"三長／董顧通知"};
+const LINE_ROUTE_LABELS={attendance:"每週出席公告",committee:"會員委員會通知",leadership:"三長／董顧通知",exchange:"交流群常態通知"};
 let lineGroupsState={configured:false,targets:[]};
 function lineGroupIdentity(){return`${session.role}:${session.name}`}
 async function lineGroupsApi(method="GET",payload=null){
@@ -283,10 +283,10 @@ function renderLineGroups(){
       ?`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>${escapeHtml(target.displayName)}</small></div><em>${target.environment==="test"?"測試群":"正式群"}</em><button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button></article>`
       :`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>尚未指定群組</small></div><em>未啟用</em></article>`;
   }).join("");
-  $("#lineGroupDiscovered").innerHTML=candidates.length?candidates.map(item=>`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途"><option value="attendance">每週出席公告</option><option value="committee">會員委員會通知</option><option value="leadership">三長／董顧通知</option></select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`).join(""):`<div class="line-group-empty">目前沒有可指定群組。邀請 Bot 後，請在群內傳一則普通訊息。</div>`;
+  $("#lineGroupDiscovered").innerHTML=candidates.length?candidates.map(item=>`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途"><option value="attendance">每週出席公告</option><option value="committee">會員委員會通知</option><option value="leadership">三長／董顧通知</option><option value="exchange">交流群常態通知</option></select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`).join(""):`<div class="line-group-empty">目前沒有可指定群組。邀請 Bot 後，請在群內傳一則普通訊息。</div>`;
   document.querySelectorAll("[data-assign-line-group]").forEach(button=>button.onclick=()=>assignLineGroup(button.dataset.assignLineGroup,button.dataset.name));
   document.querySelectorAll("[data-disable-line-group]").forEach(button=>button.onclick=()=>disableLineGroup(button.dataset.disableLineGroup,button.dataset.name));
-  $("#lineGroupStatus").textContent=lineGroupsState.configured?`目前已啟用 ${active.length}/3 個群組用途。` : "LINE Bot 機密尚未在後端完成設定。";
+  $("#lineGroupStatus").textContent=lineGroupsState.configured?`目前已啟用 ${active.length}/4 個群組用途。` : "LINE Bot 機密尚未在後端完成設定。";
 }
 async function loadLineGroups(){
   $("#lineGroupStatus").textContent="正在讀取 LINE Bot 狀態…";

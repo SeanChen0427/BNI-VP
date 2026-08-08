@@ -19,6 +19,7 @@
         ["析", "月度分析審閱", "analysis-review.html", "vp"],
         ["會", "會員委員會月會", "monthly-meeting.html"],
         ["勤", "點名與出席", "attendance.html"],
+        ["提", "常態通知", "routine-reminders.html", "vp"],
       ],
     },
     {
