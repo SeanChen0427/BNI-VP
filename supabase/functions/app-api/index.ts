@@ -2,7 +2,7 @@ import { parsePalmsText, parseExpiryText, parseTenureText } from "../../../apps/
 import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysis/engine/audit.mjs";
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
-import { enrichPublishedMemberData, hasCompletePublishedMemberData, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
+import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
@@ -219,6 +219,21 @@ function reportCategory(row: any) {
 function latestByCategory(rows: any[], category: string, period?: { start: string; end: string }) {
   return rows.find((row) => reportCategory(row) === category
     && (!period || (row.period_start === period.start && row.period_end === period.end)));
+}
+
+function validFullMonthPeriod(start: string, end: string) {
+  if (!/^\d{4}-\d{2}-01$/.test(start) || !/^\d{4}-\d{2}-\d{2}$/.test(end)) return false;
+  const startDate = new Date(`${start}T00:00:00Z`);
+  const endDate = new Date(`${end}T00:00:00Z`);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || startDate > endDate) return false;
+  const expectedEnd = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0));
+  const months = (endDate.getUTCFullYear() - startDate.getUTCFullYear()) * 12 + endDate.getUTCMonth() - startDate.getUTCMonth() + 1;
+  return end === isoDay(expectedEnd) && months >= 1 && months <= 24;
+}
+
+function reportForExactPeriod(rows: any[], period: { start: string; end: string }) {
+  return rows.find((row: any) => row.period_start === period.start && row.period_end === period.end
+    && ["renewal", "annual", "halfYear", "monthly"].includes(reportCategory(row)));
 }
 
 function auditDate(row: any) {
@@ -1328,6 +1343,63 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
     provisionalReconciliation,
     status: await monthlyDataStatus(),
   };
+}
+
+async function renewalMetricsPayload(report: any, memberName: string, source: any) {
+  const activeRows = await db("members?status=eq.active&select=people!inner(display_name)");
+  const activeNames = new Set((activeRows || []).map((row: any) => String(row.people?.display_name || "").replace(/\s+/g, "")));
+  const members = report.members.filter((member: any) => activeNames.has(String(member.name || "").replace(/\s+/g, "")));
+  const normalizedName = memberName.replace(/\s+/g, "");
+  const member = members.find((item: any) => String(item.name || "").replace(/\s+/g, "") === normalizedName);
+  if (!member) throw Object.assign(new Error(`續約 PALMS 中找不到會員「${memberName}」，請確認報表期間與姓名`), { status: 409 });
+  return {
+    period: report.period,
+    member: { name: memberName, metrics: normalizedPalmsMetrics(member) },
+    averages: averagePalmsMetrics(members),
+    memberCount: members.length,
+    source: { importId: source.id, category: reportCategory(source), importedAt: source.imported_at },
+  };
+}
+
+async function renewalDataApi(request: Request, url: URL, context: Context) {
+  const body = request.method === "POST" ? await requestBody(request) : {};
+  const periodStart = String(url.searchParams.get("periodStart") || body.periodStart || "");
+  const periodEnd = String(url.searchParams.get("periodEnd") || body.periodEnd || "");
+  const member = String(url.searchParams.get("member") || body.member || "").trim().slice(0, 100);
+  if (!member) throw new Error("請指定續約會員");
+  if (!validFullMonthPeriod(periodStart, periodEnd)) throw new Error("續約 PALMS 期間必須是 1～24 個完整月份");
+  const period = { start: periodStart, end: periodEnd };
+  if (request.method === "GET") {
+    const rows = await reportImports();
+    const source = reportForExactPeriod(rows, period);
+    if (!source) throw Object.assign(new Error(`尚未上傳 ${periodStart} 至 ${periodEnd} 的續約 PALMS；不會改用其他期間資料`), { status: 409 });
+    const report = parsePalmsText(await downloadReport(source), source.storage_path);
+    return renewalMetricsPayload(report, member, source);
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  leadership(context);
+  const files = Array.isArray(body.files) ? body.files : [];
+  if (files.length !== 1) throw new Error("請選擇一份對應期間的續約 PALMS");
+  const file = files[0];
+  const bytes = decodeBase64(String(file?.dataBase64 || ""));
+  if (!bytes.length || bytes.length > 8 * 1024 * 1024) throw new Error("檔案內容為空或超過 8MB");
+  const report = parsePalmsText(new TextDecoder().decode(bytes), file.name || "續約 PALMS");
+  if (report.period.start !== periodStart || report.period.end !== periodEnd) {
+    throw new Error(`報表期間是 ${report.period.start} 至 ${report.period.end}，本案件需要 ${periodStart} 至 ${periodEnd}`);
+  }
+  const contentHash = await sha256(bytes);
+  const storagePath = rawReportObjectPath({ month: periodEnd.slice(0, 7), type: "renewal", index: 0, createdAt: Date.now(), sha256: contentHash });
+  await uploadRawFile(bytes, storagePath);
+  const imported = await insertReportImport({
+    report_type: "half_year_palms",
+    period_start: periodStart,
+    period_end: periodEnd,
+    storage_path: storagePath,
+    sha256: contentHash,
+    imported_by: context.personId,
+    metadata: { category: "renewal", originalFilename: file.name || "", uploadedBy: context.identity, member },
+  });
+  return { ...(await renewalMetricsPayload(report, member, imported)), message: "續約 PALMS 已驗證並保存至 Supabase Private Storage" };
 }
 
 function meetingToApi(row: any, names: Map<string, string>) {
@@ -3490,6 +3562,7 @@ Deno.serve(async (request) => {
     const context = await authenticate(request, identity);
     let result;
     if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
+    else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);
     else if (path === "/api/new-member-registration") result = await newMemberRegistrationApi(request, context);
     else if (path === "/api/member-departure") result = await memberDepartureApi(request, context);

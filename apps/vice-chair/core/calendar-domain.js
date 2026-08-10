@@ -45,5 +45,17 @@
     const date=validDate(now)||new Date();
     return{year:date.getFullYear(),month:date.getMonth()+1,english:new Intl.DateTimeFormat("en-US",{month:"long"}).format(date).toUpperCase()};
   }
-  return{daysUntil,countdownLabel,sameMonth,dateInput,defaultVoteDeadline,monthHeading};
+  function renewalPalmsPeriod({renewalCount,membershipStart,now=new Date()}={}){
+    const current=validDate(now),startDate=dateOnly(membershipStart),count=String(renewalCount||"");
+    if(!current||!["1","2"].includes(count)||!startDate)return null;
+    const endMonth=new Date(current.getFullYear(),current.getMonth()-1,1);
+    const startMonth=count==="1"
+      ?new Date(startDate.getFullYear(),startDate.getMonth(),1)
+      :new Date(endMonth.getFullYear(),endMonth.getMonth()-11,1);
+    if(startMonth>endMonth)return null;
+    const endDate=new Date(endMonth.getFullYear(),endMonth.getMonth()+1,0);
+    const monthCount=(endMonth.getFullYear()-startMonth.getFullYear())*12+endMonth.getMonth()-startMonth.getMonth()+1;
+    return{start:dateInput(startMonth),end:dateInput(endDate),monthCount,first:count==="1"};
+  }
+  return{daysUntil,countdownLabel,sameMonth,dateInput,defaultVoteDeadline,monthHeading,renewalPalmsPeriod};
 });

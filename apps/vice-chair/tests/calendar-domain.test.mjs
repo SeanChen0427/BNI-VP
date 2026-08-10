@@ -16,5 +16,8 @@ assert.equal(calendar.sameMonth("2026-08-01T09:00",now),false);
 assert.deepEqual(calendar.monthHeading(new Date(2026,7,1)),{year:2026,month:8,english:"AUGUST"});
 assert.equal(calendar.dateInput(now),"2026-07-17");
 assert.equal(calendar.defaultVoteDeadline(now),"2026-07-18T18:00");
+assert.deepEqual(calendar.renewalPalmsPeriod({renewalCount:"1",membershipStart:"2025-10-01",now:new Date(2026,7,10)}),{start:"2025-10-01",end:"2026-07-31",monthCount:10,first:true});
+assert.deepEqual(calendar.renewalPalmsPeriod({renewalCount:"2",membershipStart:"2024-10-01",now:new Date(2026,7,10)}),{start:"2025-08-01",end:"2026-07-31",monthCount:12,first:false});
+assert.equal(calendar.renewalPalmsPeriod({renewalCount:"",membershipStart:"2025-10-01",now}),null);
 
 console.log("calendar-domain tests passed");

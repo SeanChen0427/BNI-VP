@@ -1,4 +1,4 @@
-const REPORT_TYPES = new Set(["halfYear", "annual", "monthly", "audit"]);
+const REPORT_TYPES = new Set(["halfYear", "annual", "monthly", "audit", "renewal"]);
 const MONTH_PATTERN = /^\d{4}-(?:0[1-9]|1[0-2])$/;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/;
 

@@ -63,9 +63,10 @@ test("published snapshot keeps complete annual PALMS and chapter averages for re
     members:[{name:"測試甲",score:80,profession:"甲業"},{name:"測試乙",score:70,profession:"乙業"}],
     halfReport:{period:{start:"2026-02-01",end:"2026-07-31"},members:[raw("測試甲",5,6,7,8,100000),raw("測試乙",1,2,3,4,200000)]},
     annualReport:{period:{start:"2025-08-01",end:"2026-07-31"},members:[raw("測試甲",10,20,30,40,300000),raw("測試乙",20,30,40,50,500000)]},
-    tenureReport:{members:[{name:"測試甲",cumulativeStart:"2025-01-01"},{name:"測試乙",cumulativeStart:"2025-02-01"}]}
+    tenureReport:{members:[{name:"測試甲",cumulativeStart:"2025-01-01",recentStart:"2025-10-01"},{name:"測試乙",cumulativeStart:"2025-02-01",recentStart:"2025-02-01"}]}
   });
   assert.equal(result.members[0].activation,"2025-01-01");
+  assert.equal(result.members[0].recentActivation,"2025-10-01");
   assert.equal(result.members[0].metrics.receivedOut,8);
   assert.equal(result.members[0].annualMetrics.receivedOut,40);
   assert.equal(result.memberData.averages.givenIn,15);

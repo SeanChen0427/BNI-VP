@@ -46,7 +46,9 @@ test("正式分析只接受本期半年、全年及審計報表", () => {
 });
 
 test("正式快照提供續約表單完整年度資料並可安全修復舊快照", () => {
-  assert.match(edgeSource, /enrichPublishedMemberData, hasCompletePublishedMemberData, parseBniDashboard/);
+  assert.match(edgeSource, /enrichPublishedMemberData/);
+  assert.match(edgeSource, /hasCompletePublishedMemberData/);
+  assert.match(edgeSource, /parseBniDashboard/);
   assert.match(edgeSource, /async function analysisSnapshotApi\(request: Request, context: Context\)/);
   assert.match(edgeSource, /loadPublishedFormSources\(published\.period_start, published\.period_end\)/);
   assert.match(edgeSource, /if \(\["admin", "vp"\]\.includes\(context\.role\)\)/);

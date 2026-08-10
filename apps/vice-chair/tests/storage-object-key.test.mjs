@@ -27,6 +27,11 @@ test("PALMS Storage key 拒絕不合法的月份、類型與雜湊", () => {
   assert.throws(() => rawReportObjectPath({ ...base, sha256: "不是雜湊" }), /雜湊/);
 });
 
+test("案件專用續約 PALMS 使用獨立 Private Storage 路徑",()=>{
+  const path=rawReportObjectPath({month:"2026-07",type:"renewal",index:0,createdAt:1785771363406,sha256:HASH});
+  assert.equal(path,"monthly-data/2026-07/renewal/1785771363406-0-aaaaaaaaaaaaaaaa.xls");
+});
+
 test("原始中文檔名只保存於 metadata，不再組入 Storage key", async () => {
   const source = await readFile(new URL("../../../supabase/functions/app-api/index.ts", import.meta.url), "utf8");
   assert.match(source, /metadata: \{ category: body\.type, originalFilename: file\.name/);

@@ -8,6 +8,7 @@
   <script src="assets/js/supabase-config.js?v=1"></script>
   <script src="assets/js/auth.js?v=7"></script>
   <script src="assets/js/supabase-data.js?v=2"></script>
+  <script src="core/calendar-domain.js?v=2"></script>
   <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=5"></script>
   <script src="assets/js/case-state-store.js?v=9"></script>
@@ -51,14 +52,20 @@
             <label>專業別<input id="profession" readonly></label>
             <label>輔導專員<input id="counselor" readonly></label>
             <label>陪訪專員（選填）<input id="companionCounselor" list="committeeList" placeholder="輸入或選擇陪訪專員" data-save><datalist id="committeeList"></datalist></label>
-            <label>續約次數<select id="renewalCount" data-save><option value="1">第一次續約</option><option value="2">第二次以上續約</option></select></label>
+            <label>續約次數<select id="renewalCount" data-save required><option value="">請選擇</option><option value="1">第一次續約</option><option value="2">第二次以上續約</option></select></label>
           </div>
         </section>
 
         <section class="form-card" id="snapshot">
           <div class="section-head"><span>02</span><div><h2>數據快照</h2><p>自動抓取訪談前一個完整月份的資料</p></div></div>
           <div class="traffic-card"><div><small>個人紅綠燈</small><strong><span id="score">65</span> 分・<span id="light">黃燈</span></strong><p id="trafficPeriod"></p></div><span id="lightBadge">黃</span></div>
-          <div class="period-card"><small>PALMS 表計算週期</small><strong id="palmsPeriod"></strong><p id="periodNote"></p></div>
+          <div class="period-card"><small>PALMS 表計算週期</small><strong id="palmsPeriod"></strong><p id="periodNote"></p>
+            <div class="renewal-data-state" id="renewalDataState" data-tone="pending">
+              <span id="renewalDataMessage">請先選擇續約次數，系統才會載入同一期間的會員數據與分會平均。</span>
+              <button type="button" id="renewalDataUpload" hidden>上傳此期間 PALMS</button>
+              <input type="file" id="renewalDataFile" accept=".xls" hidden>
+            </div>
+          </div>
           <h3>分會平均</h3>
           <div class="averages" id="averages"></div>
           <p class="note">平均值＝該期間分會總數 ÷ 計算人數，四捨五入、不保留小數。</p>
@@ -101,8 +108,8 @@
   </main>
   <div id="toast"></div>
   <script src="vendor/docx.iife.js"></script>
-  <script src="assets/js/terminal-form.js?v=9"></script>
-  <script src="assets/js/terminal-form-live.js?v=6"></script>
+  <script src="assets/js/terminal-form.js?v=10"></script>
+  <script src="assets/js/terminal-form-live.js?v=7"></script>
   <script src="assets/js/workspace-nav.js?v=4"></script>
 </body>
 </html>

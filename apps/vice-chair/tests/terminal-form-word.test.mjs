@@ -6,11 +6,11 @@ const form = read("assets/js/terminal-form.js");
 const live = read("assets/js/terminal-form-live.js");
 const html = read("terminal-form.html");
 
-const captureIndex = live.indexOf("const preservedDraft=serialize()");
+const captureIndex = live.indexOf("const persistedDraft=JSON.parse(localStorage.getItem(window.FulianTerminalFormStoreKey)");
 const replaceMembersIndex = live.indexOf("members=loaded");
 const restoreIndex = live.indexOf("restore({...preservedDraft,member:currentTask.member,memberSearch:currentTask.member})");
 
-assert.ok(captureIndex >= 0, "正式 PALMS 載入前必須先保存畫面上的既有答案");
+assert.ok(captureIndex >= 0, "正式 PALMS 載入前必須先保存已同步草稿與畫面上的既有答案");
 assert.ok(
   captureIndex < replaceMembersIndex && replaceMembersIndex < restoreIndex,
   "重建第 3～10 題後必須把既有答案重新填回畫面"
@@ -46,11 +46,23 @@ assert.ok(
   "必須在標記完成與產生 Word 前阻擋缺漏欄位"
 );
 assert.match(form, /if\(missing\.length\)\{/);
-assert.match(html, /terminal-form\.js\?v=9/);
+assert.match(form, /const key=`radio:\$\{el\.name\}`; if\(data\[key\]!==undefined\)el\.checked=data\[key\]===el\.value/,
+  "舊草稿沒有單選答案時必須保留系統依數據自動預選");
+assert.match(form, /renewalPalmsPeriod\(\{renewalCount:/);
+assert.match(form, /fetch\(`\/api\/renewal-data\?\$\{query\}`/);
+assert.match(form, /currentMember\.metricsReady\|\|!snapshotMatches\(renewalMetricsSnapshot\)/);
+assert.match(form, /renewalRuleVersion=2/);
+assert.match(form, /trustedRenewal=data\.renewalRuleVersion===2/,
+  "舊版草稿被誤預設為第一次續約的選擇不得沿用");
+assert.match(form, /snapshotMatches\(renewalMetricsSnapshot\)[\s\S]*?renderMetricQuestions\(\);restoreFields\(persisted\);bindInputs\(\)/,
+  "重新開啟已保存的 PALMS 快照後不得遺失訪談答案");
+assert.match(html, /<option value="">請選擇<\/option>/,
+  "續約次數不得再默認成第一次");
+assert.match(html, /terminal-form\.js\?v=10/);
 assert.match(live, /fetch\("\/api\/analysis-snapshot"/);
-assert.match(live, /正式分析快照缺少完整年度 PALMS，系統已停止顯示 0 值/);
+assert.match(live, /正式分析快照缺少完整續約資料，系統已停止顯示 0 值/);
 assert.match(live, /正式分析快照缺少分會平均，系統已停止顯示 0 值/);
 assert.doesNotMatch(live, /annualMetrics\|\|item\.metrics/, "年度 PALMS 缺失時不得靜默退回半年資料");
-assert.match(html, /terminal-form-live\.js\?v=6/);
+assert.match(html, /terminal-form-live\.js\?v=7/);
 
 console.log("terminal form Word completeness tests passed");

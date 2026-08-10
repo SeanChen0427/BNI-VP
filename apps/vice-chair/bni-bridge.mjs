@@ -112,13 +112,13 @@ function officialScores(markdown){
 function tenureDates(xml){
   const map=new Map();
   for(const row of xmlRows(xml)){
-    const name=normalizeName(`${row[1]||""}${row[3]||""}`),date=String(row[6]||"").slice(0,10);
-    if(name&&/^\d{4}-\d{2}-\d{2}$/.test(date))map.set(name,date);
+    const name=normalizeName(`${row[1]||""}${row[3]||""}`),cumulativeStart=String(row[6]||"").slice(0,10),recentStart=String(row[10]||"").slice(0,10);
+    if(name&&/^\d{4}-\d{2}-\d{2}$/.test(cumulativeStart))map.set(name,{cumulativeStart,recentStart:/^\d{4}-\d{2}-\d{2}$/.test(recentStart)?recentStart:cumulativeStart});
   }
   return map;
 }
 export const PUBLISHED_FORM_METRIC_KEYS=Object.freeze(["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"]);
-function normalizedPalmsMetrics(source={}){
+export function normalizedPalmsMetrics(source={}){
   return{
     attendance:numeric(source.present??source.attendance),absence:numeric(source.absent??source.absence),late:numeric(source.late),sick:numeric(source.medical??source.sick),
     substitutes:numeric(source.substitute??source.substitutes),givenIn:numeric(source.refGivenInternal??source.givenIn),givenOut:numeric(source.refGivenExternal??source.givenOut),
@@ -130,11 +130,16 @@ export function averageMetrics(members){
   const count=Math.max(members.length,1);
   return Object.fromEntries(PUBLISHED_FORM_METRIC_KEYS.map(key=>[key,Math.round(members.reduce((sum,item)=>sum+numeric(item.annualMetrics?.[key]),0)/count)]));
 }
+export function averagePalmsMetrics(members=[]){
+  const normalized=members.map(item=>normalizedPalmsMetrics(item));
+  const count=Math.max(normalized.length,1);
+  return Object.fromEntries(PUBLISHED_FORM_METRIC_KEYS.map(key=>[key,Math.round(normalized.reduce((sum,item)=>sum+numeric(item[key]),0)/count)]));
+}
 export function hasCompletePublishedMemberData(snapshot={}){
   const members=Array.isArray(snapshot.members)?snapshot.members:[],averages=snapshot.memberData?.averages;
   const complete=value=>value&&PUBLISHED_FORM_METRIC_KEYS.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
   return members.length>0&&snapshot.memberData?.count===members.length&&complete(averages)
-    &&members.every(member=>member?.name&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.activation||""))&&complete(member.annualMetrics));
+    &&members.every(member=>member?.name&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.activation||""))&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.recentActivation||""))&&complete(member.annualMetrics));
 }
 export function enrichPublishedMemberData({members=[],halfReport={},annualReport={},tenureReport={}}={}){
   const byName=(rows=[])=>new Map(rows.map(item=>[normalizeName(item.name),item]));
@@ -145,7 +150,7 @@ export function enrichPublishedMemberData({members=[],halfReport={},annualReport
     const absent=[];
     if(!half)absent.push("半年 PALMS");if(!annual)absent.push("一年 PALMS");if(!tenure?.cumulativeStart)absent.push("會齡");
     if(absent.length){missing.push(`${name}（${absent.join("、")}）`);return null}
-    return{...member,name,activation:tenure.cumulativeStart,metrics:normalizedPalmsMetrics(half),annualMetrics:normalizedPalmsMetrics(annual)};
+    return{...member,name,activation:tenure.cumulativeStart,recentActivation:tenure.recentStart||tenure.cumulativeStart,metrics:normalizedPalmsMetrics(half),annualMetrics:normalizedPalmsMetrics(annual)};
   });
   if(missing.length)throw new Error(`正式續約資料對帳失敗：${missing.join("；")}`);
   const complete=enriched.filter(Boolean);
@@ -174,8 +179,8 @@ async function latestVersionedFile(directory,pattern){
 export function buildMemberDetails({palmsXml="",expiryXml="",officialScoresMarkdown="",currentMembers=null,annualPalmsXml="",tenureXml=""}={}){
   const expiryMap=expiryMembers(expiryXml),scoreMap=officialScores(officialScoresMarkdown),halfMap=new Map(palmsMembers(palmsXml).map(item=>[item.name,item])),annualMap=new Map(palmsMembers(annualPalmsXml).map(item=>[item.name,item.metrics])),tenureMap=tenureDates(tenureXml);
   const canonical=Array.isArray(currentMembers?.members)?currentMembers.members:[...expiryMap].map(([name,value])=>({name,profession:value.profession}));
-  return canonical.map(entry=>{const item=halfMap.get(normalizeName(entry.name));if(!item)return null;const verified=scoreMap.get(item.name),expiry=expiryMap.get(item.name)||{};return{
-    ...item,profession:entry.profession||expiry.profession||"",activation:tenureMap.get(item.name)||"",expiryDate:expiry.expiryDate||"",annualMetrics:annualMap.get(item.name)||item.metrics,
+  return canonical.map(entry=>{const item=halfMap.get(normalizeName(entry.name));if(!item)return null;const verified=scoreMap.get(item.name),expiry=expiryMap.get(item.name)||{},tenure=tenureMap.get(item.name)||{};return{
+    ...item,profession:entry.profession||expiry.profession||"",activation:tenure.cumulativeStart||"",recentActivation:tenure.recentStart||tenure.cumulativeStart||"",expiryDate:expiry.expiryDate||"",annualMetrics:annualMap.get(item.name)||item.metrics,
     official:verified||null,score:verified?.score??null,light:verified?.light||"待確認"
   }}).filter(Boolean);
 }

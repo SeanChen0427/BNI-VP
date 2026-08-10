@@ -13,12 +13,13 @@
     const requiredMetrics=["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"];
     const complete=value=>value&&requiredMetrics.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
     const sourceMembers=Array.isArray(snapshot.members)?snapshot.members:[];
-    if(!sourceMembers.length||sourceMembers.some(item=>!item.name||!Number.isFinite(item.score)||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.activation||""))||!complete(item.annualMetrics)))throw new Error("正式分析快照缺少完整年度 PALMS，系統已停止顯示 0 值");
+    if(!sourceMembers.length||sourceMembers.some(item=>!item.name||!Number.isFinite(item.score)||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.activation||""))||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.recentActivation||""))||!complete(item.annualMetrics)))throw new Error("正式分析快照缺少完整續約資料，系統已停止顯示 0 值");
     if(!complete(snapshot.memberData?.averages))throw new Error("正式分析快照缺少分會平均，系統已停止顯示 0 值");
-    const loaded=sourceMembers.map(item=>({name:item.name,profession:item.profession||"",activation:item.activation,score:item.score,metrics:normalize(item.annualMetrics)}));
+    const loaded=sourceMembers.map(item=>({name:item.name,profession:item.profession||"",activation:item.activation,recentActivation:item.recentActivation,score:item.score,metricsReady:false,metrics:normalize(item.annualMetrics)}));
     if(!loaded.length)throw new Error("沒有可用的正式會員資料");
     if(!loaded.some(item=>item.name===currentTask.member))throw new Error(`案件會員「${currentTask.member}」不在正式會員資料`);
-    const preservedDraft=serialize();
+    const persistedDraft=JSON.parse(localStorage.getItem(window.FulianTerminalFormStoreKey)||"null")||{};
+    const preservedDraft={...persistedDraft,...serialize()};
     members=loaded;averages={...averages,...normalize(snapshot.memberData.averages)};
     document.querySelector("#memberList").innerHTML=members.map(item=>`<option value="${item.name}">${item.profession}</option>`).join("");
     restore({...preservedDraft,member:currentTask.member,memberSearch:currentTask.member});
@@ -27,6 +28,7 @@
     document.querySelector("#counselor").value=currentTask.lead||session.name;document.querySelector("#interviewer").value=currentTask.lead||session.name;
     document.querySelector("#companionCounselor").value=(currentTask.companions||[]).join("、");document.querySelector("#memberSignature").value=currentTask.member;document.querySelector("#saveTime").textContent="已由優先處理案件自動帶入";
     await window.FulianCaseStateStore.reconcileDraft(currentTask,{member:currentTask.member,...(currentTask.scheduledAt?{meetingDate:currentTask.scheduledAt}:{}),companionCounselor:(currentTask.companions||[]).join("、"),memberSignature:currentTask.member});
+    await window.FulianRenewalData.load();
     document.querySelector("#terminalForm").hidden=false;
   }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#terminalForm").hidden=true;document.querySelector("#saveState").textContent=error.message||"正式會員資料載入失敗";document.querySelector("#saveTime").textContent="本機草稿未修改，請重新整理後再試";toast(error.message||"正式會員資料載入失敗，請重新整理")}
 })();

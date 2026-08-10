@@ -6,19 +6,22 @@ const terminalCaseDomain = window.FulianCaseDomain;
 const terminalCaseFiles = window.FulianCaseFiles;
 const terminalCompletion = window.FulianInterviewCompletion.setup({formLabel:"終期輔導"});
 const STORE_KEY = terminalTaskId ? terminalCaseDomain.draftStorageKey({id:terminalTaskId,type:"renewal"}) : "fulian-terminal-counseling-draft-v3";
+window.FulianTerminalFormStoreKey=STORE_KEY;
 const DEFAULT_CHAPTER_NOTES = `1. 3次遲到及早退轉為一次缺席
 2. 紅燈有條件續約，灰燈不予續約
 3. 續約須於續約到期日前2個月的當月15日前完成申請及繳費，逾期代表放棄續約權益。`;
 
 let members = [
   {
-    name: "正式資料載入中", profession: "", activation: "2026-01-01", score: 0,
-    metrics: { givenIn: 0, givenOut: 0, receivedIn: 0, receivedOut: 0, amount: 0, visitors: 0, oneToOne: 0, late: 0, early: 0, substitutes: 0, education: 0 }
+    name: "正式資料載入中", profession: "", activation: "2026-01-01", recentActivation: "2026-01-01", score: 0,
+    metricsReady: false, metrics: { givenIn: 0, givenOut: 0, receivedIn: 0, receivedOut: 0, amount: 0, visitors: 0, oneToOne: 0, late: 0, early: 0, substitutes: 0, education: 0 }
   }
 ];
 
-let averages = { givenIn: 18, givenOut: 31, receivedIn: 15, receivedOut: 25, amount: 1650000, visitors: 3, oneToOne: 48, late: 1, substitutes: 3, education: 10 };
+let averages = { givenIn: 0, givenOut: 0, receivedIn: 0, receivedOut: 0, amount: 0, visitors: 0, oneToOne: 0, late: 0, substitutes: 0, education: 0 };
 let currentMember = members[0];
+let renewalMetricsSnapshot = null;
+let renewalMetricsLoading = false;
 let saveTimer;
 
 const metricDefs = [
@@ -116,6 +119,10 @@ function hintBox(items) { return `<div class="system-hint"><b>系統訪談提示
 function ynField(id, text, yes="有", no="沒有") { return `<div class="yn"><b>${text}</b><label><input type="radio" name="${id}" value="yes" data-save>${yes}</label><label><input type="radio" name="${id}" value="no" data-save>${no}</label></div>`; }
 
 function renderMetricQuestions() {
+  if(!currentMember.metricsReady){
+    $("#metricQuestions").innerHTML='<div class="metric-data-pending">請先確認續約次數，系統會載入完全相同期間的會員 PALMS 與分會平均。</div>';
+    return;
+  }
   $("#metricQuestions").innerHTML = metricDefs.map(q => `<article class="question"><div class="question-head"><span>${q.no}.</span><h3>${q.title(currentMember.metrics)}</h3></div>${q.chips ? `<div class="metric-breakdown">${q.chips(currentMember.metrics)}</div>` : ""}${hintBox(q.hints)}${q.options ? `<div class="official-options">${q.options(currentMember.metrics)}</div>` : ""}${q.plain ? `<p>${q.plain}</p>` : ""}${q.extra ? ynField(q.extra.id, q.extra.text, q.extra.yes, q.extra.no) : ""}<label class="long-field">委員填寫內容<textarea id="${q.id}Answer" rows="4" data-save></textarea></label></article>`).join("");
 }
 
@@ -130,23 +137,48 @@ function periodLabel(start, end) { return `${monthLabel(start)}至${monthLabel(e
 function parseLocalDate(s) { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d || 1); }
 function trafficLight(score) { if(score >= 70) return ["綠燈","綠","#198754"]; if(score >= 50) return ["黃燈","黃","#d0a12d"]; if(score >= 30) return ["紅燈","紅","#c92b32"]; return ["黑燈","黑","#25282b"]; }
 
+function expectedRenewalPeriod(member=currentMember){
+  const period=window.FulianCalendarDomain.renewalPalmsPeriod({renewalCount:$("#renewalCount").value,membershipStart:member.recentActivation||member.activation});
+  if(!period)return null;
+  const palmsStart=parseLocalDate(period.start),end=parseLocalDate(period.end);
+  return{first:period.first,end,palmsStart,monthCount:period.monthCount,period:{start:period.start,end:period.end}};
+}
+
+function snapshotMatches(snapshot){
+  const expected=expectedRenewalPeriod();
+  return Boolean(expected&&snapshot?.member?.name===currentMember.name&&snapshot?.period?.start===expected.period.start&&snapshot?.period?.end===expected.period.end);
+}
+function snapshotMatchesForMember(snapshot,member){
+  const expected=expectedRenewalPeriod(member);
+  return Boolean(expected&&snapshot?.member?.name===member.name&&snapshot?.period?.start===expected.period.start&&snapshot?.period?.end===expected.period.end);
+}
+
+function renewalDataStatus(message,tone="pending",allowUpload=false){
+  const state=$("#renewalDataState"),button=$("#renewalDataUpload");
+  state.dataset.tone=tone;$("#renewalDataMessage").textContent=message;
+  const role=window.FulianAuth?.getSession?.()?.role;
+  button.hidden=!(allowUpload&&["vp","admin"].includes(role));
+}
+
+function renderAverages(){
+  const ready=currentMember.metricsReady&&snapshotMatches(renewalMetricsSnapshot);
+  $("#averages").innerHTML = [
+    ["平均提供引薦",ready?`內 ${averages.givenIn}・外 ${averages.givenOut}`:"—"],["平均收到引薦",ready?`內 ${averages.receivedIn}・外 ${averages.receivedOut}`:"—"],["平均引薦金額",ready?money(averages.amount):"—"],["平均來賓",ready?`${averages.visitors} 人`:"—"],
+    ["平均一對一",ready?`${averages.oneToOne} 次`:"—"],["平均遲到",ready?`${averages.late} 次`:"—"],["平均代理人",ready?`${averages.substitutes} 次`:"—"],["平均教育培訓",ready?`${averages.education} 分`:"—"]
+  ].map(([k,v])=>`<div class="average"><small>${k}</small><strong>${v}</strong></div>`).join("");
+}
+
 function refreshSnapshot() {
   const end = lastCompleteMonth();
   const trafficStart = monthsBack(end, 6);
-  const first = $("#renewalCount").value === "1";
-  const activation = parseLocalDate(currentMember.activation);
-  const palmsStart = first ? new Date(activation.getFullYear(), activation.getMonth(), 1) : monthsBack(end, 12);
+  const renewal=expectedRenewalPeriod();
   const [light, badge, color] = trafficLight(currentMember.score);
   $("#score").textContent = currentMember.score; $("#light").textContent = light; $("#lightBadge").textContent = badge; $("#lightBadge").style.background = color;
   $("#trafficPeriod").textContent = `計算週期（6個月）：${periodLabel(trafficStart,end)}`;
-  $("#palmsPeriod").textContent = periodLabel(palmsStart,end);
-  const monthCount = (end.getFullYear()-palmsStart.getFullYear())*12 + end.getMonth()-palmsStart.getMonth()+1;
-  $("#periodNote").textContent = first ? `第一次續約：依實際會籍抓取 ${monthCount} 個完整月份。` : "第二次續約起：抓取訪談前 12 個完整月份。";
-  $("#averages").innerHTML = [
-    ["平均提供引薦",`內 ${averages.givenIn}・外 ${averages.givenOut}`],["平均收到引薦",`內 ${averages.receivedIn}・外 ${averages.receivedOut}`],["平均引薦金額",money(averages.amount)],["平均來賓",`${averages.visitors} 人`],
-    ["平均一對一",`${averages.oneToOne} 次`],["平均遲到",`${averages.late} 次`],["平均代理人",`${averages.substitutes} 次`],["平均教育培訓",`${averages.education} 分`]
-  ].map(([k,v])=>`<div class="average"><small>${k}</small><strong>${v}</strong></div>`).join("");
-  window.formPeriods = { trafficStart, end, palmsStart };
+  $("#palmsPeriod").textContent = renewal?periodLabel(renewal.palmsStart,end):"請先選擇續約次數";
+  $("#periodNote").textContent = !renewal?"選擇後才會載入相同期間的會員數據與分會平均。":renewal.first?`第一次續約：依實際會籍抓取 ${renewal.monthCount} 個完整月份。`:"第二次續約起：抓取訪談前 12 個完整月份。";
+  renderAverages();
+  window.formPeriods = { trafficStart, end, palmsStart:renewal?.palmsStart||null, palmsPeriod:renewal?.period||null };
 }
 
 function selectMember(name, preserve=false) {
@@ -163,18 +195,83 @@ function serialize() {
     else if (el.type === "checkbox") out[el.id] = el.checked;
     else out[el.id] = el.value;
   });
-  out.member = currentMember.name; out.loginUser = $("#loginUser").value; return out;
+  out.member = currentMember.name; out.loginUser = $("#loginUser").value;out.renewalRuleVersion=2;
+  out.renewalMetricsSnapshot=snapshotMatches(renewalMetricsSnapshot)?renewalMetricsSnapshot:null;
+  return out;
 }
-function restore(data) {
-  if (!data) return;
-  if (data.loginUser) $("#loginUser").value = data.loginUser;
-  selectMember(data.member || members[0].name, true);
+function restoreFields(data){
   $$('[data-save]').forEach(el => {
-    if (el.type === "radio") el.checked = data[`radio:${el.name}`] === el.value;
+    if (el.type === "radio") { const key=`radio:${el.name}`; if(data[key]!==undefined)el.checked=data[key]===el.value; }
     else if (el.type === "checkbox" && data[el.id] !== undefined) el.checked = data[el.id];
     else if (data[el.id] !== undefined) el.value = data[el.id];
   });
+}
+function restore(data) {
+  if (!data) return;
+  const trustedRenewal=data.renewalRuleVersion===2;
+  const working=trustedRenewal?data:{...data,renewalCount:"",renewalMetricsSnapshot:null};
+  if (working.loginUser) $("#loginUser").value = working.loginUser;
+  if(working.renewalCount!==undefined)$("#renewalCount").value=working.renewalCount;
+  renewalMetricsSnapshot=working.renewalMetricsSnapshot||null;
+  const target=members.find(item=>item.name===(working.member||members[0].name));
+  if(target&&snapshotMatchesForMember(renewalMetricsSnapshot,target)){
+    target.metrics={...target.metrics,...renewalMetricsSnapshot.member.metrics};target.metricsReady=true;averages={...averages,...renewalMetricsSnapshot.averages};
+  }
+  selectMember(working.member || members[0].name, true);
+  restoreFields(working);
   refreshSnapshot();
+}
+function clearMetricComparisons(data={}){
+  const next={...data};
+  ["givenCompare","receivedCompare","visitorCompare","oneToOneCompare"].forEach(name=>delete next[`radio:${name}`]);
+  ["amountCompareLow","amountCompareHigh","educationCompare"].forEach(id=>delete next[id]);
+  delete next.renewalMetricsSnapshot;
+  return next;
+}
+function applyRenewalMetrics(payload,{resetComparisons=false,save=true}={}){
+  const target=members.find(item=>item.name===payload?.member?.name);
+  if(!target)throw new Error("續約 PALMS 會員與案件不一致");
+  renewalMetricsSnapshot={period:payload.period,member:payload.member,averages:payload.averages,memberCount:payload.memberCount,source:payload.source};
+  target.metrics={...target.metrics,...payload.member.metrics,early:0};target.metricsReady=true;
+  currentMember=target;averages={...averages,...payload.averages};
+  const persisted=JSON.parse(localStorage.getItem(STORE_KEY)||"null")||{};
+  const draft=resetComparisons?clearMetricComparisons(persisted):persisted;
+  renderMetricQuestions();restoreFields(draft);bindInputs();refreshSnapshot();updateProgress();
+  renewalDataStatus(`已載入 ${payload.period.start} 至 ${payload.period.end} 的正式 PALMS；分會平均計算 ${payload.memberCount} 人。`,"ready");
+  if(payload.message)toast(payload.message);
+  if(save)saveDraft();
+}
+function fileBase64(file){return new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result).split(",")[1]||"");reader.onerror=()=>reject(new Error(`無法讀取 ${file.name}`));reader.readAsDataURL(file)})}
+async function loadRenewalMetrics({file=null,resetComparisons=false,force=false}={}){
+  const expected=expectedRenewalPeriod();
+  if(!expected){currentMember.metricsReady=false;renderMetricQuestions();refreshSnapshot();renewalDataStatus("請先選擇續約次數，系統才會載入同一期間的會員數據與分會平均。");return false}
+  if(currentMember.name==="正式資料載入中")return false;
+  if(!force&&snapshotMatches(renewalMetricsSnapshot)){
+    const persisted=JSON.parse(localStorage.getItem(STORE_KEY)||"null")||{};
+    currentMember.metricsReady=true;renderMetricQuestions();restoreFields(persisted);bindInputs();refreshSnapshot();updateProgress();
+    renewalDataStatus(`已載入案件保存的 ${expected.period.start} 至 ${expected.period.end} PALMS 快照。`,"ready");
+    return true;
+  }
+  if(renewalMetricsLoading)return false;
+  renewalMetricsLoading=true;const upload=$("#renewalDataUpload");upload.disabled=true;
+  currentMember.metricsReady=false;renderMetricQuestions();renderAverages();
+  renewalDataStatus(`正在核對 ${expected.period.start} 至 ${expected.period.end} 的續約 PALMS…`);
+  try{
+    let response;
+    if(file){
+      response=await fetch("/api/renewal-data",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({periodStart:expected.period.start,periodEnd:expected.period.end,member:currentMember.name,files:[{name:file.name,dataBase64:await fileBase64(file)}]})});
+    }else{
+      const query=new URLSearchParams({periodStart:expected.period.start,periodEnd:expected.period.end,member:currentMember.name});
+      response=await fetch(`/api/renewal-data?${query}`,{cache:"no-store"});
+    }
+    const payload=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(payload.message||`HTTP ${response.status}`);
+    applyRenewalMetrics(payload,{resetComparisons,save:true});return true;
+  }catch(error){
+    renewalMetricsSnapshot=null;currentMember.metricsReady=false;renderMetricQuestions();refreshSnapshot();
+    const role=window.FulianAuth?.getSession?.()?.role,leadership=["vp","admin"].includes(role);
+    renewalDataStatus(`${error.message}${leadership?"；請上傳畫面指定期間的 PALMS。":"；請由副主席補上對應期間報表。"}`,"error",true);return false;
+  }finally{renewalMetricsLoading=false;upload.disabled=false;$("#renewalDataFile").value=""}
 }
 function saveDraft() {
   localStorage.setItem(STORE_KEY, JSON.stringify(serialize()));
@@ -212,6 +309,8 @@ function completionMissingFields() {
   const missing = textFields
     .filter(([id]) => !answer(`#${id}`))
     .map(([id,label]) => ({ id, label, node: $(`#${id}`) }));
+  if(!$("#renewalCount").value)missing.unshift({id:"renewalCount",label:"續約次數",node:$("#renewalCount")});
+  if(!currentMember.metricsReady||!snapshotMatches(renewalMetricsSnapshot))missing.unshift({id:"renewalData",label:"對應期間的續約 PALMS",node:$("#renewalDataState")});
   [
     ["receivedBenefit", "第 4 題效益確認"],
     ["oneToOneBenefit", "第 7 題效益確認"],
@@ -325,10 +424,13 @@ async function init() {
   selectMember(members[0].name);
   const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); restore(saved);
   $("#memberSearch").addEventListener("change", e=>{selectMember(e.target.value);saveDraft();});
-  $("#renewalCount").addEventListener("change", refreshSnapshot);
+  $("#renewalCount").addEventListener("change",()=>{renewalMetricsSnapshot=null;currentMember.metricsReady=false;renderMetricQuestions();refreshSnapshot();loadRenewalMetrics({resetComparisons:true,force:true});});
   $("#loginUser").addEventListener("change",()=>{$("#counselor").value=$("#loginUser").value;$("#interviewer").value=$("#loginUser").value;saveDraft();});
   $("#resetDraft").onclick=()=>{if(confirm("要清除這份尚未完成的終期輔導草稿嗎？已保存的案件附件與完成紀錄不會被刪除。")){localStorage.removeItem(STORE_KEY);location.reload();}};
   $("#downloadWord").onclick=downloadWord;
+  $("#renewalDataUpload").onclick=()=>$("#renewalDataFile").click();
+  $("#renewalDataFile").onchange=event=>{const [file]=event.target.files||[];if(file)loadRenewalMetrics({file,resetComparisons:true,force:true})};
   bindInputs(); updateProgress();
 }
+window.FulianRenewalData={load:loadRenewalMetrics,apply:applyRenewalMetrics};
 window.FulianTerminalFormReady=init();
