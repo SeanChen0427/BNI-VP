@@ -3756,6 +3756,128 @@ async function testResetApi(request: Request, context: Context) {
   };
 }
 
+const COMMITTEE_BOARD_KIND = "committee-board";
+const COMMITTEE_BOARD_LIMIT = 200;
+const BOARD_CLIENT_REFERENCE = /^notice-[0-9]{10,16}-[a-z0-9-]{4,64}$/;
+const UUID_REFERENCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function boardContent(value: unknown) {
+  const content = String(value || "").trim();
+  if (!content) throw new Error("留言內容不可空白");
+  if ([...content].length > 1000) throw new Error("留言內容不可超過 1000 字");
+  return content;
+}
+
+function boardClientReference(value: unknown) {
+  const reference = String(value || "");
+  if (!BOARD_CLIENT_REFERENCE.test(reference)) throw new Error("留言識別碼格式不正確");
+  return reference;
+}
+
+function legacyBoardCreatedAt(value: unknown) {
+  const date = new Date(String(value || ""));
+  const earliest = Date.UTC(2020, 0, 1);
+  const latest = Date.now() + 5 * 60 * 1000;
+  if (Number.isNaN(date.getTime()) || date.getTime() < earliest || date.getTime() > latest) {
+    throw new Error("舊留言時間格式不正確");
+  }
+  return date.toISOString();
+}
+
+async function committeeBoardPosts(context: Context) {
+  const rows = await db(
+    `announcements?kind=eq.${COMMITTEE_BOARD_KIND}&status=eq.ready&select=id,body,author_name,author_role,created_at,created_by&order=created_at.desc&limit=${COMMITTEE_BOARD_LIMIT}`,
+  );
+  return (rows || []).map((row: any) => ({
+    id: row.id,
+    content: row.body,
+    authorName: row.author_name,
+    authorRole: row.author_role,
+    createdAt: row.created_at,
+    canDelete: ["admin", "vp"].includes(context.role) || row.created_by === context.personId,
+  }));
+}
+
+async function insertCommitteeBoardRows(rows: any[]) {
+  if (!rows.length) return;
+  await db("announcements?on_conflict=source_reference", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Prefer: "resolution=ignore-duplicates,return=minimal",
+    },
+    body: JSON.stringify(rows),
+  });
+}
+
+async function committeeBoardApi(request: Request, context: Context) {
+  if (request.method === "GET") return { posts: await committeeBoardPosts(context) };
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+
+  if (body.action === "create") {
+    const reference = boardClientReference(body.clientReference);
+    await insertCommitteeBoardRows([{
+      kind: COMMITTEE_BOARD_KIND,
+      body: boardContent(body.content),
+      status: "ready",
+      created_by: context.personId,
+      author_name: context.name,
+      author_role: context.role,
+      source_reference: `web:${reference}`,
+    }]);
+    return { posts: await committeeBoardPosts(context) };
+  }
+
+  if (body.action === "import-legacy") {
+    const legacyPosts = Array.isArray(body.posts) ? body.posts.slice(0, COMMITTEE_BOARD_LIMIT) : [];
+    const rows = legacyPosts
+      .filter((post: any) => post?.authorName === context.name && post?.authorRole === context.role)
+      .map((post: any) => {
+        const reference = boardClientReference(post.id);
+        return {
+          kind: COMMITTEE_BOARD_KIND,
+          body: boardContent(post.content),
+          status: "ready",
+          created_by: context.personId,
+          author_name: context.name,
+          author_role: context.role,
+          source_reference: `local:${reference}`,
+          created_at: legacyBoardCreatedAt(post.createdAt),
+        };
+      });
+    await insertCommitteeBoardRows(rows);
+    return { imported: rows.length, posts: await committeeBoardPosts(context) };
+  }
+
+  if (body.action === "delete") {
+    const id = String(body.id || "");
+    if (!UUID_REFERENCE.test(id)) throw new Error("留言識別碼格式不正確");
+    const rows = await db(
+      `announcements?id=eq.${encodeURIComponent(id)}&kind=eq.${COMMITTEE_BOARD_KIND}&status=eq.ready&select=id,created_by&limit=1`,
+    );
+    const post = rows?.[0];
+    if (!post) return { posts: await committeeBoardPosts(context) };
+    if (!["admin", "vp"].includes(context.role) && post.created_by !== context.personId) {
+      throw Object.assign(new Error("只能刪除自己發布的留言"), { status: 403 });
+    }
+    const now = new Date().toISOString();
+    await db(`announcements?id=eq.${encodeURIComponent(id)}&kind=eq.${COMMITTEE_BOARD_KIND}&status=eq.ready`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "cancelled",
+        deleted_at: now,
+        deleted_by: context.personId,
+        updated_at: now,
+      }),
+    });
+    return { posts: await committeeBoardPosts(context) };
+  }
+
+  throw new Error("不支援的留言板操作");
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors(request) });
   if (!supabaseUrl || !anonKey || !serviceKey) return respond(request, 500, { message: "Supabase Edge API 環境設定不完整" });
@@ -3784,6 +3906,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
     else if (path === "/api/line-reminders") result = await lineRemindersApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
+    else if (path === "/api/announcements") result = await committeeBoardApi(request, context);
     else throw Object.assign(new Error("找不到指定的應用服務"), { status: 404 });
     return respond(request, 200, result);
   } catch (error) {

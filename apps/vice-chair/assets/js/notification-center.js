@@ -1,5 +1,6 @@
 (async function () {
   await window.FulianTaskStore.ready;
+  await window.FulianAnnouncementBoard?.ready;
   const domain = window.FulianCaseDomain;
   const TASK_KEY = domain.TASK_STORAGE_KEY;
   const ANNOUNCEMENT_KEY = "fulian-announcement-board-v1";

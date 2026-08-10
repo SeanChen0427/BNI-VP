@@ -1,0 +1,24 @@
+.announcement-sync-state {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: #f1efec;
+  color: #716b65;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.announcement-sync-state.success {
+  background: #eaf5ef;
+  color: #26704e;
+}
+
+.announcement-sync-state.error {
+  background: #fff0ef;
+  color: #9f2d20;
+}
+
+#announcementPublish:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}

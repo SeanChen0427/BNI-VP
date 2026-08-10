@@ -12,7 +12,7 @@
 | `fulian-attendance-prototype-v1` | Supabase 保存失敗時的點名草稿備援；不是正式週次來源 | `assets/js/attendance.js` |
 | `fulian-attendance-history-v1` | 舊版已確認週次；首次載入後由副主席／Admin 搬入 Supabase，原值保留作復原 | `assets/js/attendance.js` |
 | `fulian-attendance-history-supabase-v1` | 本瀏覽器舊版週次搬移完成標記 | `assets/js/attendance.js` |
-| `fulian-announcement-board-v1` | 首頁留言公告 | `assets/js/announcement-board.js` |
+| `fulian-announcement-board-v1` | Supabase 首頁留言的本機快取；舊版本機留言在原作者登入時一次性搬入正式資料庫 | `assets/js/announcement-board.js` |
 | `fulian-auth-config-v1` | 原型角色、人員名單與固定共用帳號名稱；V3 起不含密碼 | `assets/js/auth.js`、`assets/js/settings.js` |
 | `fulian-auth-audit-v1` | 原型設定異動紀錄 | `assets/js/settings.js` |
 | `fulian-vp-course-v2` | 新課程進度 | `assets/js/app-v2.js` |
@@ -43,6 +43,7 @@
 - `ai_credentials`：個人 AI Key 的 AES-GCM 密文；解密 secret 只存在 Edge Function 環境。
 - `ai_profiles`：個人預設 AI 平台。
 - `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。
+- `announcements`：首頁會員委員會留言的跨裝置正式來源；作者、角色、發布時間與軟刪除紀錄只經 `app-api` 寫入，`localStorage` 不再是唯一來源。
 - `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
   - Storage object path 僅使用月份、報表類型、上傳時間、序號及 SHA-256 短指紋等 ASCII 字元；使用者原始檔名只保存於 `report_imports.metadata.originalFilename`，不得直接組入 object path。
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。

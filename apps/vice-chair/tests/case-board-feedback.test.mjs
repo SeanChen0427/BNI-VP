@@ -114,8 +114,18 @@ assert.match(
   "結案資料入口只提供副主席"
 );
 assert.match(
+  boardSource,
+  /stage === "closed" \? "案件流程已完成" : task\.stage/,
+  "結案清單不得再顯示訪談排定時保存的舊階段文字"
+);
+assert.match(
+  boardSource,
+  /stage === "closed" \? "原排定時間"/,
+  "結案清單的日期必須標示為原排定時間"
+);
+assert.match(
   readFileSync(new URL("../case-board.html", import.meta.url), "utf8"),
-  /assets\/js\/case-board\.js\?v=10/,
+  /assets\/js\/case-board\.js\?v=11/,
   "案件中心必須載入階段式決議入口的新版程式"
 );
 

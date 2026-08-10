@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.2",
+      publishedAt: "2026-08-10",
+      title: "留言板跨裝置同步",
+      level: "important",
+      changes: Object.freeze([
+        "修正電腦發布留言後，手機登入卻看不到內容的問題。",
+        "留言改由 Supabase 保存；舊電腦留言會在原作者開啟新版首頁時安全搬移。",
+        "同步失敗會保留輸入內容或本機備援，不再顯示成已成功保存。",
+        "已結案清單不再顯示續約、期中或新會員訪談的舊排定階段。"
+      ]),
+      impact: "既有電腦留言不會刪除；案件、月會、訪談、附件、回饋、投票與會員資料均不受影響。"
+    }),
+    Object.freeze({
       version: "1.0.1",
       publishedAt: "2026-08-10",
       title: "修正月會紀錄載入",

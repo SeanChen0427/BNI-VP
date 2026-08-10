@@ -81,6 +81,10 @@
     return "尚未開始訪談";
   }
 
+  function stageDetail(task, stage) {
+    return stage === "closed" ? "案件流程已完成" : task.stage || "尚未設定階段";
+  }
+
   function due(task) {
     if (!task.scheduledAt) return { label: "未排日期", overdue: false };
     const date = new Date(task.scheduledAt);
@@ -188,9 +192,9 @@
       : "";
     return `<article class="case-card">
       <div class="case-main"><span class="type-icon">${type.icon}</span><div><strong>${esc(task.member)}</strong><small>${type.label}・${esc(task.profession || "專業類別待補")}</small></div></div>
-      <div class="stage"><span class="pill ${stage}">${stageText(task, state, stage)}</span>${feedbackBadge}<small>${esc(task.stage || "尚未設定階段")}</small></div>
+      <div class="stage"><span class="pill ${stage}">${stageText(task, state, stage)}</span>${feedbackBadge}<small>${esc(stageDetail(task, stage))}</small></div>
       <div class="owner"><strong>${esc(task.lead || "未指派")}</strong><small>${people.length > 1 ? `＋${people.length - 1} 位陪訪` : "主要負責人"}</small></div>
-      <div class="deadline ${deadline.overdue ? "overdue" : ""}"><time>${deadline.label}</time><small>${deadline.overdue ? "已逾期" : "排定時間"}</small></div>
+      <div class="deadline ${deadline.overdue ? "overdue" : ""}"><time>${deadline.label}</time><small>${stage === "closed" ? "原排定時間" : deadline.overdue ? "已逾期" : "排定時間"}</small></div>
       <div class="actions">
         ${formAction}
         ${decisionAction}
