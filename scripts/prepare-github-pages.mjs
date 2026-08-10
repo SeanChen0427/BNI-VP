@@ -85,6 +85,7 @@ for (const required of [
   'assets/js/auth.js',
   'assets/js/supabase-config.js',
   'assets/js/supabase-data.js',
+  'assets/images/fulian-favicon.png',
 ]) {
   if (!outputFiles.includes(required)) {
     throw new Error(`Missing required GitHub Pages asset: ${required}`);

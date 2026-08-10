@@ -77,6 +77,16 @@
   font-size:18px;
   font-weight:800;
 }
+img.workspace-menu-brand{
+  width:56px;
+  flex-basis:56px;
+  display:block;
+  object-fit:contain;
+  padding:4px 5px;
+  border:1px solid #ffffff26;
+  background:#f7f5f2;
+  box-shadow:0 8px 18px #0003;
+}
 .workspace-menu-head div{min-width:0}
 .workspace-menu-head strong,.workspace-menu-head small{display:block}
 .workspace-menu-head strong{font-size:14px}

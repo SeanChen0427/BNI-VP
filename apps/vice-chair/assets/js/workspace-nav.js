@@ -70,7 +70,7 @@
   drawer.setAttribute("aria-hidden", "true");
   drawer.innerHTML = `
     <div class="workspace-menu-head">
-      <span class="workspace-menu-brand">富</span>
+      <img class="workspace-menu-brand" src="assets/images/fulian-favicon.png" alt="富聯分會">
       <div><strong>富聯分會</strong><small>會員委員會工作台</small></div>
       <button class="workspace-menu-close" type="button" aria-label="關閉主選單">×</button>
     </div>
