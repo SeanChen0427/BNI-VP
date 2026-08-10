@@ -54,7 +54,7 @@
       digestFingerprint=item.sourceFingerprint||"";
       digestDirty=false;
     }
-    $("#workDigestTarget").textContent=target?`${target.displayName}・正式群`:"尚未指定正式會員委員會群";
+    $("#workDigestTarget").textContent=target?`${target.displayName}・${target.environment==="production"?"正式群":"測試群"}`:"尚未指定會員委員會群";
     $("#workDigestCounts").textContent=item.counts?`進行中 ${item.counts.active}・逾期 ${item.counts.overdue}・回饋 ${item.counts.feedback}・投票 ${item.counts.vote}`:"尚未取得案件資料";
     $("#workDigestGeneratedAt").textContent=formatDateTime(item.generatedAt);
     $("#workDigestPreview").textContent=`@所有人\n${message.value.trim()}`;
@@ -116,9 +116,9 @@
   };
   $("#sendWorkDigest").onclick=async()=>{
     const item=state.workDigest||{},target=item.target,content=$("#workDigestMessage").value.trim(),button=$("#sendWorkDigest");
-    if(!target)return toast("尚未指定正式會員委員會群");
+    if(!target)return toast("尚未指定會員委員會群");
     if(!content)return toast("請先產生工作進度預覽");
-    if(!confirm(`將上方完整預覽發送到正式群組「${target.displayName}」？\n\n訊息會真的 @所有人；只有確認後才會送出。`))return;
+    if(!confirm(`將上方完整預覽發送到${target.environment==="production"?"正式":"測試"}群組「${target.displayName}」？\n\n訊息會真的 @所有人；只有確認後才會送出。`))return;
     button.disabled=true;button.textContent="發送中…";
     try{const result=await api("POST",{action:"work_digest_send",content,sourceFingerprint:digestFingerprint});state=result.state;digestDirty=false;render();toast(result.message)}
     catch(error){toast(error.message)}finally{button.textContent="確認發送至委員會群";renderWorkDigest()}

@@ -577,11 +577,10 @@ async function buildCommitteeWorkDigestPreview() {
 async function committeeWorkDigestState(target: any) {
   const preview = await buildCommitteeWorkDigestPreview();
   const deliveries = await db("committee_work_digest_deliveries?select=status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=1");
-  const productionTarget = target?.purpose === "production" ? target : null;
   return {
     ...preview,
-    target: productionTarget ? publicLineTarget(productionTarget) : null,
-    ready: Boolean(lineAccessToken() && productionTarget),
+    target: target ? publicLineTarget(target) : null,
+    ready: Boolean(lineAccessToken() && target),
     delivery: publicCommitteeWorkDigestDelivery(deliveries?.[0]),
   };
 }
@@ -689,9 +688,9 @@ async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintI
   if (!content || [...content].length > 4500) throw new Error("工作進度文案必須為 1 至 4,500 字");
   const sourceFingerprint = String(sourceFingerprintInput || "");
   if (!/^[0-9a-f]{64}$/.test(sourceFingerprint)) throw new Error("工作進度預覽版本不正確，請重新產生");
-  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&purpose=eq.production&select=*&limit=1");
+  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1");
   const target = targets?.[0];
-  if (!target) throw Object.assign(new Error("尚未在後台指定正式會員委員會群"), { status: 409 });
+  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會群"), { status: 409 });
   const latest = await buildCommitteeWorkDigestPreview();
   if (latest.sourceFingerprint !== sourceFingerprint) {
     throw Object.assign(new Error("案件或分工已在其他裝置更新，請重新產生預覽後再發送"), { status: 409 });
