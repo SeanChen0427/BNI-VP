@@ -2,7 +2,7 @@ import { parsePalmsText, parseExpiryText, parseTenureText } from "../../../apps/
 import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysis/engine/audit.mjs";
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
-import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
+import { enrichPublishedMemberData, hasCompletePublishedMemberData, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
@@ -179,6 +179,13 @@ function monthWindow(offsetMonths: number, countMonths: number) {
   const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths + 1, 0));
   const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - countMonths + 1, 1));
   return { start: isoDay(start), end: isoDay(end), month: isoDay(start).slice(0, 7) };
+}
+
+function reportWindowEnding(periodEnd: string, countMonths: number) {
+  const end = new Date(`${periodEnd}T00:00:00Z`);
+  if (Number.isNaN(end.getTime())) throw new Error("分析快照期間不正確");
+  const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - countMonths + 1, 1));
+  return { start: isoDay(start), end: periodEnd };
 }
 
 function expectedAuditWeeks(start: string, end: string) {
@@ -2008,6 +2015,27 @@ async function latestPublished() {
   return rows?.[0] || null;
 }
 
+async function loadPublishedFormSources(periodStart: string, periodEnd: string) {
+  const imports = await reportImports();
+  const halfPeriod = { start: periodStart, end: periodEnd };
+  const annualPeriod = reportWindowEnding(periodEnd, 12);
+  const half = latestByCategory(imports, "halfYear", halfPeriod);
+  const annual = latestByCategory(imports, "annual", annualPeriod);
+  const tenure = latestByCategory(imports, "tenure");
+  const missing = [];
+  if (!half) missing.push(`半年 PALMS（${halfPeriod.start} 至 ${halfPeriod.end}）`);
+  if (!annual) missing.push(`一年 PALMS（${annualPeriod.start} 至 ${annualPeriod.end}）`);
+  if (!tenure) missing.push("會齡報告");
+  if (missing.length) throw new Error(`正式續約資料尚未完整：請先上傳${missing.join("、")}`);
+  const [halfText, annualText, tenureText] = await Promise.all([downloadReport(half), downloadReport(annual), downloadReport(tenure)]);
+  const halfReport = parsePalmsText(halfText, half.storage_path);
+  const annualReport = parsePalmsText(annualText, annual.storage_path);
+  const tenureReport = parseTenureText(tenureText, tenure.storage_path);
+  if (halfReport.period.start !== halfPeriod.start || halfReport.period.end !== halfPeriod.end) throw new Error("半年 PALMS 期間與已發布分析不一致");
+  if (annualReport.period.start !== annualPeriod.start || annualReport.period.end !== annualPeriod.end) throw new Error("一年 PALMS 期間與已發布分析不一致");
+  return { halfReport, annualReport, tenureReport };
+}
+
 async function aiChatApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
@@ -2040,8 +2068,11 @@ async function loadEngineSources() {
   if (!expiry) missing.push("會員到期日報告");
   if (!tenure) missing.push("會齡報告");
   if (missing.length) throw new Error(`正式分析資料尚未完整：請先上傳${missing.join("、")}`);
-  const [halfText, expiryText, tenureText] = await Promise.all([downloadReport(half), downloadReport(expiry), downloadReport(tenure)]);
-  const annual = parsePalmsText(await downloadReport(annualRow), annualRow.storage_path);
+  const [halfText, expiryText, tenureText, annualText] = await Promise.all([downloadReport(half), downloadReport(expiry), downloadReport(tenure), downloadReport(annualRow)]);
+  const halfReport = parsePalmsText(halfText, half.storage_path);
+  const expiryReport = parseExpiryText(expiryText, expiry.storage_path);
+  const tenureReport = parseTenureText(tenureText, tenure.storage_path);
+  const annual = parsePalmsText(annualText, annualRow.storage_path);
   const allAuditRows = imports.filter((row: any) => reportCategory(row) === "audit" && auditDate(row));
   const auditRows = allAuditRows.filter((row: any) => {
     const date = auditDate(row);
@@ -2075,9 +2106,9 @@ async function loadEngineSources() {
   const sources = [half, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   return {
     engine: buildAnalysisFromParsed({
-      palms: parsePalmsText(halfText, half.storage_path),
-      expiry: parseExpiryText(expiryText, expiry.storage_path),
-      tenure: parseTenureText(tenureText, tenure.storage_path),
+      palms: halfReport,
+      expiry: expiryReport,
+      tenure: tenureReport,
       departed,
       annual,
       auditMonth: combineAuditWeeks(audits),
@@ -2086,7 +2117,27 @@ async function loadEngineSources() {
       midtermCompletions,
       sources,
     }),
+    formSources: { halfReport, annualReport: annual, tenureReport },
   };
+}
+
+async function analysisSnapshotApi(request: Request, context: Context) {
+  if (request.method !== "GET") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const published = await latestPublished();
+  if (!published?.snapshot) throw Object.assign(new Error("Supabase 尚無已發佈的 BNI 分析資料"), { status: 503 });
+  if (hasCompletePublishedMemberData(published.snapshot)) return published.snapshot;
+  const formSources = await loadPublishedFormSources(published.period_start, published.period_end);
+  const enriched = enrichPublishedMemberData({ members: published.snapshot.members || [], ...formSources });
+  const repairedAt = new Date().toISOString();
+  const snapshot = { ...published.snapshot, ...enriched, memberData: { ...enriched.memberData, repairedAt } };
+  if (["admin", "vp"].includes(context.role)) {
+    await db(`analysis_snapshots?id=eq.${published.id}&is_published=eq.true`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ snapshot, member_count: snapshot.members.length }),
+    });
+  }
+  return snapshot;
 }
 
 const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告，結尾標注本報告為草稿，需副主席確認後才正式發佈。";
@@ -2102,6 +2153,10 @@ function assertAnalysisReconciled(engine: any) {
   if (engine?.aborted || blocking.length) {
     throw Object.assign(new Error("對帳未通過，未產生草稿（先對帳，後分析）"), { status: 409, issues });
   }
+}
+
+function analysisSourceFingerprint(engine: any) {
+  return JSON.stringify((engine?.meta?.sources || []).map((source: any) => [source.path, source.sha256 || null]).sort((left: any, right: any) => String(left[0]).localeCompare(String(right[0]))));
 }
 
 async function analysisDraftApi(request: Request, context: Context) {
@@ -2212,6 +2267,11 @@ async function analysisDraftApi(request: Request, context: Context) {
   if (body.action === "publish") {
     assertAnalysisReconciled(draft.engine);
     if (!draft.aiReview) throw new Error("尚未執行 AI 審視，請先完成審視再發佈");
+    const currentSources = await loadEngineSources();
+    assertAnalysisReconciled(currentSources.engine);
+    if (analysisSourceFingerprint(currentSources.engine) !== analysisSourceFingerprint(draft.engine)) {
+      throw Object.assign(new Error("正式報表已在分析草稿產生後更新，請重新產出草稿再發佈"), { status: 409 });
+    }
     const history = await db("analysis_snapshots?is_published=eq.true&select=id");
     const version = history.length + 1;
     const html = renderDashboard({ engine: draft.engine, aiReview: draft.aiReview, version, publishedAt: new Date().toISOString() });
@@ -2230,6 +2290,9 @@ async function analysisDraftApi(request: Request, context: Context) {
         light: member.light === "green" ? "綠燈" : member.light === "yellow" ? "黃燈" : member.light === "red" ? "紅燈" : "黑燈",
       };
     });
+    const publishedMemberData = enrichPublishedMemberData({ members: snapshot.members, ...currentSources.formSources });
+    snapshot.members = publishedMemberData.members;
+    snapshot.memberData = publishedMemberData.memberData;
     snapshot.analysisReview = draft.aiReview;
     snapshot.publishedVersion = version;
     await db("analysis_snapshots", {
@@ -3432,6 +3495,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/member-departure") result = await memberDepartureApi(request, context);
     else if (path === "/api/ai-settings") result = await aiSettingsApi(request, context);
     else if (path === "/api/ai-chat") result = await aiChatApi(request, context);
+    else if (path === "/api/analysis-snapshot") result = await analysisSnapshotApi(request, context);
     else if (path === "/api/analysis-draft") result = await analysisDraftApi(request, context);
     else if (path === "/api/analysis-snapshots") result = await analysisSnapshotsApi(context);
     else if (path === "/api/tasks") result = await tasksApi(request, context);

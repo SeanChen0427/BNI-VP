@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {parseBniDashboard,parsePalmsReport,latestVersionedName,BRIDGE_SCHEMA} from "../bni-bridge.mjs";
+import {enrichPublishedMemberData,hasCompletePublishedMemberData,parseBniDashboard,parsePalmsReport,latestVersionedName,BRIDGE_SCHEMA} from "../bni-bridge.mjs";
 import {buildMemberDetails} from "../bni-bridge.mjs";
 
 test("converts dashboard into versioned bridge snapshot",()=>{
@@ -52,4 +52,25 @@ test("reads the exact PALMS period and official attendance fields",()=>{
   assert.equal(report.members[0].metrics.absence,0);
   assert.equal(report.members[0].metrics.late,0);
   assert.equal(report.members[0].metrics.substitutes,0);
+});
+
+test("published snapshot keeps complete annual PALMS and chapter averages for renewal forms",()=>{
+  const raw=(name,givenIn,givenOut,receivedIn,receivedOut,amount)=>({
+    name,present:20,absent:1,late:2,medical:0,substitute:3,refGivenInternal:givenIn,refGivenExternal:givenOut,
+    refReceivedInternal:receivedIn,refReceivedExternal:receivedOut,visitors:4,oneToOne:30,tyfcb:amount,ceu:12
+  });
+  const result=enrichPublishedMemberData({
+    members:[{name:"測試甲",score:80,profession:"甲業"},{name:"測試乙",score:70,profession:"乙業"}],
+    halfReport:{period:{start:"2026-02-01",end:"2026-07-31"},members:[raw("測試甲",5,6,7,8,100000),raw("測試乙",1,2,3,4,200000)]},
+    annualReport:{period:{start:"2025-08-01",end:"2026-07-31"},members:[raw("測試甲",10,20,30,40,300000),raw("測試乙",20,30,40,50,500000)]},
+    tenureReport:{members:[{name:"測試甲",cumulativeStart:"2025-01-01"},{name:"測試乙",cumulativeStart:"2025-02-01"}]}
+  });
+  assert.equal(result.members[0].activation,"2025-01-01");
+  assert.equal(result.members[0].metrics.receivedOut,8);
+  assert.equal(result.members[0].annualMetrics.receivedOut,40);
+  assert.equal(result.memberData.averages.givenIn,15);
+  assert.equal(result.memberData.averages.receivedOut,45);
+  assert.equal(result.memberData.averages.amount,400000);
+  assert.equal(hasCompletePublishedMemberData(result),true);
+  assert.throws(()=>enrichPublishedMemberData({members:[{name:"缺資料"}],halfReport:{members:[]},annualReport:{members:[]},tenureReport:{members:[]}}),/正式續約資料對帳失敗/);
 });

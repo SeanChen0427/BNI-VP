@@ -8,13 +8,18 @@
   document.querySelector("#counselor").value=currentTask?.lead||session.name;document.querySelector("#interviewer").value=currentTask?.lead||session.name;
   const committee=[config.vpName,...config.committee];document.querySelector("#committeeList").innerHTML=[...new Set(committee)].map(name=>`<option value="${name}"></option>`).join("");
   try{
-    const response=await fetch("/api/bni-analysis",{cache:"no-store"});if(!response.ok)throw new Error(`HTTP ${response.status}`);const snapshot=await response.json();
+    const response=await fetch("/api/analysis-snapshot",{cache:"no-store"});const snapshot=await response.json().catch(()=>({}));if(!response.ok)throw new Error(snapshot.message||`HTTP ${response.status}`);
     const metric=value=>Number(value)||0,normalize=(value={})=>({givenIn:metric(value.givenIn),givenOut:metric(value.givenOut),receivedIn:metric(value.receivedIn),receivedOut:metric(value.receivedOut),amount:metric(value.amount),visitors:metric(value.visitors),oneToOne:metric(value.oneToOne),late:metric(value.late),early:0,substitutes:metric(value.substitutes),education:metric(value.education)});
-    const loaded=(snapshot.members||[]).map(item=>({name:item.name,profession:item.profession||"",activation:item.activation||"2026-01-01",score:item.score,metrics:normalize(item.annualMetrics||item.metrics)})).filter(item=>item.name&&Number.isFinite(item.score));
+    const requiredMetrics=["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"];
+    const complete=value=>value&&requiredMetrics.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
+    const sourceMembers=Array.isArray(snapshot.members)?snapshot.members:[];
+    if(!sourceMembers.length||sourceMembers.some(item=>!item.name||!Number.isFinite(item.score)||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.activation||""))||!complete(item.annualMetrics)))throw new Error("正式分析快照缺少完整年度 PALMS，系統已停止顯示 0 值");
+    if(!complete(snapshot.memberData?.averages))throw new Error("正式分析快照缺少分會平均，系統已停止顯示 0 值");
+    const loaded=sourceMembers.map(item=>({name:item.name,profession:item.profession||"",activation:item.activation,score:item.score,metrics:normalize(item.annualMetrics)}));
     if(!loaded.length)throw new Error("沒有可用的正式會員資料");
     if(!loaded.some(item=>item.name===currentTask.member))throw new Error(`案件會員「${currentTask.member}」不在正式會員資料`);
     const preservedDraft=serialize();
-    members=loaded;averages={...averages,...normalize(snapshot.memberData?.averages||{})};
+    members=loaded;averages={...averages,...normalize(snapshot.memberData.averages)};
     document.querySelector("#memberList").innerHTML=members.map(item=>`<option value="${item.name}">${item.profession}</option>`).join("");
     restore({...preservedDraft,member:currentTask.member,memberSearch:currentTask.member});
     const search=document.querySelector("#memberSearch");search.readOnly=true;search.title="會員已由優先處理案件帶入";
@@ -23,5 +28,5 @@
     document.querySelector("#companionCounselor").value=(currentTask.companions||[]).join("、");document.querySelector("#memberSignature").value=currentTask.member;document.querySelector("#saveTime").textContent="已由優先處理案件自動帶入";
     await window.FulianCaseStateStore.reconcileDraft(currentTask,{member:currentTask.member,...(currentTask.scheduledAt?{meetingDate:currentTask.scheduledAt}:{}),companionCounselor:(currentTask.companions||[]).join("、"),memberSignature:currentTask.member});
     document.querySelector("#terminalForm").hidden=false;
-  }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#terminalForm").hidden=true;toast(error.message||"正式會員資料載入失敗，請重新整理")}
+  }catch(error){console.error("正式會員資料載入失敗",error);document.querySelector("#terminalForm").hidden=true;document.querySelector("#saveState").textContent=error.message||"正式會員資料載入失敗";document.querySelector("#saveTime").textContent="本機草稿未修改，請重新整理後再試";toast(error.message||"正式會員資料載入失敗，請重新整理")}
 })();

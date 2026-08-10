@@ -117,9 +117,48 @@ function tenureDates(xml){
   }
   return map;
 }
-function averageMetrics(members){
-  const keys=["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"],count=Math.max(members.length,1);
-  return Object.fromEntries(keys.map(key=>[key,Math.round(members.reduce((sum,item)=>sum+numeric(item.annualMetrics?.[key]),0)/count)]));
+export const PUBLISHED_FORM_METRIC_KEYS=Object.freeze(["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"]);
+function normalizedPalmsMetrics(source={}){
+  return{
+    attendance:numeric(source.present??source.attendance),absence:numeric(source.absent??source.absence),late:numeric(source.late),sick:numeric(source.medical??source.sick),
+    substitutes:numeric(source.substitute??source.substitutes),givenIn:numeric(source.refGivenInternal??source.givenIn),givenOut:numeric(source.refGivenExternal??source.givenOut),
+    receivedIn:numeric(source.refReceivedInternal??source.receivedIn),receivedOut:numeric(source.refReceivedExternal??source.receivedOut),visitors:numeric(source.visitors),
+    oneToOne:numeric(source.oneToOne),amount:numeric(source.tyfcb??source.amount),education:numeric(source.ceu??source.education)
+  };
+}
+export function averageMetrics(members){
+  const count=Math.max(members.length,1);
+  return Object.fromEntries(PUBLISHED_FORM_METRIC_KEYS.map(key=>[key,Math.round(members.reduce((sum,item)=>sum+numeric(item.annualMetrics?.[key]),0)/count)]));
+}
+export function hasCompletePublishedMemberData(snapshot={}){
+  const members=Array.isArray(snapshot.members)?snapshot.members:[],averages=snapshot.memberData?.averages;
+  const complete=value=>value&&PUBLISHED_FORM_METRIC_KEYS.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
+  return members.length>0&&snapshot.memberData?.count===members.length&&complete(averages)
+    &&members.every(member=>member?.name&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.activation||""))&&complete(member.annualMetrics));
+}
+export function enrichPublishedMemberData({members=[],halfReport={},annualReport={},tenureReport={}}={}){
+  const byName=(rows=[])=>new Map(rows.map(item=>[normalizeName(item.name),item]));
+  const halfByName=byName(halfReport.members),annualByName=byName(annualReport.members),tenureByName=byName(tenureReport.members);
+  const missing=[];
+  const enriched=members.map(member=>{
+    const name=normalizeName(member.name),half=halfByName.get(name),annual=annualByName.get(name),tenure=tenureByName.get(name);
+    const absent=[];
+    if(!half)absent.push("半年 PALMS");if(!annual)absent.push("一年 PALMS");if(!tenure?.cumulativeStart)absent.push("會齡");
+    if(absent.length){missing.push(`${name}（${absent.join("、")}）`);return null}
+    return{...member,name,activation:tenure.cumulativeStart,metrics:normalizedPalmsMetrics(half),annualMetrics:normalizedPalmsMetrics(annual)};
+  });
+  if(missing.length)throw new Error(`正式續約資料對帳失敗：${missing.join("；")}`);
+  const complete=enriched.filter(Boolean);
+  return{
+    members:complete,
+    memberData:{
+      count:complete.length,
+      averages:averageMetrics(complete),
+      metricsPeriod:halfReport.period||null,
+      annualMetricsPeriod:annualReport.period||null,
+      memberMetricsMode:"formal-palms-read-only"
+    }
+  };
 }
 
 export function latestVersionedName(names,pattern){

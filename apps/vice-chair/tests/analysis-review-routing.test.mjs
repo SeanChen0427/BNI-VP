@@ -45,6 +45,16 @@ test("正式分析只接受本期半年、全年及審計報表", () => {
   assert.doesNotMatch(edgeSource, /latestByCategory\(imports, "halfYear"\) \|\|/);
 });
 
+test("正式快照提供續約表單完整年度資料並可安全修復舊快照", () => {
+  assert.match(edgeSource, /enrichPublishedMemberData, hasCompletePublishedMemberData, parseBniDashboard/);
+  assert.match(edgeSource, /async function analysisSnapshotApi\(request: Request, context: Context\)/);
+  assert.match(edgeSource, /loadPublishedFormSources\(published\.period_start, published\.period_end\)/);
+  assert.match(edgeSource, /if \(\["admin", "vp"\]\.includes\(context\.role\)\)/);
+  assert.match(edgeSource, /snapshot\.memberData = publishedMemberData\.memberData/);
+  assert.match(edgeSource, /path === "\/api\/analysis-snapshot"/);
+  assert.match(edgeSource, /正式報表已在分析草稿產生後更新，請重新產出草稿再發佈/);
+});
+
 test("已由副主席確認的離會者不再成為後續對帳差異", () => {
   const input = {
     palms: { period: { start: "2026-02-01", end: "2026-07-31" }, members: [{ name: "測試現任", present: 1, absent: 0, late: 0, medical: 0, substitute: 0 }] },
