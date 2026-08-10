@@ -18,6 +18,7 @@
 | `fulian-vp-course-v2` | 新課程進度 | `assets/js/app-v2.js` |
 | `fulian-vp-course-v1` | 舊課程封存資料，正式頁面不再讀取 | `archive/legacy/app.js` |
 | `fulian-notification-read-v1-*` | 個人已讀通知 | `assets/js/notification-center.js` |
+| `fulian-release-notes-read-v1-{role}-{name}` | 目前登入身份最後確認的使用者版版本號；不含更新全文或業務資料 | `assets/js/release-notes.js` |
 
 案件 Key 與階段的程式唯一來源是 `core/case-domain.js`。
 

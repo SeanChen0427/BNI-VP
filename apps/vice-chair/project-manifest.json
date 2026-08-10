@@ -34,6 +34,7 @@
     "weeklyAttendanceReconciliation": "core/attendance-domain.js",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
     "lineCommitteeWorkDigest": "supabase/functions/_shared/committee-work-digest.mjs",
+    "userFacingReleaseNotes": "assets/js/release-notes.js",
     "lineCaseVoteNotice": "supabase/functions/app-api/line-message.mjs",
     "lineCaseResultAnnouncement": "supabase/functions/app-api/line-message.mjs",
     "votingAndRecusal": [
@@ -58,7 +59,7 @@
     "industry-change-form.html": "轉換行業別訪談",
     "departure-form.html": "離會訪談",
     "course.html": "副主席交接課程",
-    "settings.html": "角色、人員、帳密與個人 AI 設定",
+    "settings.html": "角色、人員、帳密、個人 AI 與使用者版更新紀錄",
     "login.html": "原型登入"
   },
   "nonNegotiableRules": [

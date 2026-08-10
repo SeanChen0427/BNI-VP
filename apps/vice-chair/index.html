@@ -23,6 +23,7 @@
   <link rel="stylesheet" href="assets/css/priority-work.css?v=1">
   <link rel="stylesheet" href="assets/css/announcement-board.css?v=1">
   <link rel="stylesheet" href="assets/css/notification-center.css?v=1">
+  <link rel="stylesheet" href="assets/css/release-notes.css?v=1">
   <link rel="stylesheet" href="assets/css/monthly-data-update.css?v=1">
   <link rel="stylesheet" href="assets/css/ai-assistant.css?v=1">
   <style>.committee-only,.strict-vp-only{display:none}.committee-mode .committee-only,.vp-mode .strict-vp-only{display:block}</style>
@@ -59,7 +60,7 @@
     </aside>
 
     <main class="workspace">
-      <header class="topbar"><button class="menu-button" id="openMenu" aria-label="開啟選單">☰</button><div class="page-heading"><small>富聯分會・會員委員會</small><strong>工作總覽</strong></div><div class="top-actions"><span class="demo-badge">準備就緒</span><label class="role-switch">登入身份 <b data-auth-name></b>・<span data-auth-role></span></label><button class="notice" id="notificationBell" type="button" aria-label="開啟通知中心" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><span id="notificationCount" hidden>0</span></button><aside class="notification-panel" id="notificationPanel" hidden><div class="notification-head"><div><small>NOTIFICATION CENTER</small><strong>提醒中心</strong></div><button type="button" id="markAllNotificationsRead">全部已讀</button></div><div class="notification-list" id="notificationList"></div></aside></div></header>
+      <header class="topbar"><button class="menu-button" id="openMenu" aria-label="開啟選單">☰</button><div class="page-heading"><small>富聯分會・會員委員會</small><strong>工作總覽</strong></div><div class="top-actions"><button class="release-trigger" id="releaseNotesTrigger" type="button"><span class="release-trigger-new" id="releaseNotesNew">NEW</span><b id="releaseNotesVersion">v—</b></button><label class="role-switch">登入身份 <b data-auth-name></b>・<span data-auth-role></span></label><button class="notice" id="notificationBell" type="button" aria-label="開啟通知中心" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><span id="notificationCount" hidden>0</span></button><aside class="notification-panel" id="notificationPanel" hidden><div class="notification-head"><div><small>NOTIFICATION CENTER</small><strong>提醒中心</strong></div><button type="button" id="markAllNotificationsRead">全部已讀</button></div><div class="notification-list" id="notificationList"></div></aside></div></header>
       <div class="content">
         <section class="month-hero"><div><span class="eyebrow" id="monthEyebrow">MONTHLY COMMAND CENTER</span><h1 id="monthTitle">本月會員狀態與工作規劃</h1><p>先處理期限與會員案件，再掌握本週例會準備。從排定第一件工作開始建立本月進度。</p></div><div class="hero-summary"><div><small id="heroPendingLabel">本月待完成</small><strong id="monthPendingCount">0</strong><span>項工作</span></div><div class="warning"><small id="heroDueLabel">3日內到期</small><strong id="monthDueCount">0</strong><span>項工作</span></div><div><small id="heroDoneLabel">本月已完成</small><strong id="monthDoneCount">0</strong><span>項工作</span></div></div></section>
         <section class="panel announcement-board" aria-labelledby="announcementTitle">
@@ -107,6 +108,17 @@
     <div class="ai-suggestions" id="aiSuggestions"><button type="button">續約流程怎麼走？</button><button type="button">缺席幾次會開放專業別？</button><button type="button">新會員訪談後要做什麼？</button></div>
     <form id="aiChatForm"><textarea id="aiChatInput" rows="2" maxlength="600" placeholder="輸入你的問題…" required></textarea><footer><span>送出後會使用你的 API 額度</span><button type="submit" id="aiChatSend">送出</button></footer></form>
   </aside>
+  <dialog class="release-dialog" id="releaseNotesDialog" aria-labelledby="releaseDialogTitle">
+    <div class="release-dialog-card">
+      <header class="release-dialog-head"><div><small>SYSTEM UPDATE</small><h2>系統版本更新</h2></div><button type="button" class="release-dialog-close" id="closeReleaseNotes" aria-label="關閉更新內容">×</button></header>
+      <div class="release-dialog-meta"><b id="releaseDialogVersion">v—</b><time id="releaseDialogDate"></time></div>
+      <h3 id="releaseDialogTitle"></h3>
+      <ul id="releaseDialogChanges"></ul>
+      <p class="release-dialog-impact" id="releaseDialogImpact"></p>
+      <footer class="release-dialog-actions"><a href="settings.html#releaseNotes">查看完整更新紀錄</a><button type="button" id="acknowledgeRelease">我知道了</button></footer>
+    </div>
+  </dialog>
+  <script src="assets/js/release-notes.js?v=1"></script>
   <script src="assets/js/dashboard.js?v=5"></script>
   <script src="assets/js/work-planner.js?v=9"></script>
   <script src="assets/js/announcement-board.js?v=1"></script>
