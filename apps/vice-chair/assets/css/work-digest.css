@@ -1,0 +1,135 @@
+.work-digest-card {
+  margin-top: 18px;
+  margin-bottom: 18px;
+}
+
+.digest-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.digest-meta > div {
+  display: grid;
+  gap: 3px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #faf9f7;
+}
+
+.digest-meta small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.digest-meta strong {
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.digest-editor {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.digest-editor textarea {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 14px;
+  border: 1px solid #dcd6d0;
+  border-radius: 12px;
+  background: #fff;
+  font: 500 13px/1.75 "Noto Sans TC", sans-serif;
+  resize: vertical;
+}
+
+.digest-preview pre {
+  max-height: 520px;
+  overflow: auto;
+}
+
+.digest-safety {
+  margin: 0 0 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.digest-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.digest-actions button {
+  min-height: 42px;
+  padding: 10px 15px;
+  border-radius: 10px;
+  font: 700 12px "Noto Sans TC", sans-serif;
+  cursor: pointer;
+}
+
+.digest-actions button:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  border: 1px solid #d9a5a8;
+  background: #fff;
+  color: var(--red);
+}
+
+.primary-button {
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: #fff;
+}
+
+.digest-delivery {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f5f1ed;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.digest-delivery.sent {
+  background: #edf7f1;
+  color: var(--green);
+}
+
+.digest-delivery.failed {
+  background: #fff0f0;
+  color: var(--red);
+}
+
+@media (max-width: 700px) {
+  .digest-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .digest-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .digest-actions button {
+    width: 100%;
+    min-height: 48px;
+  }
+
+  .digest-editor textarea {
+    min-height: 330px;
+    font-size: 16px;
+  }
+
+  .digest-preview pre {
+    max-height: 340px;
+  }
+}

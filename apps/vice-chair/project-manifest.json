@@ -33,6 +33,7 @@
     "monthlyMeetingCareAssignments": "core/monthly-meeting-domain.js",
     "weeklyAttendanceReconciliation": "core/attendance-domain.js",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
+    "lineCommitteeWorkDigest": "supabase/functions/_shared/committee-work-digest.mjs",
     "lineCaseVoteNotice": "supabase/functions/app-api/line-message.mjs",
     "lineCaseResultAnnouncement": "supabase/functions/app-api/line-message.mjs",
     "votingAndRecusal": [

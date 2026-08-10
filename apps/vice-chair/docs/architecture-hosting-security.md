@@ -53,6 +53,7 @@ BNI 分析工具
 | 完整分析交換檔 | 私人 Storage 或登入後即時 API | 不得部署為公開 JSON |
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |
 | LINE 群組目標與點名公告發送紀錄 | PostgreSQL：`line_group_targets`、`attendance_line_deliveries` | 只由 Edge Function/service role 讀寫；前端只取得去識別狀態與群組顯示名稱 |
+| 每週委員工作進度發送稽核 | PostgreSQL：`committee_work_digest_deliveries` | 只由 Edge Function/service role 讀寫；不保存完整文案，只保存來源／文案雜湊與發送結果 |
 | 個人 AI API Key | 後端加密欄位／Vault（按使用者隔離） | 前端只讀取綁定狀態與末四碼；完整 Key 不可讀回 |
 | 富聯共用系統 Secret（若未來需要） | Supabase Edge Function Secrets | 前端與資料庫一般角色不可讀取 |
 | 正式帳號與密碼 | Supabase Auth | 系統不得保存明碼密碼 |

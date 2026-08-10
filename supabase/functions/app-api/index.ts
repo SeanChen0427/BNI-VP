@@ -15,6 +15,7 @@ import {
   lineAttendanceFingerprintSource,
 } from "./line-message.mjs";
 import { LINE_REMINDER_KEYS, nextRuleOccurrence, reminderRouteKey, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
+import { buildCommitteeWorkDigest } from "../_shared/committee-work-digest.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -522,6 +523,69 @@ function publicLineReminderDelivery(row: any) {
   };
 }
 
+function publicCommitteeWorkDigestDelivery(row: any) {
+  if (!row) return null;
+  return {
+    status: row.status,
+    requestedAt: row.requested_at,
+    sentAt: row.sent_at,
+    failedAt: row.failed_at,
+    errorMessage: row.error_message || "",
+  };
+}
+
+async function buildCommitteeWorkDigestPreview() {
+  const [taskRows, assignments, stateRows, people] = await Promise.all([
+    db(`tasks?source=eq.${TASK_SOURCE}&status=in.(pending,in_progress)&select=id,source_reference,category,title,due_at,lead_person_id,revision,result_summary&order=due_at.asc.nullslast`),
+    db("task_assignments?select=task_id,person_id,role&order=assigned_at.asc"),
+    db("task_case_states?select=task_id,workflow,revision"),
+    db("people?select=id,display_name"),
+  ]);
+  const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
+  const assignmentsByTask = new Map<string, any[]>();
+  for (const assignment of assignments || []) {
+    if (!assignmentsByTask.has(assignment.task_id)) assignmentsByTask.set(assignment.task_id, []);
+    assignmentsByTask.get(assignment.task_id)!.push(assignment);
+  }
+  const stateByTask = new Map((stateRows || []).map((row: any) => [row.task_id, row]));
+  const tasks = (taskRows || []).map((row: any) => {
+    const meta: any = parseTaskJson(row.result_summary);
+    const assigned = assignmentsByTask.get(row.id) || [];
+    const state = stateByTask.get(row.id) || {};
+    return {
+      id: row.source_reference,
+      type: row.category,
+      member: row.title,
+      dueAt: meta.scheduledAt || row.due_at || "",
+      lead: names.get(row.lead_person_id) || "",
+      companions: assigned.filter((item: any) => item.role === "companion")
+        .map((item: any) => names.get(item.person_id)).filter(Boolean),
+      revision: Number(row.revision || 0),
+      workflowRevision: Number(state.revision || 0),
+      workflow: state.workflow || {},
+    };
+  });
+  const digest = buildCommitteeWorkDigest(tasks);
+  return {
+    content: digest.content,
+    counts: digest.counts,
+    sourceFingerprint: await sha256Text(digest.source),
+    generatedAt: new Date().toISOString(),
+  };
+}
+
+async function committeeWorkDigestState(target: any) {
+  const preview = await buildCommitteeWorkDigestPreview();
+  const deliveries = await db("committee_work_digest_deliveries?select=status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=1");
+  const productionTarget = target?.purpose === "production" ? target : null;
+  return {
+    ...preview,
+    target: productionTarget ? publicLineTarget(productionTarget) : null,
+    ready: Boolean(lineAccessToken() && productionTarget),
+    delivery: publicCommitteeWorkDigestDelivery(deliveries?.[0]),
+  };
+}
+
 async function lineRemindersState() {
   const [rules, targets, deliveries] = await Promise.all([
     db("line_reminder_rules?select=*&order=reminder_key.asc"),
@@ -529,6 +593,7 @@ async function lineRemindersState() {
     db("line_reminder_deliveries?select=reminder_key,trigger_source,local_due_date,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
   ]);
   const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, publicLineTarget(target)]));
+  const workDigest = await committeeWorkDigestState((targets || []).find((target: any) => target.route_key === "committee") || null);
   return {
     configured: Boolean(lineAccessToken()),
     schedulerReady: Boolean(Deno.env.get("LINE_REMINDER_CRON_SECRET")),
@@ -539,6 +604,7 @@ async function lineRemindersState() {
     },
     rules: (rules || []).map(publicLineReminderRule),
     deliveries: (deliveries || []).map(publicLineReminderDelivery),
+    workDigest,
   };
 }
 
@@ -548,6 +614,117 @@ async function finishLineReminderDelivery(deliveryId: string, patch: any) {
     headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify(patch),
   });
+}
+
+async function finishCommitteeWorkDigestDelivery(deliveryId: string, patch: any) {
+  await db(`committee_work_digest_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function beginCommitteeWorkDigestDelivery(target: any, sourceHash: string, messageHash: string, context: Context) {
+  const localDate = taipeiDay();
+  const existingRows = await db(
+    `committee_work_digest_deliveries?group_target_id=eq.${target.id}`
+      + `&local_due_date=eq.${localDate}&message_sha256=eq.${messageHash}&select=*&limit=1`,
+  );
+  const existing = existingRows?.[0];
+  if (existing?.status === "sent") {
+    throw Object.assign(new Error("今天相同內容的工作進度已送達，系統已阻擋重複發送"), { status: 409 });
+  }
+  if (existing?.status === "processing" && Date.now() - new Date(existing.requested_at).getTime() < 5 * 60 * 1000) {
+    throw Object.assign(new Error("工作進度正在發送，請勿重複操作"), { status: 409 });
+  }
+  const now = new Date().toISOString();
+  if (existing) {
+    const updated = await db(`committee_work_digest_deliveries?id=eq.${existing.id}&status=neq.sent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        source_sha256: sourceHash,
+        status: "processing",
+        attempt_count: Number(existing.attempt_count || 0) + 1,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+        sent_at: null,
+        failed_at: null,
+        line_request_id: null,
+        line_message_id: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+    if (!updated?.[0]) throw Object.assign(new Error("工作進度發送狀態已更新，請重新整理"), { status: 409 });
+    return updated[0];
+  }
+  try {
+    const inserted = await db("committee_work_digest_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        group_target_id: target.id,
+        local_due_date: localDate,
+        source_sha256: sourceHash,
+        message_sha256: messageHash,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+      }),
+    });
+    return inserted[0];
+  } catch (error) {
+    if (String((error as Error)?.message || error).includes("duplicate key")) {
+      throw Object.assign(new Error("工作進度正在發送或已送達，請勿重複操作"), { status: 409 });
+    }
+    throw error;
+  }
+}
+
+async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintInput: unknown, context: Context) {
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  const content = String(contentInput || "").trim();
+  if (!content || [...content].length > 4500) throw new Error("工作進度文案必須為 1 至 4,500 字");
+  const sourceFingerprint = String(sourceFingerprintInput || "");
+  if (!/^[0-9a-f]{64}$/.test(sourceFingerprint)) throw new Error("工作進度預覽版本不正確，請重新產生");
+  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&purpose=eq.production&select=*&limit=1");
+  const target = targets?.[0];
+  if (!target) throw Object.assign(new Error("尚未在後台指定正式會員委員會群"), { status: 409 });
+  const latest = await buildCommitteeWorkDigestPreview();
+  if (latest.sourceFingerprint !== sourceFingerprint) {
+    throw Object.assign(new Error("案件或分工已在其他裝置更新，請重新產生預覽後再發送"), { status: 409 });
+  }
+  const messageHash = await sha256Text(`committee-work-digest-text-v2-v1\n${content}`);
+  const delivery = await beginCommitteeWorkDigestDelivery(target, sourceFingerprint, messageHash, context);
+  const message = buildLineMentionAllMessage(content);
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
+      body: JSON.stringify({ to: target.line_group_id, messages: [message] }),
+    });
+  } catch (error) {
+    const errorMessage = String((error as Error)?.message || error).slice(0, 1000);
+    await finishCommitteeWorkDigestDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: errorMessage });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${errorMessage}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const errorMessage = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishCommitteeWorkDigestDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: `HTTP_${response.status}`, error_message: errorMessage });
+    throw Object.assign(new Error(`LINE 工作進度發送失敗：${errorMessage}`), { status: 502 });
+  }
+  await finishCommitteeWorkDigestDelivery(delivery.id, {
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  return { message: `工作進度已發送到「${target.display_name}」`, state: await lineRemindersState() };
 }
 
 async function findCaseVoteLineDelivery(task: any, snapshot: any, target: any, messageHash: string) {
@@ -771,6 +948,7 @@ async function lineRemindersApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   if (body.action === "test") return sendLineReminderTest(String(body.reminderKey || ""), context);
+  if (body.action === "work_digest_send") return sendCommitteeWorkDigest(body.content, body.sourceFingerprint, context);
   if (body.action !== "save") throw new Error("常態通知操作不正確");
   if (!Array.isArray(body.rules) || body.rules.length !== LINE_REMINDER_KEYS.length) throw new Error("提醒設定不完整");
   const submittedKeys = new Set(body.rules.map((rule: any) => String(rule?.reminderKey || "")));

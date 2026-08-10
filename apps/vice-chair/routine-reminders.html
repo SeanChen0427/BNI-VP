@@ -12,14 +12,15 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/terminal-form.css">
-  <link rel="stylesheet" href="assets/css/routine-reminders.css?v=1">
+  <link rel="stylesheet" href="assets/css/routine-reminders.css?v=2">
+  <link rel="stylesheet" href="assets/css/work-digest.css?v=1">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=2">
-  <link rel="stylesheet" href="assets/css/routine-reminders-mobile.css?v=3">
+  <link rel="stylesheet" href="assets/css/routine-reminders-mobile.css?v=4">
 </head>
 <body>
   <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・LINE 常態通知</span></div><label>目前登入身份<input id="loginIdentity" readonly></label></header>
   <main>
-    <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>LINE 常態通知</h1><p>管理交流群與會員委員會群的固定提醒、文案及測試發送；每種通知只會送到後台指定的正確群組。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
+    <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>LINE 常態通知</h1><p>管理交流群與會員委員會群的固定提醒，並可先預覽每週委員工作進度再確認發送。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
 
     <section class="form-card target-card">
       <div class="section-head"><span>01</span><div><h2>通知群組連線</h2><p>系統依通知類型固定選擇交流群或會員委員會群，不會讓前台臨時指定其他群組</p></div></div>
@@ -63,13 +64,31 @@
 
     <section class="form-card action-card"><div><b>啟用前請先測試</b><span>測試會立即送到該通知對應的群組，不受設定日期與時間限制；保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
 
+    <section class="form-card work-digest-card">
+      <div class="section-head"><span>05</span><div><h2>每週會員委員會工作進度</h2><p>即時讀取正式案件、主責、陪訪及期限；副主席先確認排版與內容，系統不會自動發送</p></div></div>
+      <div class="digest-meta">
+        <div><small>正式發送群組</small><strong id="workDigestTarget">正在確認…</strong></div>
+        <div><small>本次資料狀態</small><strong id="workDigestCounts">正在讀取案件…</strong></div>
+        <div><small>預覽產生時間</small><strong id="workDigestGeneratedAt">—</strong></div>
+      </div>
+      <label class="digest-editor">可編輯 LINE 文案<textarea id="workDigestMessage" rows="18" maxlength="4500" spellcheck="false"></textarea></label>
+      <div class="message-preview digest-preview"><small>會員委員會群 LINE 預覽</small><pre id="workDigestPreview">正在產生預覽…</pre></div>
+      <p class="digest-safety">按下發送前會再次顯示正式群組名稱並要求確認；若案件或分工在預覽後更新，系統會阻擋舊版本發送。</p>
+      <div class="digest-actions">
+        <button type="button" class="secondary-button" id="refreshWorkDigest">重新抓取最新工作</button>
+        <button type="button" class="secondary-button" id="copyWorkDigest">複製預覽</button>
+        <button type="button" class="primary-button" id="sendWorkDigest">確認發送至委員會群</button>
+      </div>
+      <div class="digest-delivery" id="workDigestDelivery">尚未從本頁發送</div>
+    </section>
+
     <section class="form-card history-card">
-      <div class="section-head"><span>05</span><div><h2>最近發送紀錄</h2><p>排程與人工測試都會留下結果，方便確認通知是否送到正確群組</p></div></div>
+      <div class="section-head"><span>06</span><div><h2>最近發送紀錄</h2><p>排程與人工測試都會留下結果，方便確認通知是否送到正確群組</p></div></div>
       <div class="delivery-list" id="deliveryList"><article>尚無發送紀錄</article></div>
     </section>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/routine-reminders.js?v=4"></script>
+  <script src="assets/js/routine-reminders.js?v=5"></script>
   <script src="assets/js/workspace-nav.js?v=4"></script>
 </body>
 </html>
