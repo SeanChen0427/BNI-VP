@@ -8,7 +8,7 @@ const html = read("terminal-form.html");
 
 const captureIndex = live.indexOf("const preservedDraft=serialize()");
 const replaceMembersIndex = live.indexOf("members=loaded");
-const restoreIndex = live.indexOf("restore({...preservedDraft,member:currentTask.member})");
+const restoreIndex = live.indexOf("restore({...preservedDraft,member:currentTask.member,memberSearch:currentTask.member})");
 
 assert.ok(captureIndex >= 0, "正式 PALMS 載入前必須先保存畫面上的既有答案");
 assert.ok(
@@ -19,6 +19,11 @@ assert.doesNotMatch(
   live,
   /selectMember\(currentTask\.member\)/,
   "正式資料載入不得只重建會員題目而遺失既有答案"
+);
+assert.match(
+  live,
+  /restore\(\{\.\.\.preservedDraft,member:currentTask\.member,memberSearch:currentTask\.member\}\)/,
+  "案件會員姓名不得被正式資料載入前的占位草稿覆蓋"
 );
 
 assert.match(form, /function completionMissingFields\(\)/);
@@ -42,6 +47,6 @@ assert.ok(
 );
 assert.match(form, /if\(missing\.length\)\{/);
 assert.match(html, /terminal-form\.js\?v=9/);
-assert.match(html, /terminal-form-live\.js\?v=4/);
+assert.match(html, /terminal-form-live\.js\?v=5/);
 
 console.log("terminal form Word completeness tests passed");

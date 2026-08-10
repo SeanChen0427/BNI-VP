@@ -16,7 +16,7 @@
     const preservedDraft=serialize();
     members=loaded;averages={...averages,...normalize(snapshot.memberData?.averages||{})};
     document.querySelector("#memberList").innerHTML=members.map(item=>`<option value="${item.name}">${item.profession}</option>`).join("");
-    restore({...preservedDraft,member:currentTask.member});
+    restore({...preservedDraft,member:currentTask.member,memberSearch:currentTask.member});
     const search=document.querySelector("#memberSearch");search.readOnly=true;search.title="會員已由優先處理案件帶入";
     if(currentTask.scheduledAt)document.querySelector("#meetingDate").value=currentTask.scheduledAt;
     document.querySelector("#counselor").value=currentTask.lead||session.name;document.querySelector("#interviewer").value=currentTask.lead||session.name;
