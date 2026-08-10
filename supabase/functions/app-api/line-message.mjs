@@ -1,5 +1,6 @@
 export const LINE_ATTENDANCE_MESSAGE_FORMAT = "text-v2-mention-all-v1";
 export const CASE_VOTE_NOTICE_FORMAT = "case-vote-text-v2-mention-all-v1";
+export const CASE_RESULT_ANNOUNCEMENT_FORMAT = "case-result-plain-text-v1";
 
 const CASE_VOTE_LABELS = {
   new: "新申請",
@@ -65,6 +66,57 @@ function spokenTime(hourValue, minuteValue) {
   const period = hour < 12 ? "上午" : hour === 12 ? "中午" : hour < 18 ? "下午" : "晚上";
   const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
   return `${period}${displayHour}${minute ? `:${String(minute).padStart(2, "0")}` : "點"}`;
+}
+
+export function formatCaseResultDate(value = new Date()) {
+  const parts = taipeiDateParts(value);
+  return `${Number(parts.year)}.${Number(parts.month)}.${Number(parts.day)}`;
+}
+
+export function buildCaseResultAnnouncementText({
+  caseType,
+  applicant,
+  profession,
+  referrerName,
+  currentProfession,
+  newProfession,
+  announcedAt = new Date(),
+}) {
+  const type = String(caseType || "");
+  const memberName = String(applicant || "").trim();
+  if (!memberName) throw new Error("案件申請者姓名尚未填寫");
+  const date = formatCaseResultDate(announcedAt);
+  if (type === "new") {
+    const professionName = String(profession || "").trim();
+    const referrer = String(referrerName || "").trim();
+    if (!professionName) throw new Error("新會員專業別尚未填寫");
+    if (!referrer) throw new Error("請先從既有會員中選擇引薦人");
+    return `【 ${date} 新會員入會投票結果 】\n\n申請者：${memberName}\n專業別：${professionName}\n推薦人：${referrer}\n\n商業訪談投票結果：通過\n----------------------\n以上經董事顧問確認後，特此公告，\n感謝邀請人、會員委員的付出協助！\n\n（只讀不回）`;
+  }
+  if (type === "renewal") {
+    const professionName = String(profession || "").trim();
+    if (!professionName) throw new Error("續約會員專業別尚未填寫");
+    return `【 ${date} 續約會員投票結果 】\n\n申請者：${memberName}\n專業別：${professionName}\n\n商業訪談投票結果：通過\n----------------------\n以上經董事顧問確認後，特此公告，\n感謝會員委員的付出協助！\n\n（只讀不回）`;
+  }
+  if (type === "industry") {
+    const oldProfession = String(currentProfession || "").trim();
+    const desiredProfession = String(newProfession || "").trim();
+    if (!oldProfession) throw new Error("原專業別尚未保存");
+    if (!desiredProfession) throw new Error("欲轉專業別尚未填寫");
+    if (oldProfession === desiredProfession) throw new Error("原專業別與欲轉專業別不可相同");
+    return `【 ${date} 轉換專業別投票結果 】\n\n申請者：${memberName}\n原專業別：${oldProfession}\n欲轉專業別：${desiredProfession}\n\n商訪專業別轉換投票結果：通過。\n\n「${oldProfession}」已開放專業別，歡迎夥伴邀約。\n----------------------\n\n以上經董事顧問確認後，特此公告。\n\n（只讀不回）`;
+  }
+  throw new Error("案件類型不適用正式結果公告");
+}
+
+export function caseResultAnnouncementFingerprintSource(content) {
+  return `${CASE_RESULT_ANNOUNCEMENT_FORMAT}\n${String(content)}`;
+}
+
+export function buildCaseResultAnnouncementMessage(input) {
+  const text = buildCaseResultAnnouncementText(input);
+  if ([...text].length > 5000) throw new Error("LINE 正式結果公告超過 5,000 字");
+  return { type: "text", text };
 }
 
 export function formatCaseVoteDeadline(deadlineAt, now = new Date()) {

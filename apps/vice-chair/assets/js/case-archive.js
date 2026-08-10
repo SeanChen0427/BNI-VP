@@ -83,6 +83,7 @@
     $("#advisorFacts").innerHTML = [
       fact("三長群發送", state.leadersSent ? "已登記發送" : "未登記"),
       fact("董事顧問確認", advisorLabel),
+      fact("正式公告群", state.resultAnnouncementSent ? `${dateLabel(state.resultAnnouncementSentAt)}・${state.resultAnnouncementTargetName || "正式公告群"}` : decision.status === "不通過" ? "不通過案件不公告" : "未發布"),
       fact("確認備註", state.advisorNote),
       ...(task.type === "renewal" ? [
         fact("過去一年培訓", form.annualTraining),

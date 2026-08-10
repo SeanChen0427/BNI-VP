@@ -6,9 +6,11 @@ import { parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
+  buildCaseResultAnnouncementMessage,
   buildCaseVoteNoticeText,
   buildLineAttendanceMessage,
   buildLineMentionAllMessage,
+  caseResultAnnouncementFingerprintSource,
   caseVoteNoticeFingerprintSource,
   lineAttendanceFingerprintSource,
 } from "./line-message.mjs";
@@ -593,6 +595,86 @@ async function beginCaseVoteLineDelivery(task: any, snapshot: any, target: any, 
 
 async function finishCaseVoteLineDelivery(deliveryId: string, patch: any) {
   await db(`case_vote_line_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function findCaseResultLineDelivery(taskId: string) {
+  const rows = await db(
+    `case_result_line_deliveries?task_id=eq.${taskId}&notification_type=eq.final_result&select=*&limit=1`,
+  );
+  return rows?.[0] || null;
+}
+
+async function beginCaseResultLineDelivery(
+  task: any,
+  snapshot: any,
+  target: any,
+  announcementHash: string,
+  payloadSnapshot: any,
+  context: Context,
+) {
+  const existing = await findCaseResultLineDelivery(task.id);
+  if (existing?.status === "sent") return { delivery: existing, alreadySent: true };
+  if (existing?.status === "processing" && Date.now() - new Date(existing.requested_at).getTime() < 5 * 60 * 1000) {
+    throw Object.assign(new Error("LINE 正式結果公告正在發送，請勿重複操作"), { status: 409 });
+  }
+  const now = new Date().toISOString();
+  if (existing) {
+    const updated = await db(`case_result_line_deliveries?id=eq.${existing.id}&status=neq.sent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        snapshot_id: snapshot.id,
+        group_target_id: target.id,
+        decision_result: "approved",
+        announcement_sha256: announcementHash,
+        payload_snapshot: payloadSnapshot,
+        status: "processing",
+        attempt_count: Number(existing.attempt_count || 0) + 1,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+        sent_at: null,
+        failed_at: null,
+        line_request_id: null,
+        line_message_id: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+    if (!updated?.[0]) throw Object.assign(new Error("LINE 正式結果公告狀態已更新，請重新整理"), { status: 409 });
+    return { delivery: updated[0], alreadySent: false };
+  }
+  try {
+    const inserted = await db("case_result_line_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        task_id: task.id,
+        snapshot_id: snapshot.id,
+        group_target_id: target.id,
+        notification_type: "final_result",
+        decision_result: "approved",
+        announcement_sha256: announcementHash,
+        payload_snapshot: payloadSnapshot,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+      }),
+    });
+    return { delivery: inserted[0], alreadySent: false };
+  } catch (error) {
+    if (String((error as Error)?.message || error).includes("duplicate key")) {
+      throw Object.assign(new Error("LINE 正式結果公告正在發送或已送達，請勿重複操作"), { status: 409 });
+    }
+    throw error;
+  }
+}
+
+async function finishCaseResultLineDelivery(deliveryId: string, patch: any) {
+  await db(`case_result_line_deliveries?id=eq.${deliveryId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify(patch),
@@ -2768,6 +2850,187 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   };
 }
 
+async function caseResultAnnouncementPayload(access: any, existing: any, announcedAt: string) {
+  const workflow = existing?.workflow || {};
+  const form = workflow.form || {};
+  const draft = existing?.draft || {};
+  const taskMeta = parseTaskJson(access.task.result_summary);
+  let officialMember: any = null;
+  if (access.task.member_id) {
+    const memberRows = await db(
+      `members?id=eq.${access.task.member_id}&status=eq.active&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&limit=1`,
+    );
+    officialMember = memberRows?.[0] || null;
+  }
+  const base = {
+    caseType: access.task.category,
+    applicant: String(access.task.title || "").trim(),
+    announcedAt,
+  };
+  if (access.task.category === "new") {
+    const referrerName = String(form.referrerName || draft.referrerName || "").trim();
+    if (!referrerName) throw Object.assign(new Error("請先從既有會員中選擇引薦人"), { status: 409 });
+    if (referrerName === base.applicant) {
+      throw Object.assign(new Error("新會員申請者不能同時作為自己的引薦人"), { status: 409 });
+    }
+    const referrerRows = await db(
+      `members?status=eq.active&people.display_name=eq.${encodeURIComponent(referrerName)}&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&limit=2`,
+    );
+    const referrer = referrerRows?.[0];
+    if (!referrer || referrerRows.length !== 1) {
+      throw Object.assign(new Error("引薦人不在目前正式會員主檔，請重新選擇"), { status: 409 });
+    }
+    const profession = String(draft.profession || taskMeta.profession || form.profession || "").trim();
+    return {
+      input: { ...base, profession, referrerName: referrer.people.display_name },
+      snapshot: {
+        caseType: "new",
+        applicant: base.applicant,
+        profession,
+        referrerMemberId: referrer.id,
+        referrerPersonId: referrer.people.id,
+        referrerName: referrer.people.display_name,
+        announcedAt,
+      },
+    };
+  }
+  if (access.task.category === "renewal") {
+    const profession = String(officialMember?.profession || taskMeta.profession || form.profession || "").trim();
+    return {
+      input: { ...base, profession },
+      snapshot: { caseType: "renewal", applicant: base.applicant, profession, announcedAt },
+    };
+  }
+  if (access.task.category === "industry") {
+    const currentProfession = String(draft.currentProfession || officialMember?.profession || "").trim();
+    const newProfession = String(draft.profession || form.newProfession || taskMeta.newProfession || "").trim();
+    return {
+      input: { ...base, currentProfession, newProfession },
+      snapshot: { caseType: "industry", applicant: base.applicant, currentProfession, newProfession, announcedAt },
+    };
+  }
+  throw Object.assign(new Error("此案件類型不適用正式結果公告"), { status: 409 });
+}
+
+async function markCaseResultAnnouncementSent(access: any, delivery: any, target: any, sentAt: string, context: Context) {
+  await db("rpc/edge_mark_task_result_announcement_sent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_task_id: access.task.id,
+      p_actor: context.personId,
+      p_actor_auth_user_id: context.userId,
+      p_delivery_id: delivery.id,
+      p_target_name: target.display_name,
+      p_sent_at: sentAt,
+    }),
+  });
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  return caseStateResponse(access, latestRows?.[0], context);
+}
+
+async function sendCaseResultAnnouncement(access: any, existing: any, context: Context) {
+  leadership(context);
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用正式結果公告"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (workflow.closed) throw Object.assign(new Error("案件已結案，不能補送正式公告"), { status: 409 });
+  if (workflow.advisorStatus !== "confirmed") {
+    throw Object.assign(new Error("董事顧問尚未確認同意，不能發布公告"), { status: 409 });
+  }
+  if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
+  const [snapshotRows, targetRows] = await Promise.all([
+    db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=*&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.attendance&purpose=eq.production&select=*&limit=1"),
+  ]);
+  const snapshot = snapshotRows?.[0];
+  const target = targetRows?.[0];
+  if (!snapshot) throw Object.assign(new Error("本案沒有正式投票快照"), { status: 409 });
+  if (snapshot.result !== "approved") {
+    throw Object.assign(new Error(snapshot.result === "rejected" ? "投票不通過的案件不發布公告群" : "本案尚未形成通過決議"), { status: 409 });
+  }
+  if (!target) throw Object.assign(new Error("尚未在後台指定正式公告群"), { status: 409 });
+
+  const announcedAt = new Date().toISOString();
+  const { input, snapshot: payloadSnapshot } = await caseResultAnnouncementPayload(access, existing, announcedAt);
+  const lineMessage = buildCaseResultAnnouncementMessage(input);
+  const announcementHash = await sha256Text(caseResultAnnouncementFingerprintSource(lineMessage.text));
+  const prior = await findCaseResultLineDelivery(access.task.id);
+  if (workflow.resultAnnouncementSent && prior?.status !== "sent") {
+    throw Object.assign(new Error("本案已有正式公告紀錄；為避免重複發送，請先確認案件歷程"), { status: 409 });
+  }
+  if (prior?.status === "sent") {
+    const sentAt = prior.sent_at || announcedAt;
+    const state = await markCaseResultAnnouncementSent(access, prior, target, sentAt, context);
+    return {
+      ...state,
+      message: `正式結果公告先前已送達「${target.display_name}」，系統已阻擋重複發送`,
+      lineTarget: publicLineTarget(target),
+      lineSentAt: sentAt,
+      alreadySent: true,
+    };
+  }
+
+  const { delivery } = await beginCaseResultLineDelivery(
+    access.task,
+    snapshot,
+    target,
+    announcementHash,
+    payloadSnapshot,
+    context,
+  );
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
+      body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
+    });
+  } catch (error) {
+    const message = String((error as Error)?.message || error).slice(0, 1000);
+    await finishCaseResultLineDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: message });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${message}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const message = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishCaseResultLineDelivery(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      error_code: `HTTP_${response.status}`,
+      error_message: message,
+      line_request_id: response.headers.get("x-line-request-id") || null,
+    });
+    throw Object.assign(new Error(`LINE 正式結果公告發送失敗：${message}`), { status: 502 });
+  }
+  const sentAt = new Date().toISOString();
+  await finishCaseResultLineDelivery(delivery.id, {
+    status: "sent",
+    sent_at: sentAt,
+    failed_at: null,
+    error_code: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  let state;
+  try {
+    state = await markCaseResultAnnouncementSent(access, delivery, target, sentAt, context);
+  } catch (error) {
+    throw Object.assign(new Error(`LINE 已送達「${target.display_name}」，但案件剛由其他裝置更新；請重新整理確認，勿立即重送`), { status: 409, cause: error });
+  }
+  return {
+    ...state,
+    message: `正式結果公告已由 LINE OA 發送到「${target.display_name}」`,
+    lineTarget: publicLineTarget(target),
+    lineSentAt: sentAt,
+    alreadySent: false,
+  };
+}
+
 async function caseStatesApi(request: Request, context: Context) {
   if (request.method === "GET") {
     const [tasks, assignments, states] = await Promise.all([
@@ -2798,6 +3061,10 @@ async function caseStatesApi(request: Request, context: Context) {
 
   if (body.kind === "vote-notice") {
     return sendCaseVoteNotice(access, existing, context);
+  }
+
+  if (body.kind === "result-announcement") {
+    return sendCaseResultAnnouncement(access, existing, context);
   }
 
   if (body.kind === "feedback") {
@@ -2887,6 +3154,9 @@ async function caseStatesApi(request: Request, context: Context) {
     return caseStateResponse(access, latestRows?.[0], context);
   } else if (body.kind === "reset") {
     leadership(context);
+    if (currentWorkflow.resultAnnouncementSent) {
+      throw Object.assign(new Error("正式公告已發布，案件只能結案，不能重設"), { status: 409 });
+    }
     try {
       await db("rpc/edge_reset_task_case_as_user", {
         method: "POST",
@@ -2941,6 +3211,20 @@ async function caseStatesApi(request: Request, context: Context) {
         workflow.voteNoticeTargetName = currentWorkflow.voteNoticeTargetName || "";
         workflow.voteNoticeDeliveryId = currentWorkflow.voteNoticeDeliveryId || "";
       }
+      if (currentWorkflow.resultAnnouncementSent) {
+        workflow.resultAnnouncementSent = true;
+        workflow.resultAnnouncementSentAt = currentWorkflow.resultAnnouncementSentAt || "";
+        workflow.resultAnnouncementTargetName = currentWorkflow.resultAnnouncementTargetName || "";
+        workflow.resultAnnouncementDeliveryId = currentWorkflow.resultAnnouncementDeliveryId || "";
+        workflow.advisorStatus = currentWorkflow.advisorStatus || "confirmed";
+        workflow.advisorNote = currentWorkflow.advisorNote || "";
+        workflow.form.referrerName = currentWorkflow.form?.referrerName || workflow.form.referrerName || "";
+      } else {
+        workflow.resultAnnouncementSent = false;
+        delete workflow.resultAnnouncementSentAt;
+        delete workflow.resultAnnouncementTargetName;
+        delete workflow.resultAnnouncementDeliveryId;
+      }
       if (deadlineChanged) {
         voteDeadlineUpdate = normalizedDeadline(proposed.form.voteDeadline);
       }
@@ -2948,7 +3232,9 @@ async function caseStatesApi(request: Request, context: Context) {
       if (access.assigned) {
         const protectedKeys = new Set([
           "votingOpen", "voteNoticeSent", "voterSnapshot", "leadersSent",
-          "advisorStatus", "advisorNote", "closed",
+          "advisorStatus", "advisorNote", "resultAnnouncementSent",
+          "resultAnnouncementSentAt", "resultAnnouncementTargetName",
+          "resultAnnouncementDeliveryId", "closed",
         ]);
         workflow = { ...workflow };
         for (const [key, value] of Object.entries(proposed)) {
@@ -2964,6 +3250,23 @@ async function caseStatesApi(request: Request, context: Context) {
     }
   } else {
     throw new Error("不支援的案件同步類型");
+  }
+
+  if (body.kind === "workflow" && workflow.closed) {
+    if (!access.leadership) throw Object.assign(new Error("只有副主席或 Admin 可結案"), { status: 403 });
+    if (workflow.advisorStatus !== "confirmed") {
+      throw Object.assign(new Error("董事顧問尚未確認同意，不能結案"), { status: 409 });
+    }
+    const snapshots = access.task.case_id
+      ? await db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=result&limit=1`)
+      : [];
+    const result = snapshots?.[0]?.result || "pending";
+    if (!["approved", "rejected"].includes(result)) {
+      throw Object.assign(new Error("本案尚未形成正式投票決議，不能結案"), { status: 409 });
+    }
+    if (result === "approved" && !currentWorkflow.resultAnnouncementSent) {
+      throw Object.assign(new Error("通過案件尚未成功發布公告群，不能結案"), { status: 409 });
+    }
   }
 
   try {

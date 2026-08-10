@@ -70,7 +70,11 @@
 
   function stageText(task, state, stage) {
     if (stage === "closed") return "已結案存檔";
-    if (stage === "advisor") return state?.advisorStatus === "returned" ? "董顧退回補件" : "等待董顧確認";
+    if (stage === "advisor") {
+      if (state?.resultAnnouncementSent) return "公告已發布・待結案";
+      if (state?.advisorStatus === "confirmed") return "董顧已確認・待公告或結案";
+      return state?.advisorStatus === "returned" ? "董顧退回補件" : "等待董顧確認";
+    }
     if (stage === "vote") return `投票中・已投 ${Object.keys(state?.votes || {}).length} 票`;
     if (stage === "feedback") return `回饋中・已收 ${Object.values(state?.feedback || {}).filter(value => String(value).trim()).length} 份`;
     if (stage === "interview") return "訪談草稿進行中";
@@ -172,7 +176,11 @@
           : participation.status === "recused"
             ? "查看委員投票"
             : "進入委員投票"
-        : "處理董顧確認";
+        : state?.resultAnnouncementSent
+          ? "完成案件結案"
+          : state?.advisorStatus === "confirmed"
+            ? "處理公告與結案"
+            : "處理董顧確認";
     const decisionAction = decisionStage
       && feedbackStarted
       && (stage !== "advisor" || canManageDecision)

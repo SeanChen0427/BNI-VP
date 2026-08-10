@@ -36,6 +36,24 @@
     document.querySelector("#witness2").value = companions[0] || "";
     document.querySelector("#witness3").value = companions[1] || "";
     if (task.scheduledAt) document.querySelector("#meetingDate").value = task.scheduledAt;
+    const memberResponse = await fetch("/api/bni-analysis", { cache: "no-store" });
+    if (!memberResponse.ok) throw new Error(`正式會員資料載入失敗：HTTP ${memberResponse.status}`);
+    const snapshot = await memberResponse.json();
+    const members = (snapshot.members || [])
+      .filter(item => item?.name && item.name !== task.member)
+      .sort((left, right) => left.name.localeCompare(right.name, "zh-Hant"));
+    if (!members.length) throw new Error("沒有可選擇的正式會員引薦人");
+    const draftKey = window.FulianCaseDomain.draftStorageKey(task);
+    let savedReferrer = "";
+    try { savedReferrer = JSON.parse(localStorage.getItem(draftKey) || "{}").referrerName || ""; } catch {}
+    const referrerSelect = document.querySelector("#referrerName");
+    referrerSelect.replaceChildren(new Option("請選擇引薦人", ""));
+    members.forEach(member => {
+      const option = new Option(member.name, member.name);
+      option.dataset.memberId = String(member.memberId || member.id || member.personId || member.name);
+      referrerSelect.add(option);
+    });
+    if (members.some(member => member.name === savedReferrer)) referrerSelect.value = savedReferrer;
     document.querySelector("#saveTime").textContent = "已由進行中案件帶入";
     await window.FulianCaseStateStore.reconcileDraft(task, {
       applicant: task.member,
@@ -47,6 +65,7 @@
       secondCompanion: companions[1] || "",
       witness2: companions[0] || "",
       witness3: companions[1] || "",
+      ...(referrerSelect.value ? { referrerName: referrerSelect.value } : {}),
     });
     form.hidden = false;
   } catch (error) {

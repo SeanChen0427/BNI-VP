@@ -57,6 +57,12 @@ function relationValue(id){const selected=answer(`#${id}`);return selected==="�
 function extraText(type){if(type==="arrivalTime")return`承諾到場時間：${answer("#arrivalTime")||"未填寫"}`;if(type==="proxy")return`代理人姓名：${answer("#proxyName")||"未填寫"}　關係：${relationValue("proxyRelation")||"未填寫"}`;if(type==="msp")return`MSP（上）：${answer("#mspUpDate")||"未填寫"}　MSP（下）：${answer("#mspDownDate")||"未填寫"}`;if(type==="session")return`新會員交流座談會：${answer("#sessionDate1")||"未填寫"}／${answer("#sessionDate2")||"未填寫"}`;if(type==="organization")return`組織名稱：${answer("#organizationName")||"未填寫"}　參與方式／角色：${answer("#organizationRole")||"未填寫"}`;if(type==="guests")return`觀禮者一：${answer("#guest1Name")||"未填寫"}（${relationValue("guest1Relation")||"關係未填"}）　觀禮者二：${answer("#guest2Name")||"未填寫"}（${relationValue("guest2Relation")||"關係未填"}）`;return""}
 async function downloadWord(){
   if(typeof docx==="undefined"){toast("Word元件尚未載入，請重新整理後再試");return}
+  const referrerSelect=$("#referrerName"),referrerName=answer("#referrerName");
+  if(!referrerName||![...referrerSelect.options].some(option=>option.value===referrerName&&option.dataset.memberId)){
+    toast("請先從正式會員名單選擇引薦人");
+    referrerSelect.focus();
+    return;
+  }
   newMemberCompletion.begin();
   const{Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,BorderStyle,AlignmentType,PageOrientation,ShadingType}=docx,font="Arial Unicode MS",fontSpec={ascii:font,hAnsi:font,eastAsia:font,cs:font};
   const run=(text,opts={})=>new TextRun({text:String(text??""),font:fontSpec,size:opts.size||21,bold:!!opts.bold,color:opts.color});

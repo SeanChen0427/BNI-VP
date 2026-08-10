@@ -9,7 +9,7 @@ let sourceTask=null;
 const authConfig=FulianAuth.getConfig(),authSession=FulianAuth.getSession();
 const committee=[authConfig.vpName,...authConfig.committee];
 const roles=Object.fromEntries(committee.map(name=>[name,name===authConfig.vpName?"副主席":"會員委員"]));
-const steps = ["保存 Word", "通知回饋", "委員回饋", "回饋達標", "開啟投票", "通知投票", "形成決議", "三長群", "董顧確認", "結案存檔"];
+const steps = ["保存 Word", "通知回饋", "委員回饋", "回饋達標", "開啟投票", "通知投票", "形成決議", "三長群", "董顧確認", "公告群", "結案存檔"];
 const typeConfig = {
   renewal:{label:"續約", voteLabel:"續約", approve:"同意續約", reject:"不同意續約", prefix:"RE"},
   new:{label:"新申請", voteLabel:"新申請", approve:"同意入會", reject:"不同意入會", prefix:"NM"},
@@ -35,6 +35,10 @@ const initialState = {
   leadersSent:false,
   advisorStatus:"pending",
   advisorNote:"",
+  resultAnnouncementSent:false,
+  resultAnnouncementSentAt:"",
+  resultAnnouncementTargetName:"",
+  resultAnnouncementDeliveryId:"",
   closed:false,
   log:[]
 };
@@ -44,6 +48,7 @@ let saveTimer;
 let lastPersist=Promise.resolve();
 let feedbackDirty=false;
 let feedbackEditorTarget=currentUser();
+let announcementMembers=[];
 
 function loadState(){
   try{return {...initialState, ...JSON.parse(localStorage.getItem(STORAGE_KEY)||"null")};}
@@ -76,6 +81,26 @@ function voteDeadlineLineLabel(value,now=new Date()){
   return`${deadline.getFullYear()}/${deadline.getMonth()+1}/${deadline.getDate()} ${time}`;
 }
 function config(){return typeConfig[$("#caseType").value];}
+function caseDraft(){
+  if(!sourceTask)return{};
+  try{return JSON.parse(localStorage.getItem(caseDomain.draftStorageKey(sourceTask))||"{}");}
+  catch{return{};}
+}
+function announcementDate(value=new Date()){
+  const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(value);
+  const get=type=>Number(parts.find(part=>part.type===type)?.value||0);
+  return`${get("year")}.${get("month")}.${get("day")}`;
+}
+function resultAnnouncementText(){
+  const type=$("#caseType").value,name=$("#applicant").value.trim(),profession=$("#profession").value.trim(),date=announcementDate();
+  if(type==="new"){
+    const referrer=$("#resultReferrerName").value.trim();
+    return`【 ${date} 新會員入會投票結果 】\n\n申請者：${name}\n專業別：${profession}\n推薦人：${referrer||"尚未選擇"}\n\n商業訪談投票結果：通過\n----------------------\n以上經董事顧問確認後，特此公告，\n感謝邀請人、會員委員的付出協助！\n\n（只讀不回）`;
+  }
+  if(type==="renewal")return`【 ${date} 續約會員投票結果 】\n\n申請者：${name}\n專業別：${profession}\n\n商業訪談投票結果：通過\n----------------------\n以上經董事顧問確認後，特此公告，\n感謝會員委員的付出協助！\n\n（只讀不回）`;
+  const draft=caseDraft(),oldProfession=String(draft.currentProfession||state.form?.currentProfession||"").trim();
+  return`【 ${date} 轉換專業別投票結果 】\n\n申請者：${name}\n原專業別：${oldProfession||"尚未保存"}\n欲轉專業別：${profession}\n\n商訪專業別轉換投票結果：通過。\n\n「${oldProfession||"原專業別尚未保存"}」已開放專業別，歡迎夥伴邀約。\n----------------------\n\n以上經董事顧問確認後，特此公告。\n\n（只讀不回）`;
+}
 function escapeHtml(text){return String(text).replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));}
 function toast(message){const show=text=>{const node=$("#toast");node.textContent=text;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2200)};if(/已(儲存|保存|開啟|記錄|結案)|狀態已|已模擬/.test(message)){lastPersist.then(()=>show(message)).catch(error=>show(error.message||"Supabase 保存失敗"));return}show(message);}
 function addLog(text){state.log.unshift({text,time:nowLabel(),done:true});state.log=state.log.slice(0,20);}
@@ -94,8 +119,9 @@ function voteDecision(){
 
 function currentStage(){
   const decision=voteDecision();
-  if(state.closed)return 9;
-  if(state.advisorStatus==="confirmed")return 9;
+  if(state.closed)return 10;
+  if(state.resultAnnouncementSent)return 10;
+  if(state.advisorStatus==="confirmed")return decision.status==="reject"?10:9;
   if(state.leadersSent)return 8;
   if(decision.status==="pass"||decision.status==="reject")return 7;
   if(state.voteNoticeSent)return 6;
@@ -111,6 +137,20 @@ function populateSelects(){
   $("#companionInterviewer").innerHTML=options;
   $("#leadInterviewer").value=sourceTask?.lead||authConfig.committee[0]||authConfig.vpName;
   $("#companionInterviewer").value=sourceTask?.companions?.[0]||authConfig.vpName;
+}
+
+function populateResultReferrers(){
+  const select=$("#resultReferrerName"),desired=String(state.form?.referrerName||caseDraft().referrerName||"").trim();
+  select.replaceChildren(new Option("請選擇正式會員", ""));
+  announcementMembers
+    .filter(member=>member?.name&&member.name!==$("#applicant").value)
+    .sort((left,right)=>left.name.localeCompare(right.name,"zh-Hant"))
+    .forEach(member=>{
+      const option=new Option(member.name,member.name);
+      option.dataset.memberId=String(member.memberId||member.id||member.personId||member.name);
+      select.add(option);
+    });
+  if([...select.options].some(option=>option.value===desired))select.value=desired;
 }
 
 function configureIdentity(){const role=authSession.role==="vp"?"vp":authSession.role==="committee"?"committee":"admin";$("#loginUser").innerHTML=`<option value="${authSession.name}" data-role="${role}">${authSession.name}（${role==="vp"?"副主席":role==="committee"?"會員委員":"系統開發人員 Admin"}）</option>`;$("#loginUser").disabled=true;}
@@ -137,10 +177,10 @@ function leadersMessage(){
 function renderWorkflow(){
   const stage=currentStage();
   $("#workflowStrip").innerHTML=steps.map((name,index)=>`<div class="workflow-step ${state.closed||index<stage?"done":index===stage?"current":""}"><b>${index+1}</b><small>${name}</small></div>`).join("");
-  const displayStage=Math.min(stage+1,10);
+  const displayStage=Math.min(stage+1,steps.length);
   $("#stageNumber").textContent=displayStage;
-  $("#stageTitle").textContent=state.closed?"案件已結案":steps[Math.min(stage,9)];
-  const progress=state.closed?100:Math.min(stage*10,100);
+  $("#stageTitle").textContent=state.closed?"案件已結案":steps[Math.min(stage,steps.length-1)];
+  const progress=state.closed?100:Math.min(Math.round(stage/(steps.length-1)*100),100);
   $("#progressBar").style.width=`${progress}%`;
   $("#progressText").textContent=`${progress}%`;
 }
@@ -155,7 +195,7 @@ function renderPermissions(){
     node.hidden=!allowed;
   });
   $(".workspace-grid").classList.toggle("committee-view",!allowed);
-  $("#permissionText").textContent=allowed?"目前可操作開票、通知、送三長群與結案。":"委員可填寫回饋及投票；開票、發送與結案由副主席操作。";
+  $("#permissionText").textContent=allowed?"目前可操作開票、通知、送三長群、正式公告與結案。":"委員可填寫回饋及投票；開票、發送與結案由副主席操作。";
   $(".permission-note").classList.toggle("committee",!allowed);
 }
 
@@ -248,6 +288,7 @@ function renderVote(){
 function renderResult(){
   const decision=voteDecision();
   const formed=decision.status==="pass"||decision.status==="reject";
+  const approved=decision.status==="pass",rejected=decision.status==="reject",isNew=$("#caseType").value==="new";
   $("#renewalExtra").hidden=$("#caseType").value!=="renewal";
   $("#leadersPreview").textContent=formed?leadersMessage():"尚未形成會員委員會決議，三長群文案會在過半參與且形成多數後產生。";
   $("#copyLeaders").disabled=!formed;
@@ -255,10 +296,34 @@ function renderResult(){
   $("#sendLeaders").textContent=state.leadersSent?"已發送三長群":"模擬發送三長群";
   $("#advisorStatus").value=state.advisorStatus;
   $("#advisorNote").value=state.advisorNote;
-  $("#advisorStatus").disabled=!(isVp()&&state.leadersSent&&!state.closed);
-  $("#advisorNote").disabled=!(isVp()&&state.leadersSent&&!state.closed);
-  $("#saveAdvisor").disabled=!(isVp()&&state.leadersSent&&!state.closed);
-  $("#closeCase").disabled=!(isVp()&&state.advisorStatus==="confirmed"&&!state.closed);
+  const advisorEditable=isVp()&&state.leadersSent&&!state.resultAnnouncementSent&&!state.closed;
+  $("#advisorStatus").disabled=!advisorEditable;
+  $("#advisorNote").disabled=!advisorEditable;
+  $("#saveAdvisor").disabled=!advisorEditable;
+  $("#resultReferrerRow").hidden=!isNew;
+  $("#resultReferrerName").disabled=!(isVp()&&isNew&&!state.resultAnnouncementSent&&!state.closed);
+  const oldProfession=String(caseDraft().currentProfession||state.form?.currentProfession||"").trim();
+  const referrerValid=!isNew||[...$("#resultReferrerName").options].some(option=>option.value===$("#resultReferrerName").value&&option.dataset.memberId);
+  const fieldsValid=Boolean($("#applicant").value.trim()&&$("#profession").value.trim()&&referrerValid&&($("#caseType").value!=="industry"||oldProfession));
+  $("#resultAnnouncementPreview").textContent=rejected?"本案表決不通過，依現行規則不發布公告群。":formed?resultAnnouncementText():"尚未形成會員委員會決議。";
+  $("#copyResultAnnouncement").disabled=!(approved&&fieldsValid);
+  $("#sendResultAnnouncement").disabled=!(isVp()&&approved&&state.advisorStatus==="confirmed"&&fieldsValid&&!state.resultAnnouncementSent&&!state.closed);
+  $("#sendResultAnnouncement").textContent=state.resultAnnouncementSent?"已發布正式公告":"發送正式公告群";
+  const announcementState=$("#resultAnnouncementState");
+  announcementState.classList.toggle("sent",Boolean(state.resultAnnouncementSent));
+  announcementState.textContent=state.resultAnnouncementSent
+    ? `已於 ${dateLabel(state.resultAnnouncementSentAt)} 發送至「${state.resultAnnouncementTargetName||"正式公告群"}」，系統已鎖定避免重複發送。`
+    : rejected
+      ? "此案不通過，不需要也不能發布公告。"
+      : !formed
+        ? "等待會員委員會形成通過決議。"
+        : state.advisorStatus!=="confirmed"
+          ? "等待董事顧問確認後，才可人工發布。"
+          : !fieldsValid
+            ? isNew?"請先從正式會員名單選擇引薦人。":"公告欄位不完整，請回到訪談資料確認。"
+            : "已可發布；按下按鈕後仍會顯示正式群警告與完整文案，確認後才送出。";
+  const mayClose=state.advisorStatus==="confirmed"&&(rejected||(approved&&state.resultAnnouncementSent));
+  $("#closeCase").disabled=!(isVp()&&mayClose&&!state.closed);
   if(state.closed)$("#closeSection").innerHTML=`<div class="closed-banner">案件已結案存檔・${$("#caseId").textContent}</div>`;
 }
 
@@ -278,7 +343,7 @@ function renderSummary(){
   $("#feedbackNoticePreview").textContent=feedbackNotice();
   $("#sendFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.feedbackNotified&&!state.closed);
   $("#sendFeedbackNotice").textContent=state.feedbackNotified?"已通知委員":"模擬 LINE Bot 通知";
-  $("#resetCase").hidden=state.closed;
+  $("#resetCase").hidden=state.closed||state.resultAnnouncementSent;
   $("#activityLog").innerHTML=state.log.map(item=>`<li class="${item.done?"done":""}"><b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.time)}</span></li>`).join("");
 }
 
@@ -292,12 +357,15 @@ function render(){
 }
 
 function collectForm(){
+  const draft=caseDraft();
   return {
     caseType:sourceTask?.type||$("#caseType").value,
     applicant:sourceTask?.member||$("#applicant").value,
     profession:sourceTask?.profession||$("#profession").value,
     interviewDate:$("#interviewDate").value,leadInterviewer:$("#leadInterviewer").value,companionInterviewer:$("#companionInterviewer").value,
-    voteDeadline:$("#voteDeadline").value,recusedMember:recusedApplicant(),annualTraining:$("#annualTraining").value,annualVisitors:$("#annualVisitors").value
+    voteDeadline:$("#voteDeadline").value,recusedMember:recusedApplicant(),annualTraining:$("#annualTraining").value,annualVisitors:$("#annualVisitors").value,
+    referrerName:$("#caseType").value==="new"?$("#resultReferrerName").value:"",
+    currentProfession:$("#caseType").value==="industry"?String(draft.currentProfession||state.form?.currentProfession||"").trim():""
   };
 }
 
@@ -333,6 +401,7 @@ function restoreForm(){
   const form=state.form||{};
   const taskBoundFields=new Set(["caseType","applicant","profession"]);
   Object.entries(form).forEach(([id,value])=>{if(id==="recusedMember"||id==="loginUser"||(sourceTask&&taskBoundFields.has(id)))return;const node=$(`#${id}`);if(node&&value!==undefined)node.value=value;});
+  if($("#caseType").value==="new")$("#resultReferrerName").value=form.referrerName||caseDraft().referrerName||"";
   $("#recusedMember").value=recusedApplicant()||"無須迴避";
   if(state.votingOpen&&!Object.keys(state.votes||{}).length){
     const corrected=eligibleMembers();
@@ -381,7 +450,26 @@ function bindEvents(){
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
   $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});
   $("#saveAdvisor").addEventListener("click",()=>{if(!isVp())return;state.advisorStatus=$("#advisorStatus").value;state.advisorNote=$("#advisorNote").value.trim();addLog(state.advisorStatus==="confirmed"?"董事顧問已同意會員委員會決議":state.advisorStatus==="returned"?"董事顧問退回補充資料":"董事顧問確認仍待回覆");persistNow();toast("董顧確認狀態已保存");});
-  $("#closeCase").addEventListener("click",async()=>{if(!isVp()||state.advisorStatus!=="confirmed")return;const proposed={...state,form:collectForm(),closed:true,log:[{text:"案件已由副主席確認結案存檔",time:nowLabel(),done:true},...(state.log||[])].slice(0,20)};$("#saveState").textContent="正在確認 Supabase 正式結案…";lastPersist=window.FulianCaseStateStore.saveWorkflow(CASE_ID,proposed);try{await lastPersist;state=loadState();render();await window.FulianTaskStore.refresh();sourceTask=window.FulianTaskStore.all().find(item=>item.id===CASE_ID)||sourceTask;$("#saveState").textContent="案件已正式結案並保存至 Supabase";toast("案件已結案存檔")}catch(error){$("#saveState").textContent="Supabase 結案失敗，案件仍維持原狀";render();toast(error.message||"案件結案同步失敗")}});
+  $("#copyResultAnnouncement").addEventListener("click",async()=>{if(voteDecision().status!=="pass")return;await navigator.clipboard.writeText(resultAnnouncementText());toast("正式公告文案已複製");});
+  $("#sendResultAnnouncement").addEventListener("click",async()=>{
+    if(!isVp()||voteDecision().status!=="pass"||state.advisorStatus!=="confirmed")return;
+    const text=resultAnnouncementText();
+    if(!confirm(`即將發送到正式公告群，所有會員都會看到。\n此公告不會標註 @所有人，且同一案件成功送出後不能重複發送。\n\n${text}\n\n確定立即發送？`))return;
+    const button=$("#sendResultAnnouncement");button.disabled=true;button.textContent="正式 LINE 發送中…";
+    $("#saveState").textContent="正在等待 LINE 確認送達…";
+    lastPersist=window.FulianCaseStateStore.sendResultAnnouncement(CASE_ID);
+    try{
+      const result=await lastPersist;
+      state=loadState();render();
+      $("#saveState").textContent="正式公告已送達並保存至 Supabase";
+      toast(result.message||"正式公告已送達公告群");
+    }catch(error){
+      state=loadState();render();
+      $("#saveState").textContent="正式公告尚未完成";
+      toast(error.message||"正式公告發送失敗");
+    }
+  });
+  $("#closeCase").addEventListener("click",async()=>{const decision=voteDecision(),mayClose=state.advisorStatus==="confirmed"&&(decision.status==="reject"||(decision.status==="pass"&&state.resultAnnouncementSent));if(!isVp()||!mayClose)return;const proposed={...state,form:collectForm(),closed:true,log:[{text:"案件已由副主席確認結案存檔",time:nowLabel(),done:true},...(state.log||[])].slice(0,20)};$("#saveState").textContent="正在確認 Supabase 正式結案…";lastPersist=window.FulianCaseStateStore.saveWorkflow(CASE_ID,proposed);try{await lastPersist;state=loadState();render();await window.FulianTaskStore.refresh();sourceTask=window.FulianTaskStore.all().find(item=>item.id===CASE_ID)||sourceTask;$("#saveState").textContent="案件已正式結案並保存至 Supabase";toast("案件已結案存檔")}catch(error){$("#saveState").textContent="Supabase 結案失敗，案件仍維持原狀";render();toast(error.message||"案件結案同步失敗")}});
   $("#resetCase").addEventListener("click",async()=>{if(!isVp())return toast("只有副主席可以重設案件");if(!confirm("要重設這個案件嗎？目前的回饋、投票與流程紀錄會清除。"))return;$("#saveState").textContent="正在重設案件…";try{await window.FulianCaseStateStore.reset(CASE_ID);location.reload()}catch(error){$("#saveState").textContent="重設失敗";toast(error.message||"案件重設失敗")}});
   window.addEventListener("fulian:data-changed",event=>{
     if(event.detail?.source!=="supabase-case-state"||event.detail?.taskId!==CASE_ID)return;
@@ -408,7 +496,11 @@ async function init(){
   restoreForm();
   if($("#applicant").value){
     try{
-      const response=await fetch("/api/bni-analysis",{cache:"no-store"}),snapshot=await response.json(),matched=(snapshot.members||[]).find(item=>item.name===$("#applicant").value);
+      const response=await fetch("/api/bni-analysis",{cache:"no-store"});
+      if(!response.ok)throw new Error(`正式會員資料載入失敗：HTTP ${response.status}`);
+      const snapshot=await response.json(),matched=(snapshot.members||[]).find(item=>item.name===$("#applicant").value);
+      announcementMembers=snapshot.members||[];
+      populateResultReferrers();
       if(matched?.profession&&!$("#profession").value)$("#profession").value=matched.profession;
       if(autofillAnnualRenewalMetrics(snapshot,matched)){
         state.form=collectForm();
@@ -416,7 +508,7 @@ async function init(){
         $("#saveState").textContent="年度 PALMS 已自動帶入";
         $("#saveTime").textContent=`最後儲存 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
       }
-    }catch{if($("#caseType").value==="renewal"){$("#annualDataSource").hidden=false;$("#annualDataSource").textContent="年度 PALMS 載入失敗，請重新整理或人工確認。";}}
+    }catch{if($("#caseType").value==="renewal"){$("#annualDataSource").hidden=false;$("#annualDataSource").textContent="年度 PALMS 載入失敗，請重新整理或人工確認。";}else if($("#caseType").value==="new"){$("#resultAnnouncementState").textContent="正式會員名單載入失敗，請重新整理後再選擇引薦人。";}}
   }
   try{$("#downloadWord").disabled=!(await getWord());}catch{$("#downloadWord").disabled=true;}
   bindEvents();

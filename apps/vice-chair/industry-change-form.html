@@ -24,7 +24,7 @@
     <div class="layout">
       <aside class="steps"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#professional">專業與321A</a><a href="#goals">加入目標</a><a href="#commitment">投入與出席</a><a href="#training">培訓與制度</a><a href="#network">組織與宣誓</a><a href="#closing">其他事項</a><a href="#contacts">20人名單</a><a href="#signatures">確認與簽名</a></nav><div class="privacy"><b>正式輸出邊界</b><p>官方題目與填寫內容會輸出；系統追問提示、321A內部判讀及委員內部備註不輸出。</p></div></aside>
       <form id="industryChangeForm" hidden>
-        <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>申請者須為富聯現有會員</p></div></div><div class="case-gate"><span>流程前置</span><b>已提出轉換行業別申請</b><small>由會員委員會安排訪談並確認新舊專業類別界線</small></div><div class="fields two"><label>會談日期與時間<input id="meetingDate" type="datetime-local" data-save></label><label>訪談方式／地址<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label><label>申請會員搜尋<input id="memberSearch" list="memberList" data-save><datalist id="memberList"></datalist></label><label>原專業類別<input id="currentProfession" readonly></label><label>申請轉換專業類別<input id="profession" placeholder="請依轉換申請書手動填寫" data-save></label><label>主訪委員<input id="leadInterviewer" readonly></label><label>陪訪委員<input id="companionInterviewer" list="committeeList" data-save></label><label>第二陪訪（選填）<input id="secondCompanion" list="committeeList" data-save></label><label>分會<input value="富聯" readonly></label><datalist id="committeeList"></datalist></div></section>
+        <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>申請者須為富聯現有會員</p></div></div><div class="case-gate"><span>流程前置</span><b>已提出轉換行業別申請</b><small>由會員委員會安排訪談並確認新舊專業類別界線</small></div><div class="fields two"><label>會談日期與時間<input id="meetingDate" type="datetime-local" data-save></label><label>訪談方式／地址<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label><label>申請會員搜尋<input id="memberSearch" list="memberList" data-save><datalist id="memberList"></datalist></label><label>原專業類別<input id="currentProfession" readonly data-save></label><label>申請轉換專業類別<input id="profession" placeholder="請依轉換申請書手動填寫" data-save></label><label>主訪委員<input id="leadInterviewer" readonly></label><label>陪訪委員<input id="companionInterviewer" list="committeeList" data-save></label><label>第二陪訪（選填）<input id="secondCompanion" list="committeeList" data-save></label><label>分會<input value="富聯" readonly></label><datalist id="committeeList"></datalist></div></section>
 
         <section class="form-card" id="professional"><div class="section-head"><span>02</span><div><h2>專業資料與321A</h2><p>官方專業題目＋系統內部判讀</p></div></div><article class="question"><div class="question-head"><span>1.</span><h3>請清楚表明主要從事的業務、產品與服務內容，與同業不同的優勢或個人優勢，有何代表性客戶與成功見證？</h3></div><div class="system-hint"><b>系統訪談提示・不輸出至 Word</b><ul><li>請申請者說明最常承接的案件、服務流程及不承接的範圍。</li><li>優先記錄可查證的案例、客戶類型與客訴處理方式。</li></ul></div><div class="long-stack"><label class="long-field">主要業務、產品與服務<textarea id="businessContent" rows="6" data-save></textarea></label><label class="long-field">與同業或個人差異優勢<textarea id="advantages" rows="6" data-save></textarea></label><label class="long-field">代表性客戶<textarea id="representativeClients" rows="5" data-save></textarea></label><label class="long-field">成功見證<textarea id="successStories" rows="5" data-save></textarea></label></div></article>
           <article class="question"><div class="question-head"><span>2.</span><h3>所申請的專業類別是全職或兼職？年資多久？</h3></div><div class="inline-fields"><label>投入型態<select id="employmentType" data-save><option value="">請選擇</option><option>全職</option><option>兼職</option></select></label><label>產業年資<input id="experienceYears" type="number" min="0" step="0.5" placeholder="年" data-save></label></div></article>
@@ -49,13 +49,13 @@
   <div id="toast"></div>
   <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=5"></script>
-  <script src="assets/js/case-state-store.js?v=8"></script>
+  <script src="assets/js/case-state-store.js?v=9"></script>
   <script src="services/case-files.js?v=4"></script>
   <script src="services/interview-completion.js?v=1"></script>
   <script src="vendor/docx.iife.js"></script>
   <script src="core/interview-word-domain.js?v=1"></script>
   <script src="assets/js/industry-change-form.js?v=7"></script>
-  <script src="assets/js/industry-change-form-live.js?v=4"></script>
+  <script src="assets/js/industry-change-form-live.js?v=5"></script>
   <script src="assets/js/workspace-nav.js?v=4"></script>
 </body>
 </html>

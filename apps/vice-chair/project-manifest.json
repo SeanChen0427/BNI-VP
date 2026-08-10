@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-07-20",
+  "updated": "2026-08-10",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -34,6 +34,7 @@
     "weeklyAttendanceReconciliation": "core/attendance-domain.js",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
     "lineCaseVoteNotice": "supabase/functions/app-api/line-message.mjs",
+    "lineCaseResultAnnouncement": "supabase/functions/app-api/line-message.mjs",
     "votingAndRecusal": [
       "core/case-domain.js",
       "docs/voting-rules.md"

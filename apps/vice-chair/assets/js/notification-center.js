@@ -55,7 +55,11 @@
 
     if (stage === domain.STAGES.ADVISOR) {
       kind = "advisor";
-      title = state.advisorStatus === "returned" ? "董顧退回案件補件" : "案件等待董顧確認";
+      title = state.resultAnnouncementSent
+        ? "正式公告已發布・案件待結案"
+        : state.advisorStatus === "confirmed"
+          ? "董顧已確認・待公告或結案"
+          : state.advisorStatus === "returned" ? "董顧退回案件補件" : "案件等待董顧確認";
       link = `case-workflow.html?case=${encodeURIComponent(task.id)}`;
       icon = "顧";
       priority = 3;

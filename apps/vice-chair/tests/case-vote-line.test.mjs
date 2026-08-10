@@ -50,7 +50,7 @@ test("年度培訓與來賓欄位只在續約案件顯示", () => {
   const css = read("apps/vice-chair/assets/css/case-workflow-extra.css");
 
   assert.match(html, /id="renewalExtra" hidden/);
-  assert.match(html, /case-workflow-extra\.css\?v=3/);
+  assert.match(html, /case-workflow-extra\.css\?v=4/);
   assert.match(workflow, /\$\("#renewalExtra"\)\.hidden=\$\("#caseType"\)\.value!=="renewal"/);
   assert.match(workflow, /catch\{if\(\$\("#caseType"\)\.value==="renewal"\)/);
   assert.match(css, /\.renewal-extra\[hidden\],[\s\S]*?\.annual-data-source\[hidden\][\s\S]*?display: none !important/);
@@ -98,6 +98,6 @@ test("後端只以正式案件、正式委員會群與投票快照發送", () =>
   assert.match(html, /id="copyVoteNotice"/);
   assert.match(html, /通知委員（正式 LINE OA）/);
   assert.match(html, /id="voteNoticePreview"/);
-  assert.match(html, /case-state-store\.js\?v=8/);
-  assert.match(html, /case-workflow\.js\?v=19/);
+  assert.match(html, /case-state-store\.js\?v=9/);
+  assert.match(html, /case-workflow\.js\?v=20/);
 });
