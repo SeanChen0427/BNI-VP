@@ -7,12 +7,16 @@ const read = relative => readFile(fileURLToPath(new URL(relative, import.meta.ur
 
 test('留言板正式資料表提供冪等匯入、軟刪除且禁止瀏覽器直接寫入', async () => {
   const migration = await read('../../../supabase/migrations/20260810173000_committee_board_sync.sql');
+  const serviceRoleGrant = await read('../../../supabase/migrations/20260810174500_announcements_service_role_grant.sql');
 
   assert.match(migration, /add column if not exists author_name text/);
   assert.match(migration, /add column if not exists source_reference text/);
   assert.match(migration, /create unique index if not exists announcements_source_reference_unique/);
   assert.match(migration, /deleted_at timestamptz/);
   assert.match(migration, /revoke all on table public\.announcements from public, anon, authenticated/);
+  assert.match(serviceRoleGrant, /grant select, insert, update\s+on table public\.announcements\s+to service_role/s);
+  assert.match(serviceRoleGrant, /revoke all\s+on table public\.announcements\s+from public, anon, authenticated/s);
+  assert.doesNotMatch(serviceRoleGrant, /\b(update|delete|insert into)\s+public\.announcements/i);
 });
 
 test('Edge API 以登入身份建立、匯入與刪除留言', async () => {

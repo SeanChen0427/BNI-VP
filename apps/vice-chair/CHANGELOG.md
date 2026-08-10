@@ -1,5 +1,11 @@
 # 變更紀錄
 
+## 2026-08-10－留言板 service-role 權限修正
+
+- 明確授權 app-api 的 `service_role` 讀取、新增及軟刪除留言，修正正式環境 `permission denied for table announcements`。
+- 瀏覽器端 `anon`、`authenticated` 仍無法直接存取留言表，所有留言操作繼續由 app-api 驗證身分。
+- 本次 migration 只調整資料表權限，不新增、修改或刪除任何既有留言資料。
+
 ## 2026-08-10－結案清單移除舊排定階段
 
 - 修正案件已顯示「已結案存檔」，下方卻仍殘留「續約訪談已排定／期中關懷已排定／待進行新會員訪談」的矛盾文字。
