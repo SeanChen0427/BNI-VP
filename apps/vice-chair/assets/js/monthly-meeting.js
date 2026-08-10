@@ -53,7 +53,7 @@
       if(item.taskId)return{...item,state:completedTaskIds.has(item.taskId)?"done":item.state};
       const savedTaskExists=saved.taskId&&liveTaskIds.has(saved.taskId);
       const staleSchedule=saved.taskId&&!savedTaskExists&&["scheduled","active"].includes(saved.state);
-      return{...item,state:staleSchedule?"pending":completedTaskIds.has(saved.taskId)?"done":saved.state||item.state,owner:saved.owner||item.owner,companion:saved.companion||item.companion,dueDate:saved.dueDate||item.dueDate,note:saved.note||item.note||"",taskId:savedTaskExists?saved.taskId:"",taskCreatedByMeeting:savedTaskExists&&Boolean(saved.taskCreatedByMeeting),syncMissing:Boolean(staleSchedule)};
+      return{...item,state:staleSchedule?"pending":completedTaskIds.has(saved.taskId)?"done":saved.state||item.state,owner:saved.owner||item.owner,companion:saved.companion||item.companion,dueDate:saved.dueDate||item.dueDate,note:saved.note||item.note||"",taskId:savedTaskExists?saved.taskId:"",taskCreatedByMeeting:savedTaskExists&&Boolean(saved.taskCreatedByMeeting),syncMissing:Boolean(staleSchedule||saved.syncMissing),taskDeleted:Boolean(saved.taskDeleted)};
     });
   }
   function careMembersText(items=[]){
@@ -67,6 +67,7 @@
   }
   async function syncCareTask(item){
     if(!canManage||!requiresCareAssignment(item)||!item.member||!item.taskType)return null;
+    if(item.taskDeleted)return"deleted";
     let tasks=loadTasks();
     const referenced=item.taskId?tasks.find(task=>task.id===item.taskId):null;
     if(referenced&&!FulianCaseDomain.sameTaskIdentity(referenced,item)){
@@ -89,10 +90,11 @@
   function renderCareBoard(items=[]){
     const board=$("#careVisualBoard"),config=FulianAuth.getConfig(),people=[config.vpName,...config.committee].filter(Boolean),groups=new Map();
     for(const item of items){if(!groups.has(item.category))groups.set(item.category,[]);groups.get(item.category).push(item)}
-    board.innerHTML=items.length?[...groups].map(([category,rows],index)=>`<details class="care-group" ${index<2?"open":""}><summary><b>${escapeHtml(category)}</b><span>${rows.length} 項</span></summary><div class="care-card-grid">${rows.map(item=>`<article class="care-manage-card ${item.owner&&item.dueDate?"":"missing-owner"}" data-care-id="${escapeHtml(item.id)}" data-state="${escapeHtml(item.state)}"><div class="care-card-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></div><span class="care-state-badge">${escapeHtml(careStates[item.state]||"待討論")}</span></div><p class="care-card-detail">${escapeHtml(item.detail)}</p><p class="care-card-action">建議：${escapeHtml(item.action)}</p><div class="care-card-controls"><label>追蹤委員（必填）<select class="care-control" data-field="owner" required><option value="">請選擇追蹤委員</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.owner===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>陪訪委員（選填）<select class="care-control" data-field="companion"><option value="">不指定陪訪</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.companion===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>處理狀態<select class="care-control" data-field="state">${Object.entries(careStates).map(([value,label])=>`<option value="${value}" ${item.state===value?"selected":""}>${label}</option>`).join("")}</select></label><label>排定日期（必填）<input class="care-control" data-field="dueDate" type="date" required value="${escapeHtml(item.dueDate||"")}"></label><label class="full">工作備註<textarea class="care-control" data-field="note" placeholder="儲存後同步到首頁工作排定">${escapeHtml(item.note||"")}</textarea></label></div></article>`).join("")}</div></details>`).join(""):(record.care?.members?`<pre class="care-legacy-record">${escapeHtml(record.care.members)}</pre>`:`<div class="history-empty">目前沒有需要討論或排定的續約及輔導項目</div>`);
+    board.innerHTML=items.length?[...groups].map(([category,rows],index)=>`<details class="care-group" ${index<2?"open":""}><summary><b>${escapeHtml(category)}</b><span>${rows.length} 項</span></summary><div class="care-card-grid">${rows.map(item=>`<article class="care-manage-card ${item.owner&&item.dueDate?"":"missing-owner"} ${item.taskDeleted?"deleted-schedule":""}" data-care-id="${escapeHtml(item.id)}" data-state="${escapeHtml(item.state)}"><div class="care-card-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></div><span class="care-state-badge">${escapeHtml(careStates[item.state]||"待討論")}</span></div><p class="care-card-detail">${escapeHtml(item.detail)}</p><p class="care-card-action">建議：${escapeHtml(item.action)}</p>${item.taskDeleted?`<div class="care-sync-warning"><div><b>原工作排程已刪除</b><span>月會紀錄與原分工仍保留；系統不會自動復活案件。</span></div>${canManage&&record.status!=="final"?`<button type="button" data-recreate-care="${escapeHtml(item.id)}">重新建立工作排程</button>`:""}</div>`:""}<div class="care-card-controls"><label>追蹤委員（必填）<select class="care-control" data-field="owner" required><option value="">請選擇追蹤委員</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.owner===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>陪訪委員（選填）<select class="care-control" data-field="companion"><option value="">不指定陪訪</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.companion===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>處理狀態<select class="care-control" data-field="state">${Object.entries(careStates).map(([value,label])=>`<option value="${value}" ${item.state===value?"selected":""}>${label}</option>`).join("")}</select></label><label>排定日期（必填）<input class="care-control" data-field="dueDate" type="date" required value="${escapeHtml(item.dueDate||"")}"></label><label class="full">工作備註<textarea class="care-control" data-field="note" placeholder="儲存後同步到首頁工作排定">${escapeHtml(item.note||"")}</textarea></label></div></article>`).join("")}</div></details>`).join(""):(record.care?.members?`<pre class="care-legacy-record">${escapeHtml(record.care.members)}</pre>`:`<div class="history-empty">目前沒有需要討論或排定的續約及輔導項目</div>`);
     renderCareSummary(items);
     if(!canManage||record.status==="final")return;
     board.querySelectorAll("[data-care-id]").forEach(card=>card.querySelectorAll(".care-control").forEach(control=>control.onchange=async()=>{const item=record.care.items.find(value=>value.id===card.dataset.careId);if(!item)return;if(control.dataset.field==="companion"&&control.value===item.owner){control.value="";return toast("陪訪委員不能與追蹤委員相同")}if(control.dataset.field==="owner"&&control.value===item.companion){item.companion="";card.querySelector('[data-field="companion"]').value=""}item[control.dataset.field]=control.value;try{const synced=await syncCareTask(item);record.care.members=careMembersText(record.care.items);$("#careMembers").value=record.care.members;card.dataset.state=item.state;card.classList.toggle("missing-owner",!item.owner||!item.dueDate);card.querySelector(".care-state-badge").textContent=careStates[item.state];renderCareSummary(record.care.items);scheduleSave();if(synced==="created")toast("已同步建立首頁工作排定")}catch(error){toast(error.message||"工作排定同步失敗")}}));
+    board.querySelectorAll("[data-recreate-care]").forEach(button=>button.onclick=async()=>{const item=record.care.items.find(value=>value.id===button.dataset.recreateCare);if(!item)return;if(!confirm(`確認依原分工與日期，重新建立「${item.title}」的工作排程？`))return;button.disabled=true;try{item.taskDeleted=false;item.syncMissing=false;item.taskId="";const synced=await syncCareTask(item);record.care.members=careMembersText(record.care.items);scheduleSave();renderCareBoard(record.care.items);toast(synced==="created"?"已重新建立工作排程":"已連結現有工作排程")}catch(error){item.taskDeleted=true;item.syncMissing=true;button.disabled=false;toast(error.message||"重新建立工作排程失敗")}});
   }
   function collect(){
     const careItems=record.care?.items||[],careText=careItems.length?careMembersText(careItems):record.care?.members||"";
@@ -156,11 +158,14 @@
   async function init(){
     try{
       await window.FulianTaskStore.ready;
-      if(canManage){
-        const reconciliation=await api("POST",{identity,action:"reconcile-care-tasks"});
-        if(reconciliation.repaired||reconciliation.relinked)await window.FulianTaskStore.refresh();
-      }
       await Promise.all([loadBni(),api().then(data=>store=data)]);
+      let reconciliationError=null;
+      if(canManage){
+        try{
+          const reconciliation=await api("POST",{identity,action:"reconcile-care-tasks"});
+          if(reconciliation.repaired||reconciliation.relinked||reconciliation.unlinked){await window.FulianTaskStore.refresh();store=await api()}
+        }catch(error){reconciliationError=error;console.error("月會工作排程對帳失敗",error)}
+      }
       if(!canManage){
         document.body.classList.add("committee-history-mode");$("#accessNotice").hidden=false;
         record=store.records.length?structuredClone(store.records[0]):null;renderHistory();bind();
@@ -173,7 +178,7 @@
       if(!existing){record.growth.chapterActual=snapshot?.summary?.totalMembers||0;record.growth={...record.growth,...context,chapterActual:snapshot?.summary?.totalMembers||0}}
       if(record.status!=="final")record.care={...record.care,items:careItems,members:careMembers};
       if(record.status!=="final")try{record.attendance={...record.attendance,...await attendanceContext(record.reportMonth)}}catch(error){record.attendance.source=error.message}
-      renderRecord();renderHistory();bind();$("#saveState").textContent=existing?(record.status==="final"?"正式紀錄已保存":"草稿已載入"):"新月份草稿";$("#saveMeta").textContent=existing&&record.updatedAt?new Date(record.updatedAt).toLocaleString("zh-TW"):"開始填寫後自動保存";if(existing&&(legacyCleared||careChanged))await save("draft",true);
+      renderRecord();renderHistory();bind();$("#saveState").textContent=existing?(record.status==="final"?"正式紀錄已保存":"草稿已載入"):"新月份草稿";$("#saveMeta").textContent=reconciliationError?"月會紀錄已載入；部分工作排程同步待檢查":existing&&record.updatedAt?new Date(record.updatedAt).toLocaleString("zh-TW"):"開始填寫後自動保存";if(reconciliationError)toast("月會紀錄已載入，部分工作排程同步待檢查");if(existing&&(legacyCleared||careChanged))await save("draft",true);
     }catch(error){$("#saveState").textContent="月會功能無法載入";$("#saveMeta").textContent=error.message;toast(error.message)}
   }
   init();

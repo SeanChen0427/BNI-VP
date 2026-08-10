@@ -285,9 +285,18 @@ test("月會排定必須由 Supabase 任務佐證，舊草稿會自動修復", (
   assert.match(edge, /body\.action === "reconcile-care-tasks"/);
   assert.match(edge, /record = \(await ensureMonthlyCareTasks\(record, context\)\)\.record/);
   assert.match(edge, /await saveLeadershipTask\(monthlyCareTaskInput/);
+  assert.match(edge, /deleted_task_references\?source=eq\.\$\{TASK_SOURCE\}/);
+  assert.match(edge, /item\.taskDeleted = true/);
+  assert.match(edge, /return \{ repaired: created, relinked: linked, unlinked \}/);
   assert.match(monthly, /action:"reconcile-care-tasks"/);
   assert.match(monthly, /await window\.FulianTaskStore\.refresh\(\)/);
   assert.match(monthly, /staleSchedule\?"pending"/);
+  assert.match(monthly, /月會紀錄已載入；部分工作排程同步待檢查/);
+  assert.match(monthly, /原工作排程已刪除/);
+  assert.match(monthly, /data-recreate-care/);
+  const recordsLoadedAt = monthly.indexOf("await Promise.all([loadBni(),api().then(data=>store=data)]);");
+  const reconciliationAt = monthly.indexOf('action:"reconcile-care-tasks"');
+  assert.ok(recordsLoadedAt >= 0 && reconciliationAt > recordsLoadedAt, "月會紀錄必須先讀取，再執行工作排程對帳");
   assert.match(rpcFix, /on conflict on constraint task_private_details_pkey/);
   assert.doesNotMatch(rpcFix, /on conflict \(task_id\)/);
   assert.match(rpcVariableFix, /due_at = v_due_at/);

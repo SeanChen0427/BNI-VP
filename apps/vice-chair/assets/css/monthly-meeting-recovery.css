@@ -1,0 +1,45 @@
+.care-manage-card.deleted-schedule {
+  border-left-color: #9b6a2e;
+  background: #fffdf8;
+}
+
+.care-sync-warning {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 11px;
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: #fff2d9;
+  color: #745021;
+}
+
+.care-sync-warning > div {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.care-sync-warning b { font-size: 10px; }
+.care-sync-warning span { font-size: 9px; }
+
+.care-sync-warning button {
+  border: 1px solid #c99d62;
+  border-radius: 8px;
+  background: #fff;
+  color: #7b531e;
+  padding: 7px 9px;
+  font: 700 9px inherit;
+  cursor: pointer;
+}
+
+.care-sync-warning button:disabled { opacity: .5; }
+
+@media (max-width: 560px) {
+  .care-sync-warning {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .care-sync-warning button { min-height: 42px; }
+}

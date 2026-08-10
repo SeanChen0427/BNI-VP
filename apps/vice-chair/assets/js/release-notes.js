@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.1",
+      publishedAt: "2026-08-10",
+      title: "修正月會紀錄載入",
+      level: "important",
+      changes: Object.freeze([
+        "修正舊月會草稿引用已刪除案件時，整個月會頁面無法載入的問題。",
+        "月會紀錄會先正常顯示；失效排程只標示待處理，不會自動復活已刪除案件。"
+      ]),
+      impact: "既有月會內容、案件、期中關懷、訪談草稿、附件、回饋與投票資料均保留。"
+    }),
+    Object.freeze({
       version: "1.0.0",
       publishedAt: "2026-08-10",
       title: "交接與委員會通知更新",

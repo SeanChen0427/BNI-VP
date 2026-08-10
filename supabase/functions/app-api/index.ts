@@ -1642,22 +1642,35 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
   const items = Array.isArray(care.items) ? care.items.map((item: any) => ({ ...item })) : [];
   const actionable = items.filter((item: any) =>
     item.assignmentRequired !== false
+    && item.taskDeleted !== true
     && ["pending", "scheduled", "active"].includes(String(item.state || "pending"))
     && ["renewal", "midterm", "special"].includes(String(item.taskType || ""))
     && String(item.member || "").trim()
     && String(item.owner || "").trim()
     && String(item.dueDate || "").trim()
   );
-  if (!actionable.length) return { record: { ...record, care: { ...care, items } }, created: 0, linked: 0 };
+  if (!actionable.length) return { record: { ...record, care: { ...care, items } }, created: 0, linked: 0, unlinked: 0 };
 
   const rows = await db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,category,title,status,result_summary`);
+  const deletedRows = await db(`deleted_task_references?source=eq.${TASK_SOURCE}&select=source_reference`);
+  const deletedReferences = new Set((deletedRows || []).map((row: any) => row.source_reference));
   const byReference = new Map((rows || []).map((row: any) => [row.source_reference, row]));
   const directoryState = directory || await taskDirectory();
   let created = 0;
   let linked = 0;
+  let unlinked = 0;
 
   for (const item of actionable) {
     let preferredReference = monthlyCareTaskReference(record, item);
+    if (deletedReferences.has(preferredReference)) {
+      item.taskId = "";
+      item.taskCreatedByMeeting = false;
+      item.taskDeleted = true;
+      item.syncMissing = true;
+      item.state = "pending";
+      unlinked += 1;
+      continue;
+    }
     let existing = byReference.get(preferredReference);
     if (existing && (existing.category !== item.taskType || existing.title !== item.member)) {
       item.taskId = "";
@@ -1683,7 +1696,20 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
       continue;
     }
 
-    await saveLeadershipTask(monthlyCareTaskInput(record, item, preferredReference, context), context, directoryState);
+    try {
+      await saveLeadershipTask(monthlyCareTaskInput(record, item, preferredReference, context), context, directoryState);
+    } catch (error) {
+      if (String((error as any)?.message).includes("TASK_DELETED")) {
+        item.taskId = "";
+        item.taskCreatedByMeeting = false;
+        item.taskDeleted = true;
+        item.syncMissing = true;
+        item.state = "pending";
+        unlinked += 1;
+        continue;
+      }
+      throw error;
+    }
     item.taskId = preferredReference;
     item.taskCreatedByMeeting = true;
     if (item.state === "pending") item.state = "scheduled";
@@ -1702,7 +1728,7 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
     byReference.set(preferredReference, inserted);
     created += 1;
   }
-  return { record: { ...record, care: { ...care, items } }, created, linked };
+  return { record: { ...record, care: { ...care, items } }, created, linked, unlinked };
 }
 
 async function committeeMeetingsApi(request: Request, context: Context) {
@@ -1724,12 +1750,14 @@ async function committeeMeetingsApi(request: Request, context: Context) {
     const directory = await taskDirectory();
     let created = 0;
     let linked = 0;
+    let unlinked = 0;
     for (const row of rows || []) {
       const current = meetingToApi(row, names);
       const result = await ensureMonthlyCareTasks(current, context, directory);
       created += result.created;
       linked += result.linked;
-      if (!result.created && !result.linked) continue;
+      unlinked += result.unlinked;
+      if (!result.created && !result.linked && !result.unlinked) continue;
       await db(`committee_meetings?id=eq.${row.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
@@ -1738,7 +1766,7 @@ async function committeeMeetingsApi(request: Request, context: Context) {
         }),
       });
     }
-    return { repaired: created, relinked: linked };
+    return { repaired: created, relinked: linked, unlinked };
   }
   if (body.action === "settings") {
     const target = Math.round(Number(body.chapterSizeTarget));
