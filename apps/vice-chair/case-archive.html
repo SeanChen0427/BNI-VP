@@ -29,7 +29,7 @@
 
   <main>
     <section class="hero">
-      <div><span>CASE ARCHIVE</span><h1 id="pageTitle">結案資料</h1><p>保存當筆案件的訪談 Word、委員回饋、投票、董顧確認與案件歷程。</p></div>
+      <div><span>CASE ARCHIVE</span><h1 id="pageTitle">結案資料</h1><p id="archiveDescription">保存當筆案件的正式訪談與適用的後續紀錄。</p></div>
       <div class="archive-badge"><small>案件狀態</small><strong id="archiveStatus">讀取中</strong></div>
     </section>
 
@@ -50,6 +50,11 @@
         </div>
       </section>
 
+      <section class="card" id="departureInsightsSection" hidden>
+        <div class="section-head"><span>03</span><div><h2>分會營運改善紀錄</h2><p>由離會訪談整理的去識別化觀察與後續優化行動</p></div></div>
+        <dl class="facts" id="departureInsights"></dl>
+      </section>
+
       <section class="card" id="decisionSection">
         <div class="section-head"><span>03</span><div><h2>委員回饋與投票決議</h2><p>保留結案當下的回饋、資格快照及票數</p></div></div>
         <div class="decision-summary" id="decisionSummary"></div>
@@ -63,7 +68,7 @@
       </section>
 
       <section class="card">
-        <div class="section-head"><span>05</span><div><h2>案件歷程</h2><p>依保存時間由新到舊排列</p></div></div>
+        <div class="section-head"><span id="activityStep">05</span><div><h2>案件歷程</h2><p>依保存時間由新到舊排列</p></div></div>
         <ol class="timeline" id="activityLog"></ol>
       </section>
     </div>
@@ -71,7 +76,7 @@
 
   <div id="toast"></div>
   <script src="services/case-files.js?v=4"></script>
-  <script src="assets/js/case-archive.js?v=2"></script>
+  <script src="assets/js/case-archive.js?v=3"></script>
   <script src="assets/js/workspace-nav.js?v=5"></script>
 </body>
 </html>

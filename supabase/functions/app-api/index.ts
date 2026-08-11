@@ -1991,11 +1991,37 @@ async function reconcileProvisionalMembersWithPalms(parsed: any, importId: strin
 }
 
 async function memberDepartureState() {
-  const current = await db("members?status=eq.active&select=profession,people!inner(display_name)&order=created_at.asc");
-  const departed = await db("members?status=eq.departed&select=departed_on,profession,people!inner(display_name,notes)&order=departed_on.desc");
+  const [current, departed, tasks, preferences] = await Promise.all([
+    db("members?status=eq.active&select=id,person_id,profession,people!inner(display_name)&order=created_at.asc"),
+    db("members?status=eq.departed&select=id,person_id,departed_on,profession,people!inner(display_name,notes)&order=departed_on.desc"),
+    db(`tasks?source=eq.${TASK_SOURCE}&category=eq.departure&select=member_id,status,due_at,completed_at,source_reference,created_at&order=created_at.desc`),
+    db("departure_interview_preferences?select=member_id,disposition"),
+  ]);
+  const latestTaskByMember = new Map<string, any>();
+  for (const task of tasks || []) {
+    if (task.member_id && !latestTaskByMember.has(task.member_id)) latestTaskByMember.set(task.member_id, task);
+  }
+  const dispositionByMember = new Map((preferences || []).map((item: any) => [item.member_id, item.disposition]));
   return {
-    currentMembers: current.map((row: any) => ({ name: row.people.display_name, profession: row.profession || "" })),
-    departed: departed.map((row: any) => ({ name: row.people.display_name, confirmedAt: row.departed_on, note: row.people.notes || "" })),
+    currentMembers: current.map((row: any) => ({ memberId: row.id, personId: row.person_id, name: row.people.display_name, profession: row.profession || "" })),
+    departed: departed.map((row: any) => {
+      const task = latestTaskByMember.get(row.id);
+      const interviewStatus = task
+        ? task.status === "completed" ? "completed" : "scheduled"
+        : dispositionByMember.get(row.id) === "waived" ? "waived" : "optional";
+      return {
+        memberId: row.id,
+        personId: row.person_id,
+        name: row.people.display_name,
+        profession: row.profession || "",
+        confirmedAt: row.departed_on,
+        note: row.people.notes || "",
+        interviewStatus,
+        interviewTaskId: task?.source_reference || "",
+        interviewScheduledAt: task?.due_at || "",
+        interviewCompletedAt: task?.completed_at || "",
+      };
+    }),
   };
 }
 
@@ -2020,6 +2046,31 @@ async function memberDepartureApi(request: Request, context: Context) {
   if (request.method === "GET") return memberDepartureState();
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
+  if (body.action === "set-interview-disposition") {
+    const memberId = String(body.memberId || "");
+    const disposition = String(body.disposition || "");
+    if (!UUID_REFERENCE.test(memberId) || !["optional", "waived"].includes(disposition)) {
+      throw new Error("離會訪談設定不正確");
+    }
+    const rows = await db(`members?id=eq.${memberId}&status=eq.departed&select=id,people!inner(display_name)&limit=1`);
+    const target = rows?.[0];
+    if (!target) throw new Error("找不到指定的離會會員");
+    if (disposition === "waived") {
+      const scheduled = await db(`tasks?source=eq.${TASK_SOURCE}&category=eq.departure&member_id=eq.${memberId}&select=id,status&limit=1`);
+      if (scheduled?.length) {
+        throw Object.assign(new Error("此會員已有離會訪談排程或完成紀錄，不能標記為不安排"), { status: 409 });
+      }
+    }
+    await db("departure_interview_preferences?on_conflict=member_id", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ member_id: memberId, disposition, updated_by: context.personId, updated_at: new Date().toISOString() }),
+    });
+    return {
+      message: disposition === "waived" ? `${target.people.display_name} 已標記為不安排離會訪談` : `${target.people.display_name} 已恢復為可安排離會訪談`,
+      state: await memberDepartureState(),
+    };
+  }
   const name = String(body.name || "").replace(/\s+/g, "");
   if (!name || String(body.confirmName || "").replace(/\s+/g, "") !== name) throw new Error("確認姓名不一致：請重新輸入完整姓名");
   const people = await db(`people?display_name=eq.${encodeURIComponent(name)}&select=id,status,notes&limit=1`);
@@ -2614,11 +2665,14 @@ function cleanTaskInput(value: any) {
     .filter(Boolean))]
     .filter((name) => name !== lead)
     .slice(0, 2);
+  const memberRecordId = String(value?.memberRecordId || "").trim();
+  if (memberRecordId && !UUID_REFERENCE.test(memberRecordId)) throw new Error("案件會員識別碼格式不正確");
   if (!id || !TASK_TYPES.has(type) || !member || !lead) throw new Error("排程資料缺少有效的案件編號、類型、對象或主責人");
   return {
     id,
     type,
     member,
+    memberRecordId,
     profession: String(value?.profession || "").trim().slice(0, 200),
     scheduledAt: String(value?.scheduledAt || "").trim().slice(0, 40),
     lead,
@@ -2641,7 +2695,7 @@ function cleanTaskInput(value: any) {
 async function taskDirectory() {
   const [people, members, terms] = await Promise.all([
     db("people?select=id,display_name,status"),
-    db("members?select=id,people!inner(display_name)"),
+    db("members?select=id,status,profession,people!inner(display_name)"),
     db("committee_terms?status=eq.active&select=person_id,role,starts_on,ends_on,people!inner(display_name,status)"),
   ]);
   const today = taipeiDay();
@@ -2654,7 +2708,9 @@ async function taskDirectory() {
     people,
     personById: new Map(people.map((person: any) => [person.id, person.display_name])),
     personByName: new Map(activeCommittee.map((term: any) => [term.people.display_name, term.person_id])),
-    memberByName: new Map(members.map((member: any) => [member.people?.display_name, member.id])),
+    memberById: new Map(members.map((member: any) => [member.id, { id: member.id, name: member.people?.display_name, status: member.status, profession: member.profession || "" }])),
+    activeMemberByName: new Map(members.filter((member: any) => member.status === "active").map((member: any) => [member.people?.display_name, member.id])),
+    departureMemberByName: new Map(members.filter((member: any) => ["active", "departed"].includes(member.status)).map((member: any) => [member.people?.display_name, member.id])),
   };
 }
 
@@ -2687,6 +2743,8 @@ async function taskResponse(context: Context) {
       id: row.source_reference,
       type: row.category,
       member: row.title,
+      memberRecordId: row.member_id || "",
+      memberStatus: directory.memberById.get(row.member_id)?.status || "",
       profession: meta.profession || "",
       scheduledAt: meta.scheduledAt || row.due_at || "",
       lead: directory.personById.get(row.lead_person_id) || "",
@@ -2710,9 +2768,24 @@ async function taskResponse(context: Context) {
 
 async function saveLeadershipTask(input: any, context: Context, directory: any) {
   const task = cleanTaskInput(input);
-  const memberId = directory.memberByName.get(task.member) || null;
+  const exactMember = task.memberRecordId ? directory.memberById.get(task.memberRecordId) : null;
+  if (task.memberRecordId && (!exactMember || exactMember.name !== task.member)) {
+    throw new Error("案件會員識別資料與姓名不一致，請重新選擇會員");
+  }
+  const memberId = task.type === "new"
+    ? null
+    : exactMember?.id || (task.type === "departure"
+      ? directory.departureMemberByName.get(task.member)
+      : directory.activeMemberByName.get(task.member)) || null;
   if (task.type !== "new" && !memberId) {
     throw new Error(`案件會員「${task.member}」不在正式會員名單`);
+  }
+  const selectedMember = memberId ? directory.memberById.get(memberId) : null;
+  if (task.type !== "new" && task.type !== "departure" && selectedMember?.status !== "active") {
+    throw new Error(`案件會員「${task.member}」不是現任會員`);
+  }
+  if (task.type === "departure" && !["active", "departed"].includes(selectedMember?.status)) {
+    throw new Error(`離會訪談對象「${task.member}」不在現任或歷史離會名單`);
   }
   const leadId = directory.personByName.get(task.lead);
   if (!leadId) throw new Error(`主責人「${task.lead}」不在有效委員名單`);
@@ -3398,6 +3471,12 @@ async function caseStatesApi(request: Request, context: Context) {
   const expectedRevision = Number(body.revision || 0);
   const currentWorkflow = existing?.workflow || {};
   const currentDraft = existing?.draft || {};
+  const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
+  const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
+
+  if (["vote-notice", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+    throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
+  }
 
   if (body.kind === "vote-notice") {
     return sendCaseVoteNotice(access, existing, context);
@@ -3585,7 +3664,7 @@ async function caseStatesApi(request: Request, context: Context) {
           caseType: access.task.category,
           applicant: access.task.title,
         };
-        if (["midterm", "departure"].includes(access.task.category) && proposed.wordSaved) workflow.closed = true;
+        if (recordOnlyCase && proposed.wordSaved) workflow.closed = true;
       }
     }
   } else {
@@ -3593,19 +3672,26 @@ async function caseStatesApi(request: Request, context: Context) {
   }
 
   if (body.kind === "workflow" && workflow.closed) {
-    if (!access.leadership) throw Object.assign(new Error("只有副主席或 Admin 可結案"), { status: 403 });
-    if (workflow.advisorStatus !== "confirmed") {
-      throw Object.assign(new Error("董事顧問尚未確認同意，不能結案"), { status: 409 });
-    }
-    const snapshots = access.task.case_id
-      ? await db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=result&limit=1`)
-      : [];
-    const result = snapshots?.[0]?.result || "pending";
-    if (!["approved", "rejected"].includes(result)) {
-      throw Object.assign(new Error("本案尚未形成正式投票決議，不能結案"), { status: 409 });
-    }
-    if (result === "approved" && !currentWorkflow.resultAnnouncementSent) {
-      throw Object.assign(new Error("通過案件尚未成功發布公告群，不能結案"), { status: 409 });
+    if (recordOnlyCase) {
+      if (!workflow.wordSaved) {
+        throw Object.assign(new Error("訪談 Word 尚未成功保存，不能結案"), { status: 409 });
+      }
+    } else {
+      if (!decisionCase) throw Object.assign(new Error("此案件類型不能由案件流程結案"), { status: 409 });
+      if (!access.leadership) throw Object.assign(new Error("只有副主席或 Admin 可結案"), { status: 403 });
+      if (workflow.advisorStatus !== "confirmed") {
+        throw Object.assign(new Error("董事顧問尚未確認同意，不能結案"), { status: 409 });
+      }
+      const snapshots = access.task.case_id
+        ? await db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=result&limit=1`)
+        : [];
+      const result = snapshots?.[0]?.result || "pending";
+      if (!["approved", "rejected"].includes(result)) {
+        throw Object.assign(new Error("本案尚未形成正式投票決議，不能結案"), { status: 409 });
+      }
+      if (result === "approved" && !currentWorkflow.resultAnnouncementSent) {
+        throw Object.assign(new Error("通過案件尚未成功發布公告群，不能結案"), { status: 409 });
+      }
     }
   }
 

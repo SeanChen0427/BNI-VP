@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.3",
+      publishedAt: "2026-08-11",
+      title: "離會訪談改為純紀錄流程",
+      level: "important",
+      changes: Object.freeze([
+        "離會訪談保存 Word 後直接結案，不進入委員回饋、投票、董事顧問確認或公告流程。",
+        "已登記離會的會員仍可從歷史紀錄安排補訪；補訪不會恢復會員資格，也不會加入現任人數。",
+        "表單新增清楚的營運改善摘要與後續優化行動欄位，供分會持續改善。",
+        "結案資料頁只顯示離會訪談 Word、營運改善紀錄與案件歷程，不再出現決議區塊。"
+      ]),
+      impact: "不修改既有已完成案件、訪談 Word 或歷史資料；只修正後續離會訪談的流程限制與顯示。"
+    }),
+    Object.freeze({
       version: "1.0.2",
       publishedAt: "2026-08-10",
       title: "留言板跨裝置同步",

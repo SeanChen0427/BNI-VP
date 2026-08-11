@@ -55,6 +55,7 @@
 - `case_vote_line_deliveries`：開票通知的正式會員委員會群發送稽核與防重送紀錄。
 - `case_result_line_deliveries`：新會員、續約與轉換專業別通過後的正式公告群發送稽核；只允許 `approved`，保存送出當下的案件欄位快照與雜湊，瀏覽器角色不可讀取。
 - `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。
+- `departure_interview_preferences`：歷史離會會員的選擇性補訪設定，只記錄「可安排／不安排」及操作者；不得修改 `members.status`、`departed_on` 或 PALMS 對帳結果。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
 - `deleted_task_references`：副主席／Admin 明確刪除案件後的識別碼封存標記；只保存來源、案件編號、原任務 UUID 與刪除時間，阻止舊裝置把 localStorage 殘影再次匯回，不保存會員內容或訪談資料。
 - `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。

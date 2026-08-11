@@ -10,11 +10,15 @@ test("離會人員紀錄預設只顯示最新五人並可展開完整歷史", ()
   const source = read("apps/vice-chair/assets/js/settings.js");
 
   assert.match(page, /id="toggleDepartureHistory"[^>]+aria-controls="departedList"/);
-  assert.match(page, /assets\/js\/settings\.js\?v=12/);
+  assert.match(page, /assets\/js\/settings\.js\?v=13/);
   assert.match(source, /DEPARTURE_PREVIEW_LIMIT=5/);
   assert.match(source, /localeCompare\(String\(a\.confirmedAt/);
   assert.match(source, /departureHistoryExpanded\?departed:departed\.slice\(0,DEPARTURE_PREVIEW_LIMIT\)/);
   assert.match(source, /查看全部歷史紀錄/);
   assert.match(source, /收合歷史紀錄/);
   assert.match(source, /aria-expanded/);
+  assert.match(source, /離會訪談未安排（選擇性）/);
+  assert.match(source, /case-board\.html\?new=departure&amp;memberId=/);
+  assert.match(source, /data-departure-interview-disposition="waived"/);
+  assert.match(source, /set-interview-disposition/);
 });

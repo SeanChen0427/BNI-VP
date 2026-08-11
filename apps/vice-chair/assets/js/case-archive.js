@@ -56,12 +56,11 @@
 
   function renderDecision(task, state) {
     if (!domain.requiresDecisionWorkflow(task)) {
-      $("#decisionSummary").innerHTML = '<div class="no-decision"><b>本案不需委員回饋及投票</b><span>訪談 Word 完成後即依規則結案。</span></div>';
-      $("#feedbackList").hidden = true;
-      $("#voteList").hidden = true;
+      $("#decisionSection").hidden = true;
       $("#advisorSection").hidden = true;
       return;
     }
+    $("#decisionSection").hidden = false;
     const decision = decisionOf(state);
     $("#decisionSummary").innerHTML = `
       <article><small>結案決議</small><strong>${esc(decision.status)}</strong></article>
@@ -89,6 +88,19 @@
         fact("過去一年培訓", form.annualTraining),
         fact("過去一年來賓", form.annualVisitors)
       ] : [])
+    ].join("");
+  }
+
+  function renderRecordOnlySummary(task, draft) {
+    const isDeparture = task.type === "departure";
+    $("#departureInsightsSection").hidden = !isDeparture;
+    $("#activityStep").textContent = isDeparture ? "04" : domain.requiresDecisionWorkflow(task) ? "05" : "03";
+    if (!isDeparture) return;
+    $("#archiveDescription").textContent = "保存離會訪談 Word、分會營運改善摘要與案件歷程；本案不含委員回饋、投票、董事顧問確認或公告流程。";
+    $("#departureInsights").innerHTML = [
+      fact("改善議題分類", draft.reasonCategory),
+      fact("分會營運改善摘要", draft.committeeSummary),
+      fact("後續優化行動與追蹤", draft.internalNotes)
     ].join("");
   }
 
@@ -146,6 +158,7 @@
     $("#archiveStatus").textContent = "已結案存檔";
     $("#pageTitle").textContent = `${task.member}・${typeMap[task.type] || "會員案件"}`;
     const stateForm = state.form || {};
+    const draft = domain.readDraft(localStorage, task) || {};
     $("#caseFacts").innerHTML = [
       fact("案件編號", task.id),
       fact("案件類型", typeMap[task.type]),
@@ -157,6 +170,7 @@
       fact("結案時間", dateLabel(task.completedAt || state.interviewCompletedAt)),
       fact("保存檔名", state.wordName)
     ].join("");
+    renderRecordOnlySummary(task, draft);
     renderDecision(task, state);
     const log = Array.isArray(state.log) ? state.log : [];
     $("#activityLog").innerHTML = log.length

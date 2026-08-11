@@ -12,6 +12,7 @@
     special: { label: "特定會員關懷", stage: "待進行會員關懷", form: "member-care.html", existing: true },
   };
   let members = [];
+  let departureMembers = [];
   const esc = value => String(value ?? "").replace(/[&<>"']/g, character => ({
     "&": "&amp;",
     "<": "&lt;",
@@ -36,7 +37,8 @@
           <div class="case-create-fields">
             <label>案件類型<select id="createType">${Object.entries(types).map(([value, item]) => `<option value="${value}">${item.label}</option>`).join("")}</select></label>
             <label>排定日期與時間<input id="createDate" type="datetime-local" required></label>
-            <label>會員／申請者<input id="createMember" list="createMemberList" autocomplete="off" required placeholder="搜尋會員或輸入新申請者"><datalist id="createMemberList"></datalist></label>
+            <label id="createMemberField">會員／申請者<input id="createMember" list="createMemberList" autocomplete="off" required placeholder="搜尋會員或輸入新申請者"><datalist id="createMemberList"></datalist></label>
+            <label id="createDepartureMemberField" hidden>離會訪談對象<select id="createDepartureMember"></select><small>可選現任會員或歷史離會會員；補訪不會恢復會員資格。</small></label>
             <label>專業類別<input id="createProfession" placeholder="新會員請手動填寫"></label>
             <label>主要負責人<select id="createLead">${committee.map(name => `<option value="${esc(name)}">${esc(name)}${name === config.vpName ? "（副主席）" : ""}</option>`).join("")}</select></label>
             <label>優先程度<select id="createPriority"><option value="normal">一般</option><option value="high">高優先</option></select></label>
@@ -64,11 +66,33 @@
   }
 
   function syncProfession() {
-    const found = members.find(item => item.name === document.querySelector("#createMember").value.trim());
+    const type = document.querySelector("#createType").value;
+    const found = type === "departure"
+      ? departureMembers.find(item => item.memberId === document.querySelector("#createDepartureMember").value)
+      : members.find(item => item.name === document.querySelector("#createMember").value.trim());
     if (found) document.querySelector("#createProfession").value = found.profession || "";
   }
 
-  function open(type = "renewal") {
+  function renderDepartureMembers(selectedMemberId = "") {
+    const select = document.querySelector("#createDepartureMember");
+    const active = departureMembers.filter(item => item.status === "active");
+    const departed = departureMembers.filter(item => item.status === "departed");
+    select.innerHTML = `<option value="">請選擇訪談對象</option>${active.length ? `<optgroup label="現任會員">${active.map(item => `<option value="${esc(item.memberId)}">${esc(item.name)}・${esc(item.profession || "未設定專業別")}</option>`).join("")}</optgroup>` : ""}${departed.length ? `<optgroup label="歷史離會會員">${departed.map(item => `<option value="${esc(item.memberId)}">${esc(item.name)}・${esc(item.profession || "未設定專業別")}（已離會）</option>`).join("")}</optgroup>` : ""}`;
+    if (selectedMemberId && departureMembers.some(item => item.memberId === selectedMemberId)) select.value = selectedMemberId;
+    syncProfession();
+  }
+
+  function configureMemberField(selectedMemberId = "") {
+    const isDeparture = document.querySelector("#createType").value === "departure";
+    document.querySelector("#createMemberField").hidden = isDeparture;
+    document.querySelector("#createMember").required = !isDeparture;
+    document.querySelector("#createDepartureMemberField").hidden = !isDeparture;
+    document.querySelector("#createDepartureMember").required = isDeparture;
+    if (isDeparture) renderDepartureMembers(selectedMemberId);
+    else syncProfession();
+  }
+
+  function open(type = "renewal", preset = {}) {
     const selectedType = types[type] ? type : "renewal";
     document.querySelector("#createType").value = selectedType;
     document.querySelector("#createMember").value = "";
@@ -80,8 +104,9 @@
     document.querySelector("#createPriority").value = "normal";
     document.querySelector("#createNotes").value = "";
     renderCompanions();
+    configureMemberField(preset.memberId || "");
     document.querySelector("#caseCreateModal").hidden = false;
-    document.querySelector("#createMember").focus();
+    (selectedType === "departure" ? document.querySelector("#createDepartureMember") : document.querySelector("#createMember")).focus();
   }
 
   function close() {
@@ -92,9 +117,16 @@
   async function submit(event) {
     event.preventDefault();
     const type = document.querySelector("#createType").value;
-    const member = document.querySelector("#createMember").value.trim();
+    const departureMember = type === "departure"
+      ? departureMembers.find(item => item.memberId === document.querySelector("#createDepartureMember").value)
+      : null;
+    const member = departureMember?.name || document.querySelector("#createMember").value.trim();
     if (!member) return;
-    if (types[type]?.existing && !members.some(item => item.name === member)) {
+    if (type === "departure" && !departureMember) {
+      alert("請從現任或歷史離會會員名單選擇訪談對象。");
+      return;
+    }
+    if (type !== "departure" && types[type]?.existing && !members.some(item => item.name === member)) {
       alert("此案件類型必須從正式會員名單選擇，不可手動輸入其他姓名。");
       return;
     }
@@ -104,6 +136,7 @@
       id,
       type,
       member,
+      memberRecordId: departureMember?.memberId || members.find(item => item.name === member)?.memberId || "",
       profession: document.querySelector("#createProfession").value.trim(),
       scheduledAt: document.querySelector("#createDate").value,
       lead: document.querySelector("#createLead").value,
@@ -127,22 +160,39 @@
     document.querySelector("#closeCaseCreate").onclick = close;
     document.querySelector("#cancelCaseCreate").onclick = close;
     document.querySelector("#caseCreateForm").onsubmit = submit;
+    document.querySelector("#createType").onchange = () => configureMemberField();
     document.querySelector("#createLead").onchange = renderCompanions;
     document.querySelector("#createMember").onchange = syncProfession;
+    document.querySelector("#createDepartureMember").onchange = syncProfession;
     document.querySelector("#newCase").onclick = () => open("renewal");
     try {
       const response = await fetch("/api/bni-analysis", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
-      members = (data.members || []).map(item => ({ name: item.name, profession: item.profession || "" }));
+      members = (data.members || []).map(item => ({ memberId: item.memberId || item.id || "", name: item.name, profession: item.profession || "" }));
       document.querySelector("#createMemberList").innerHTML = members
         .map(item => `<option value="${esc(item.name)}">${esc(item.profession)}</option>`)
         .join("");
     } catch {
       members = [];
     }
+    try {
+      if (["admin", "vp"].includes(session.role)) {
+        const identity = `${session.role}:${session.name}`;
+        const response = await fetch(`/api/member-departure?identity=${encodeURIComponent(identity)}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+        departureMembers = [
+          ...(data.currentMembers || []).map(item => ({ ...item, status: "active" })),
+          ...(data.departed || []).map(item => ({ ...item, status: "departed" })),
+        ];
+      }
+    } catch {
+      departureMembers = members.map(item => ({ ...item, status: "active" }));
+    }
     const requested = new URLSearchParams(location.search).get("new");
-    if (requested) open(requested);
+    const requestedMemberId = new URLSearchParams(location.search).get("memberId") || "";
+    if (requested) open(requested, { memberId: requestedMemberId });
   }
 
   init();

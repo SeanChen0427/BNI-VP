@@ -191,9 +191,21 @@ function sortedDepartures(){
 function renderDepartureState(){
   const departed=sortedDepartures();
   const visible=departureHistoryExpanded?departed:departed.slice(0,DEPARTURE_PREVIEW_LIMIT);
-  $("#departureMemberOptions").innerHTML=departureState.currentMembers.map(m=>`<option value="${m.name}">${m.profession||""}</option>`).join("");
+  const interviewLabels={optional:"離會訪談未安排（選擇性）",scheduled:"離會訪談已排定",completed:"離會訪談已完成",waived:"已標記不安排訪談"};
+  $("#departureMemberOptions").innerHTML=departureState.currentMembers.map(m=>`<option value="${escapeHtml(m.name)}">${escapeHtml(m.profession||"")}</option>`).join("");
   $("#departedList").innerHTML=visible.length
-    ?visible.map(d=>`<article><b>${d.name}</b><span>離會確認日 ${d.confirmedAt}</span><span>${d.note||"—"}</span><button data-undo-departure="${d.name}">撤銷</button></article>`).join("")
+    ?visible.map(d=>{
+      const status=d.interviewStatus||"optional";
+      const action=status==="optional"
+        ?`<a href="case-board.html?new=departure&amp;memberId=${encodeURIComponent(d.memberId||"")}">安排離會訪談</a><button type="button" data-departure-interview-disposition="waived" data-member-id="${escapeHtml(d.memberId||"")}" data-member-name="${escapeHtml(d.name)}">不安排</button>`
+        :status==="waived"
+          ?`<button type="button" data-departure-interview-disposition="optional" data-member-id="${escapeHtml(d.memberId||"")}" data-member-name="${escapeHtml(d.name)}">改為可安排</button>`
+          :status==="scheduled"
+            ?`<a href="case-board.html#active">查看排程</a>`
+            :`<a href="case-archive.html?case=${encodeURIComponent(d.interviewTaskId||"")}">查看訪談紀錄</a>`;
+      const timing=status==="scheduled"&&d.interviewScheduledAt?`・${new Date(d.interviewScheduledAt).toLocaleString("zh-TW")}`:status==="completed"&&d.interviewCompletedAt?`・${new Date(d.interviewCompletedAt).toLocaleString("zh-TW")}`:"";
+      return`<article><div class="departure-record-copy"><b>${escapeHtml(d.name)}</b><span>離會確認日 ${escapeHtml(d.confirmedAt||"—")}・${escapeHtml(d.profession||"未設定專業別")}</span><span>${escapeHtml(d.note||"—")}</span><em data-status="${escapeHtml(status)}">${escapeHtml(interviewLabels[status]||status)}${escapeHtml(timing)}</em></div><div class="departure-record-actions">${action}<button type="button" data-undo-departure="${escapeHtml(d.name)}">撤銷離會</button></div></article>`;
+    }).join("")
     :`<article><span>目前離會名單沒有紀錄。</span></article>`;
   $("#departureHistorySummary").textContent=departed.length>DEPARTURE_PREVIEW_LIMIT&&!departureHistoryExpanded
     ?`顯示最近 ${DEPARTURE_PREVIEW_LIMIT} 人・共 ${departed.length} 人`
@@ -203,6 +215,7 @@ function renderDepartureState(){
   toggle.textContent=departureHistoryExpanded?"收合歷史紀錄":`查看全部歷史紀錄（${departed.length} 人）`;
   toggle.setAttribute("aria-expanded",String(departureHistoryExpanded));
   document.querySelectorAll("[data-undo-departure]").forEach(button=>button.onclick=()=>undoDepartureFlow(button.dataset.undoDeparture));
+  document.querySelectorAll("[data-departure-interview-disposition]").forEach(button=>button.onclick=()=>setDepartureInterviewDisposition(button.dataset.memberId,button.dataset.memberName,button.dataset.departureInterviewDisposition));
 }
 async function loadDepartureState(){
   try{
@@ -251,6 +264,14 @@ async function undoDepartureFlow(name){
     departureState=data.state;renderDepartureState();
     $("#departureStatus").textContent=data.message;log(`${session.name}撤銷離會登記：${name}`);toast("已撤銷離會登記");
   }catch(error){$("#departureStatus").textContent=error.message;toast("撤銷失敗")}
+}
+async function setDepartureInterviewDisposition(memberId,name,disposition){
+  if(disposition==="waived"&&!confirm(`確認暫不安排「${name}」的離會訪談？\n這不影響離會狀態，之後仍可改回可安排。`))return;
+  try{
+    const data=await departurePost({action:"set-interview-disposition",memberId,disposition});
+    departureState=data.state;renderDepartureState();
+    $("#departureStatus").textContent=data.message;log(`${session.name}${disposition==="waived"?"標記不安排":"恢復可安排"}離會訪談：${name}`);toast(data.message);
+  }catch(error){$("#departureStatus").textContent=error.message;toast("離會訪談設定失敗")}
 }
 function initDeparture(){
   if(!canManageDeparture)return;

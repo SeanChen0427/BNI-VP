@@ -15,11 +15,18 @@
     const response=await fetch("/api/bni-analysis",{cache:"no-store"});
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
     const snapshot=await response.json();
-    members=(snapshot.members||[]).map(item=>({name:item.name,profession:item.profession||""})).filter(item=>item.name);
-    if(!members.length)throw new Error("沒有可用的正式會員資料");
-    if(!members.some(item=>item.name===task.member))throw new Error(`案件會員「${task.member}」不在正式會員資料`);
+    const activeMembers=(snapshot.members||[]).map(item=>({name:item.name,profession:item.profession||""})).filter(item=>item.name);
+    const activeMatch=activeMembers.find(item=>item.name===task.member);
+    const boundMember=activeMatch||{name:task.member,profession:task.profession||""};
+    if(!boundMember.name||(!activeMatch&&!task.memberRecordId))throw new Error(`案件會員「${task.member}」沒有正式會員識別資料`);
+    members=[boundMember];
     document.querySelector("#memberList").innerHTML=members.map(item=>`<option value="${item.name}">${item.profession}</option>`).join("");
     selectMember(task.member);
+    if(task.memberStatus==="departed"){
+      const notice=document.querySelector("#departureMemberState");
+      notice.hidden=false;
+      notice.textContent="這是已離會會員的補訪紀錄；完成訪談不會恢復現任會員資格，也不影響目前會員人數或 PALMS。";
+    }
     document.querySelector("#interviewer").value=task.lead||session.name;
     if(task.companions?.length)document.querySelector("#companion").value=task.companions.join("、");
     if(task.scheduledAt)document.querySelector("#interviewDate").value=task.scheduledAt;

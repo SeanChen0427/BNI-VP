@@ -30,7 +30,7 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
 });
 
 test("目前版本明確聲明不修改既有正式資料", () => {
-  assert.match(releaseScript, /version: "1\.0\.2"/);
-  assert.match(releaseScript, /既有電腦留言不會刪除/);
-  assert.match(releaseScript, /案件、月會、訪談、附件、回饋、投票與會員資料均不受影響/);
+  assert.match(releaseScript, /version: "1\.0\.3"/);
+  assert.match(releaseScript, /不修改既有已完成案件、訪談 Word 或歷史資料/);
+  assert.match(releaseScript, /離會訪談保存 Word 後直接結案/);
 });
