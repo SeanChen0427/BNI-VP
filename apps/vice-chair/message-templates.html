@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>文稿範本｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/message-templates.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=7"></script>
+  <script src="assets/js/supabase-data.js?v=2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← 回工作台</a>
+    <div class="brand-title"><strong>富聯分會</strong><span>會員委員會常用資源</span></div>
+    <div class="session"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" data-auth-logout>登出</button></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><span>COMMON COPY LIBRARY</span><h1>文稿範本</h1><p>選好需要的文稿後一鍵複製；系統不讀取案件，也不會自行發送任何訊息。</p></div>
+      <div class="hero-mark" aria-hidden="true">文</div>
+    </section>
+
+    <aside class="privacy-note"><b>使用方式</b><span>副主席可直接複製固定公版；只有系統開發人員 Admin 能修改公版。身分證字號由會員本人回覆，系統不保存。</span></aside>
+    <section class="access-notice" id="accessNotice" hidden><b>只有副主席或 Admin 可以使用文稿範本</b><span>會員委員介面不提供正式對外文稿。</span></section>
+    <div id="templateSections" aria-live="polite"><div class="loading-card">正在載入正式文稿…</div></div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="core/message-template-domain.js?v=1"></script>
+  <script src="assets/js/message-templates.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=6"></script>
+</body>
+</html>

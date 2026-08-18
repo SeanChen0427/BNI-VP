@@ -4,6 +4,7 @@ import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analy
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
+import "../../../apps/vice-chair/core/message-template-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
   buildCaseResultAnnouncementMessage,
@@ -43,6 +44,7 @@ const GEMINI_MAX_ATTEMPTS = 3;
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
+const messageTemplateDomain = (globalThis as any).FulianMessageTemplateDomain;
 
 type Provider = typeof PROVIDERS[number];
 type Context = {
@@ -2124,6 +2126,35 @@ async function memberDepartureApi(request: Request, context: Context) {
   throw new Error("不支援的動作");
 }
 
+const MESSAGE_TEMPLATE_SETTINGS_KEY = "common_message_templates";
+
+async function messageTemplateSettings() {
+  const rows = await db(`app_settings?key=eq.${MESSAGE_TEMPLATE_SETTINGS_KEY}&select=value&limit=1`);
+  return messageTemplateDomain.normalize(rows?.[0]?.value);
+}
+
+async function messageTemplatesApi(request: Request, context: Context) {
+  leadership(context);
+  const current = await messageTemplateSettings();
+  if (request.method === "GET") return messageTemplateDomain.response(current);
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  if (context.role !== "admin") {
+    throw Object.assign(new Error("只有系統開發人員 Admin 可以修改正式文稿範本"), { status: 403 });
+  }
+  const body = await requestBody(request);
+  if (body.action !== "save") throw new Error("不支援的文稿操作");
+  const next = messageTemplateDomain.saveTemplate(current, String(body.templateId || ""), body.content, {
+    updatedAt: new Date().toISOString(),
+    updatedBy: context.identity,
+  });
+  await db("app_settings?on_conflict=key", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify({ key: MESSAGE_TEMPLATE_SETTINGS_KEY, value: next, updated_by: context.personId }),
+  });
+  return { ...messageTemplateDomain.response(next), message: "正式文稿範本已保存" };
+}
+
 async function encryptionKey() {
   const secret = Deno.env.get("FULIAN_AI_ENCRYPTION_KEY");
   if (!secret || secret.length < 32) throw new Error("AI 金鑰加密服務尚未完成設定");
@@ -3979,6 +4010,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);
     else if (path === "/api/new-member-registration") result = await newMemberRegistrationApi(request, context);
     else if (path === "/api/member-departure") result = await memberDepartureApi(request, context);
+    else if (path === "/api/message-templates") result = await messageTemplatesApi(request, context);
     else if (path === "/api/ai-settings") result = await aiSettingsApi(request, context);
     else if (path === "/api/ai-chat") result = await aiChatApi(request, context);
     else if (path === "/api/analysis-snapshot") result = await analysisSnapshotApi(request, context);

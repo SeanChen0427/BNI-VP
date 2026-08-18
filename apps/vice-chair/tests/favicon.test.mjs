@@ -11,7 +11,7 @@ test('正式前台頁面都使用富聯 favicon 與 Apple Touch Icon', async () 
   const pages = (await readdir(appRoot))
     .filter((name) => name.endsWith('.html') && name !== 'dashboard-preview-temp.html');
 
-  assert.equal(pages.length, 18);
+  assert.equal(pages.length, 19);
   for (const page of pages) {
     const html = await readFile(path.join(appRoot, page), 'utf8');
     assert.match(html, /<link rel="icon" type="image\/png" sizes="512x512" href="assets\/images\/fulian-favicon\.png">/, page);

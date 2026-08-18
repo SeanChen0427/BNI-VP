@@ -5,6 +5,8 @@ document.querySelector("#monthTitle").textContent=`${monthHeading.month}月會�
 function closeMenu(){sidebar.classList.remove("open");scrim.classList.remove("show")}
 document.querySelector("#openMenu").onclick=()=>{sidebar.classList.add("open");scrim.classList.add("show")};
 document.querySelector("#closeMenu").onclick=closeMenu;scrim.onclick=closeMenu;
+const navStateKey="fulian-nav-groups-v1";let navState={};try{navState=JSON.parse(localStorage.getItem(navStateKey)||"{}")||{}}catch{}
+document.querySelectorAll("details[data-nav-key]").forEach(group=>{const key=group.dataset.navKey;if(navState[key])group.open=true;group.addEventListener("toggle",()=>{navState[key]=group.open;localStorage.setItem(navStateKey,JSON.stringify(navState))})});
 document.body.classList.toggle("committee-mode",session.role==="committee");
 document.body.classList.toggle("vp-mode",session.role==="vp");
 document.querySelectorAll('a[href="#"].disabled').forEach(link=>link.addEventListener("click",event=>event.preventDefault()));
