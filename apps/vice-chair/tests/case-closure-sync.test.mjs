@@ -33,7 +33,7 @@ test("前台只在 Supabase 結案成功後套用正式狀態", () => {
   assert.doesNotMatch(handler, /state\.closed=true/, "伺服器成功前不可先把本機畫面標成已結案");
   assert.match(workflow, /\$\("#resetCase"\)\.hidden=state\.closed/);
   assert.match(html, /Supabase 正式資料/);
-  assert.match(html, /case-workflow\.js\?v=20/);
+  assert.match(html, /case-workflow\.js\?v=21/);
 });
 
 test("結案交易必須先鎖定回饋，再把案件標為 closed", () => {

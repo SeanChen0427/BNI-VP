@@ -23,6 +23,9 @@ const initialState = {
   wordName:"",
   wordReal:false,
   feedbackNotified:false,
+  feedbackNoticeSentAt:"",
+  feedbackNoticeTargetName:"",
+  feedbackNoticeDeliveryId:"",
   feedback:{},
   feedbackMeta:{},
   votingOpen:false,
@@ -156,7 +159,7 @@ function populateResultReferrers(){
 function configureIdentity(){const role=authSession.role==="vp"?"vp":authSession.role==="committee"?"committee":"admin";$("#loginUser").innerHTML=`<option value="${authSession.name}" data-role="${role}">${authSession.name}（${role==="vp"?"副主席":role==="committee"?"會員委員":"系統開發人員 Admin"}）</option>`;$("#loginUser").disabled=true;}
 
 function feedbackNotice(){
-  const blankMembers=eligibleMembers().map(name=>`■ ${name} - ${state.feedback[name]||""}`).join("\n");
+  const blankMembers=eligibleMembers().map(name=>`■ ${name} -`).join("\n");
   return `@All 【 ${config().label}商訪表述&回饋 】\n請主、陪訪回饋與表述,並請委員們參照相簿中「訪談表」及「相關資料」回饋表述。各位為分會重要的守門員,請儘量給予回饋建議!\n------------------\n${$("#interviewDate").value.replaceAll("-","/")}\n地點: ZOOM\n申請者: ${$("#applicant").value}\n專業別: ${$("#profession").value}\n主訪：${$("#leadInterviewer").value} 陪訪：${$("#companionInterviewer").value}\n------------------\n${blankMembers}`;
 }
 
@@ -342,7 +345,17 @@ function renderSummary(){
   $("#profession").readOnly=true;
   $("#feedbackNoticePreview").textContent=feedbackNotice();
   $("#sendFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.feedbackNotified&&!state.closed);
-  $("#sendFeedbackNotice").textContent=state.feedbackNotified?"已通知委員":"模擬 LINE Bot 通知";
+  const feedbackFormallySent=Boolean(state.feedbackNoticeDeliveryId);
+  $("#sendFeedbackNotice").textContent=state.feedbackNotified
+    ? feedbackFormallySent?"已發送回饋通知":"已通知（歷史紀錄）"
+    : "通知委員（正式 LINE OA）";
+  const feedbackLineState=$("#feedbackLineState");
+  feedbackLineState.classList.toggle("sent",Boolean(state.feedbackNotified));
+  feedbackLineState.textContent=state.feedbackNotified
+    ? feedbackFormallySent
+      ? `已於 ${dateLabel(state.feedbackNoticeSentAt)} 發送至「${state.feedbackNoticeTargetName||"會員委員會正式群"}」，系統已鎖定避免重複發送。`
+      : "本案已有先前的人工／模擬通知紀錄；為避免正式群收到重複訊息，系統不會自動補送。"
+    : "將使用正式 LINE OA 發送至後台已綁定的會員委員會群，並真正 @所有人。";
   $("#resetCase").hidden=state.closed||state.resultAnnouncementSent;
   $("#activityLog").innerHTML=state.log.map(item=>`<li class="${item.done?"done":""}"><b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.time)}</span></li>`).join("");
 }
@@ -441,7 +454,29 @@ function bindEvents(){
   $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $("#copyFeedbackNotice").addEventListener("click",async()=>{await navigator.clipboard.writeText(feedbackNotice());toast("回饋通知已複製");});
-  $("#sendFeedbackNotice").addEventListener("click",()=>{if(!isVp())return;state.feedbackNotified=true;addLog("已模擬發送委員回饋通知至會員委員會群");persistNow();toast("已模擬通知委員");});
+  $("#sendFeedbackNotice").addEventListener("click",async()=>{
+    if(!isVp()||!state.wordSaved||state.feedbackNotified)return;
+    if(!confirm(`即將透過正式 LINE OA 發送到後台已綁定的會員委員會正式群，並 @所有人。\n成功送出後，同一案件不能重複發送。\n\n${feedbackNotice()}\n\n確定立即發送？`))return;
+    const button=$("#sendFeedbackNotice");button.disabled=true;button.textContent="正式 LINE 發送中…";
+    clearTimeout(saveTimer);
+    state.form=collectForm();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    $("#saveState").textContent="正在確認案件欄位與 LINE 正式群…";
+    try{await window.FulianCaseStateStore.flush()}catch(error){state=loadState();render();$("#saveState").textContent="案件欄位尚未同步";return toast(error.message||"請先完成案件資料同步");}
+    button.disabled=true;button.textContent="正式 LINE 發送中…";
+    $("#saveState").textContent="正在等待 LINE 確認送達…";
+    lastPersist=window.FulianCaseStateStore.sendFeedbackNotice(CASE_ID);
+    try{
+      const result=await lastPersist;
+      state=loadState();render();
+      $("#saveState").textContent="委員回饋通知已送達並保存至 Supabase";
+      toast(result.message||"委員回饋通知已由正式 LINE OA 發送");
+    }catch(error){
+      state=loadState();render();
+      $("#saveState").textContent="LINE 委員回饋通知尚未完成";
+      toast(error.message||"委員回饋通知發送失敗");
+    }
+  });
   $("#saveFeedback").addEventListener("click",async()=>{const text=$("#myFeedback").value.trim(),user=currentUser(),target=selectedFeedbackAuthor(),proxy=isVp()&&target!==user;if(!text)return toast("請先填寫回饋內容");if(!user)return toast("登入身份載入失敗，請重新登入後再試");if(!eligibleMembers().includes(target))return toast(`${target||user}是本案申請者，依規則須迴避回饋與投票`);if(target!==user&&!isVp())return toast("只有副主席可以代填會員委員回饋");$("#saveState").textContent=proxy?`正在代填 ${target} 的回饋…`:"正在保存你的回饋…";lastPersist=window.FulianCaseStateStore.saveFeedback(CASE_ID,text,target);try{await lastPersist;feedbackDirty=false;state=loadState();render();$("#saveState").textContent=proxy?`${target} 的代填回饋已保存至 Supabase`:"你的回饋已保存至 Supabase";toast(proxy?`已代填 ${target} 的回饋`:"回饋已儲存")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"回饋保存失敗")}});
   $("#openVote").addEventListener("click",async()=>{if(!isVp()||!feedbackReady())return;const deadline=voteDeadlineStatus();if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止，請先更新截止時間");const proposed={...state,form:collectForm(),votingOpen:true};$("#saveState").textContent="正在建立投票資格快照…";lastPersist=window.FulianCaseStateStore.openVote(CASE_ID,proposed);try{await lastPersist;state=loadState();render();$("#saveState").textContent="投票已開啟並保存資格快照";toast("系統投票已開啟")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"投票開啟失敗")}});
   $("#copyVoteNotice").addEventListener("click",async()=>{await navigator.clipboard.writeText(voteNotice());toast("投票通知文案已複製");});
