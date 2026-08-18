@@ -43,6 +43,7 @@
 - `ai_credentials`：個人 AI Key 的 AES-GCM 密文；解密 secret 只存在 Edge Function 環境。
 - `ai_profiles`：個人預設 AI 平台。
 - `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。
+- `app_settings.common_message_templates`：僅系統開發人員 Admin 可維護的跨裝置常用文稿公版，包含各範本目前文字、最近 30 次前一版本、操作者與時間；副主席只能讀取與複製，不保存會員私訊回覆或身分證字號。
 - `announcements`：首頁會員委員會留言的跨裝置正式來源；作者、角色、發布時間與軟刪除紀錄只經 `app-api` 寫入，`localStorage` 不再是唯一來源。
 - `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
   - Storage object path 僅使用月份、報表類型、上傳時間、序號及 SHA-256 短指紋等 ASCII 字元；使用者原始檔名只保存於 `report_imports.metadata.originalFilename`，不得直接組入 object path。

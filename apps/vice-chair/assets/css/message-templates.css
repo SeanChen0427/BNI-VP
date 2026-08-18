@@ -1,0 +1,79 @@
+:root {
+  --red: #a91419;
+  --ink: #292a2d;
+  --muted: #73777d;
+  --line: #e6e1dc;
+  --paper: #fff;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: #f3f1ee; color: var(--ink); font: 400 14px/1.6 "Noto Sans TC", sans-serif; }
+.topbar { min-height: 68px; padding: 10px 30px; position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 20px; background: #fffffff0; border-bottom: 1px solid var(--line); backdrop-filter: blur(14px); }
+.topbar > a { color: var(--red); font-weight: 800; text-decoration: none; }
+.brand-title { margin-right: auto; display: flex; flex-direction: column; }
+.brand-title span, .session span { color: var(--muted); font-size: 10px; }
+.session { display: flex; align-items: center; gap: 8px; }
+.session b { padding: 3px 8px; border-radius: 999px; background: #f5e7e7; color: var(--red); font-size: 9px; }
+.session button { padding: 7px 10px; border: 0; border-radius: 8px; background: #f1eeeb; cursor: pointer; font-size: 10px; }
+main { max-width: 1180px; margin: auto; padding: 28px 28px 70px; }
+.hero { min-height: 210px; padding: 38px 42px; display: flex; align-items: center; justify-content: space-between; overflow: hidden; position: relative; border-radius: 24px; background: linear-gradient(125deg, #661015, var(--red) 68%, #ca343a); box-shadow: 0 18px 42px #7510152e; color: #fff; }
+.hero > div:first-child { position: relative; z-index: 1; }
+.hero span { color: #efb7ba; font-size: 10px; font-weight: 800; letter-spacing: .18em; }
+.hero h1 { margin: 7px 0; font-size: clamp(32px, 5vw, 48px); line-height: 1.2; }
+.hero p { max-width: 650px; margin: 0; color: #f1d3d4; }
+.hero-mark { width: 112px; height: 112px; display: grid; place-items: center; border: 1px solid #ffffff2e; border-radius: 34px; background: #ffffff1a; font-size: 42px; font-weight: 800; transform: rotate(7deg); }
+.privacy-note, .access-notice { margin-top: 18px; padding: 15px 18px; display: flex; align-items: baseline; gap: 12px; border-radius: 14px; }
+.privacy-note { background: #e9e6e1; color: #64676b; }
+.access-notice { flex-direction: column; background: #fff0dc; color: #85591b; }
+.privacy-note b { color: var(--ink); white-space: nowrap; }
+.privacy-note span, .access-notice span { font-size: 11px; }
+.template-section { margin-top: 20px; padding: 24px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: 0 12px 35px #241f190d; }
+.template-section > header { margin-bottom: 17px; display: flex; align-items: flex-start; gap: 16px; }
+.template-section > header > div { margin-right: auto; }
+.template-section > header small { color: #a5a0a0; font-size: 9px; font-weight: 800; letter-spacing: .15em; }
+.template-section h2 { margin: 2px 0; font-size: 21px; }
+.template-section header p { margin: 0; color: var(--muted); font-size: 11px; }
+.template-count { padding: 5px 9px; border-radius: 999px; background: #f4efec; color: var(--muted); font-size: 10px; font-weight: 700; }
+.template-list { display: grid; gap: 15px; }
+.template-card { overflow: hidden; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.template-head { padding: 17px 18px; display: flex; align-items: flex-start; gap: 14px; background: linear-gradient(180deg, #fff, #fdfbf9); }
+.template-icon { width: 42px; height: 42px; flex: 0 0 42px; display: grid; place-items: center; border-radius: 13px; background: #f5e7e7; color: var(--red); font-weight: 800; }
+.template-title { min-width: 0; margin-right: auto; }
+.template-title strong { display: block; font-size: 15px; }
+.template-title span { display: block; color: var(--muted); font-size: 10px; }
+.target-tag { padding: 4px 8px; border-radius: 999px; background: #edf4f1; color: #356553; font-size: 9px; font-weight: 800; }
+.template-body { padding: 18px; }
+.editor-label { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; color: var(--muted); font-size: 10px; }
+.editor-label b { color: var(--ink); font-size: 11px; }
+.editor-label span:last-child { margin-left: auto; }
+.template-body textarea { width: 100%; min-height: 190px; resize: vertical; padding: 15px; border: 1px solid #dcd6d0; border-radius: 12px; background: #fff; color: var(--ink); font: 500 13px/1.75 "Noto Sans TC", sans-serif; }
+.template-body textarea[readonly] { resize: none; background: #faf8f6; cursor: text; }
+.template-body textarea:focus { outline: 3px solid #a9141920; border-color: #bd777a; }
+.template-actions { margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.template-actions button { min-height: 42px; padding: 9px 14px; border: 1px solid #d8cbc6; border-radius: 9px; background: #fff; color: #6a5c58; font: 700 11px inherit; cursor: pointer; }
+.template-actions .copy { border-color: var(--red); background: var(--red); color: #fff; }
+.template-actions .save { margin-left: auto; color: var(--red); }
+.template-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.template-meta { margin-top: 9px; color: #9b9591; font-size: 9px; }
+.loading-card { margin-top: 20px; padding: 32px; border: 1px dashed #d5cec8; border-radius: 18px; background: #fff; color: var(--muted); text-align: center; }
+#toast { position: fixed; left: 50%; bottom: 24px; z-index: 1200; max-width: min(90vw, 520px); padding: 11px 17px; border-radius: 999px; background: #292524; color: #fff; box-shadow: 0 10px 28px #0003; opacity: 0; pointer-events: none; transform: translate(-50%, 14px); transition: .2s; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+@media (max-width: 760px) {
+  .hero-mark { display: none; }
+  .template-actions .save { margin-left: 0; }
+}
+@media (max-width: 560px) {
+  .topbar { padding: 11px 10px; flex-wrap: wrap; }
+  .brand-title { display: none; }
+  .session { width: 100%; }
+  main { padding: 14px 13px 50px; }
+  .hero { min-height: 180px; padding: 28px 24px; }
+  .hero p { font-size: 12px; }
+  .privacy-note { align-items: flex-start; flex-direction: column; }
+  .template-section { padding: 17px; }
+  .template-head { flex-wrap: wrap; }
+  .target-tag { margin-left: 56px; }
+  .template-body { padding: 14px; }
+  .template-actions { display: grid; grid-template-columns: 1fr; }
+  .template-actions button { width: 100%; }
+  .template-body textarea { min-height: 260px; }
+}

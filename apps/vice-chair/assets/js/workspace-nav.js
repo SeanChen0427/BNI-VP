@@ -8,6 +8,14 @@
   const session = globalThis.FulianAuth?.getSession?.() || {};
   const role = session.role || "";
   const roleLabel = role === "vp" ? "副主席" : role === "committee" ? "會員委員" : role === "admin" ? "系統管理員" : "使用者";
+  const currentFor = href => href === "case-board.html#closed"
+    ? page === "case-archive.html"
+    : href === page || (page === "case-workflow.html" && href === "case-board.html");
+  const navItem = ([icon, label, href, access]) => `
+    <a class="workspace-menu-link${currentFor(href) ? " current" : ""}"
+       href="${href}"${access === "vp" ? ' data-vp-only="true"' : ""}>
+      <span class="workspace-menu-icon">${icon}</span><span>${label}</span><i>›</i>
+    </a>`;
   const navGroups = [
     {
       label: "日常工作",
@@ -35,7 +43,15 @@
     {
       label: "資源與設定",
       items: [
-        ["鏈", "常用連結", "useful-links.html"],
+        {
+          key: "common-resources",
+          icon: "常",
+          label: "常用資源",
+          children: [
+            ["文", "文稿範本", "message-templates.html", "vp"],
+            ["鏈", "常用連結", "useful-links.html"],
+          ],
+        },
         ["學", "副主席交接課程", "course.html", "vp"],
         ["設", "系統與個人設定", "settings.html"],
       ],
@@ -78,11 +94,11 @@
       ${navGroups.map(group => `
         <section class="workspace-menu-group">
           <small>${group.label}</small>
-          ${group.items.map(([icon, label, href, access]) => `
-            <a class="workspace-menu-link${(href === "case-board.html#closed" ? page === "case-archive.html" : href === page || (page === "case-workflow.html" && href === "case-board.html")) ? " current" : ""}"
-               href="${href}"${access === "vp" ? ' data-vp-only="true"' : ""}>
-              <span class="workspace-menu-icon">${icon}</span><span>${label}</span><i>›</i>
-            </a>`).join("")}
+          ${group.items.map(item => Array.isArray(item) ? navItem(item) : `
+            <details class="workspace-menu-subgroup" data-nav-key="${item.key}"${item.children.some(child => currentFor(child[2])) ? " open" : ""}>
+              <summary class="workspace-menu-link"><span class="workspace-menu-icon">${item.icon}</span><span>${item.label}</span><i>⌄</i></summary>
+              <div class="workspace-menu-subnav">${item.children.map(navItem).join("")}</div>
+            </details>`).join("")}
         </section>`).join("")}
     </nav>
     <div class="workspace-menu-user"><span data-workspace-avatar>人</span><div><strong data-workspace-name>使用者</strong><small>${roleLabel}</small></div></div>`;
@@ -90,6 +106,17 @@
   if (role === "committee") {
     drawer.querySelectorAll("[data-vp-only]").forEach(element => element.remove());
   }
+  const navStateKey = "fulian-nav-groups-v1";
+  let navState = {};
+  try { navState = JSON.parse(localStorage.getItem(navStateKey) || "{}") || {}; } catch {}
+  drawer.querySelectorAll("details[data-nav-key]").forEach(group => {
+    const active = Boolean(group.querySelector(".current"));
+    if (active || navState[group.dataset.navKey]) group.open = true;
+    group.addEventListener("toggle", () => {
+      navState[group.dataset.navKey] = group.open;
+      try { localStorage.setItem(navStateKey, JSON.stringify(navState)); } catch {}
+    });
+  });
   const userName = session.name || "使用者";
   drawer.querySelector("[data-workspace-name]").textContent = userName;
   drawer.querySelector("[data-workspace-avatar]").textContent = userName.slice(0, 1);

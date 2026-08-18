@@ -142,6 +142,7 @@ img.workspace-menu-brand{
 }
 .workspace-menu-link.current .workspace-menu-icon{border-color:#a84949;background:#5a2929;color:#fff}
 .workspace-menu-link i{color:#716a65;font-style:normal;text-align:right}
+.workspace-menu-subgroup>summary{list-style:none;cursor:pointer}.workspace-menu-subgroup>summary::-webkit-details-marker{display:none}.workspace-menu-subgroup[open]>summary{background:#342f2b;color:#fff}.workspace-menu-subgroup[open]>summary i{transform:rotate(180deg)}.workspace-menu-subnav{margin:2px 0 6px 39px;padding-left:9px;border-left:1px solid #514943}.workspace-menu-subnav .workspace-menu-link{grid-template-columns:25px minmax(0,1fr) 12px;min-height:39px;margin:2px 0;padding:5px 8px;font-size:11px}.workspace-menu-subnav .workspace-menu-icon{width:24px;height:24px;border-radius:7px;font-size:9px}
 .workspace-menu-user{
   display:grid;
   grid-template-columns:36px 1fr;

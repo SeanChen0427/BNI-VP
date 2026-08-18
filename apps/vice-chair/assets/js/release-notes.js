@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.4",
+      publishedAt: "2026-08-18",
+      title: "新增常用文稿範本",
+      level: "normal",
+      changes: Object.freeze([
+        "側欄把文稿範本與常用連結收合在「常用資源」，避免主選單持續變長。",
+        "新增群組使用說明、新會員訪談確認及續約訪談確認三份可複製公版。",
+        "所有文稿都是固定文字，直接按下複製即可，不讀取案件、投票或訪談 Word。",
+        "副主席可查看與複製；只有系統開發人員 Admin 能更新跨裝置正式公版。"
+      ]),
+      impact: "不發送 LINE、不保存會員回覆的身分證字號，也不讀取或修改案件、投票、Word 或會員資料。"
+    }),
+    Object.freeze({
       version: "1.0.3",
       publishedAt: "2026-08-11",
       title: "離會訪談改為純紀錄流程",
