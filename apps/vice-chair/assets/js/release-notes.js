@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.5",
+      publishedAt: "2026-08-18",
+      title: "委員回饋通知改為正式 LINE OA",
+      level: "important",
+      changes: Object.freeze([
+        "訪談 Word 保存後，可從案件流程直接將委員回饋通知發到已綁定的會員委員會正式群。",
+        "正式訊息會真正 @所有人，並由系統帶入案件、訪談日期、主訪、陪訪及當期有效委員名單。",
+        "送出前會顯示完整文案並再次確認；LINE 確認送達後才把案件標示為已通知。",
+        "同一案件成功發送後會鎖定，避免雙擊、多人同時操作或重新整理造成重複通知。"
+      ]),
+      impact: "不重送既有已標示通知的歷史案件，不修改已完成回饋、投票、Word 或案件內容；自動驗證不會呼叫正式 LINE API。"
+    }),
+    Object.freeze({
       version: "1.0.4",
       publishedAt: "2026-08-18",
       title: "新增常用文稿範本",

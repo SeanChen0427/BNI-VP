@@ -98,6 +98,6 @@ test("後端只以正式案件、正式委員會群與投票快照發送", () =>
   assert.match(html, /id="copyVoteNotice"/);
   assert.match(html, /通知委員（正式 LINE OA）/);
   assert.match(html, /id="voteNoticePreview"/);
-  assert.match(html, /case-state-store\.js\?v=9/);
-  assert.match(html, /case-workflow\.js\?v=20/);
+  assert.match(html, /case-state-store\.js\?v=10/);
+  assert.match(html, /case-workflow\.js\?v=21/);
 });

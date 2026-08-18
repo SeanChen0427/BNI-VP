@@ -53,6 +53,7 @@
 - `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、測試／正式環境與四種用途路由，不保存聊天內容。
 - `line_reminder_rules`：交流群兩種常態提醒的開關、Asia/Taipei 發送時間、例會星期、提前天數及文案；僅 service role 可讀寫，初始一律關閉。
 - `line_reminder_deliveries`：常態通知的排程／人工測試發送稽核，以 delivery key 與 LINE retry key 防重複；不保存 Channel Access Token。
+- `case_feedback_line_deliveries`：訪談後委員回饋通知的正式會員委員會群發送稽核；每案只允許一筆成功通知，不保存完整文案。
 - `case_vote_line_deliveries`：開票通知的正式會員委員會群發送稽核與防重送紀錄。
 - `case_result_line_deliveries`：新會員、續約與轉換專業別通過後的正式公告群發送稽核；只允許 `approved`，保存送出當下的案件欄位快照與雜湊，瀏覽器角色不可讀取。
 - `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。

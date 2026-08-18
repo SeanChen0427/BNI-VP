@@ -7,10 +7,12 @@ import "../../../apps/vice-chair/core/attendance-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
+  buildCaseFeedbackNoticeText,
   buildCaseResultAnnouncementMessage,
   buildCaseVoteNoticeText,
   buildLineAttendanceMessage,
   buildLineMentionAllMessage,
+  caseFeedbackNoticeFingerprintSource,
   caseResultAnnouncementFingerprintSource,
   caseVoteNoticeFingerprintSource,
   lineAttendanceFingerprintSource,
@@ -726,6 +728,73 @@ async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintI
     line_message_id: payload?.sentMessages?.[0]?.id || null,
   });
   return { message: `工作進度已發送到「${target.display_name}」`, state: await lineRemindersState() };
+}
+
+async function findCaseFeedbackLineDelivery(taskId: string) {
+  const rows = await db(
+    `case_feedback_line_deliveries?task_id=eq.${taskId}&notification_type=eq.feedback_open&select=*&limit=1`,
+  );
+  return rows?.[0] || null;
+}
+
+async function beginCaseFeedbackLineDelivery(task: any, target: any, messageHash: string, context: Context) {
+  const existing = await findCaseFeedbackLineDelivery(task.id);
+  if (existing?.status === "sent") return { delivery: existing, alreadySent: true };
+  if (existing?.status === "processing" && Date.now() - new Date(existing.requested_at).getTime() < 5 * 60 * 1000) {
+    throw Object.assign(new Error("LINE 委員回饋通知正在發送，請勿重複操作"), { status: 409 });
+  }
+  const now = new Date().toISOString();
+  if (existing) {
+    const updated = await db(`case_feedback_line_deliveries?id=eq.${existing.id}&status=neq.sent`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        group_target_id: target.id,
+        message_sha256: messageHash,
+        status: "processing",
+        attempt_count: Number(existing.attempt_count || 0) + 1,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+        requested_at: now,
+        sent_at: null,
+        failed_at: null,
+        line_request_id: null,
+        line_message_id: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+    if (!updated?.[0]) throw Object.assign(new Error("LINE 委員回饋通知狀態已更新，請重新整理"), { status: 409 });
+    return { delivery: updated[0], alreadySent: false };
+  }
+  try {
+    const inserted = await db("case_feedback_line_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        task_id: task.id,
+        group_target_id: target.id,
+        notification_type: "feedback_open",
+        message_sha256: messageHash,
+        requested_by: context.personId,
+        requested_by_auth_user_id: context.userId,
+      }),
+    });
+    return { delivery: inserted[0], alreadySent: false };
+  } catch (error) {
+    if (String((error as Error)?.message || error).includes("duplicate key")) {
+      throw Object.assign(new Error("LINE 委員回饋通知正在發送或已送達，請勿重複操作"), { status: 409 });
+    }
+    throw error;
+  }
+}
+
+async function finishCaseFeedbackLineDelivery(deliveryId: string, patch: any) {
+  await db(`case_feedback_line_deliveries?id=eq.${deliveryId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
 }
 
 async function findCaseVoteLineDelivery(task: any, snapshot: any, target: any, messageHash: string) {
@@ -3136,6 +3205,131 @@ async function activeVotingRoster() {
   return db(`committee_terms?status=eq.active&has_voting_right=eq.true&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&people.status=eq.active&select=id,person_id,role,people!inner(display_name,status)&order=created_at.asc`);
 }
 
+async function markCaseFeedbackNoticeSent(access: any, delivery: any, target: any, sentAt: string, context: Context) {
+  await db("rpc/edge_mark_task_feedback_notice_sent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_task_id: access.task.id,
+      p_actor: context.personId,
+      p_actor_auth_user_id: context.userId,
+      p_delivery_id: delivery.id,
+      p_target_name: target.display_name,
+      p_sent_at: sentAt,
+    }),
+  });
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  return caseStateResponse(access, latestRows?.[0], context);
+}
+
+async function sendCaseFeedbackNotice(access: any, existing: any, context: Context) {
+  leadership(context);
+  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員回饋通知"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (!existing || !workflow.wordSaved || workflow.closed) {
+    throw Object.assign(new Error("請先保存訪談 Word，且案件必須尚未結案"), { status: 409 });
+  }
+  await ensureTaskCase(access, context);
+  const [targetRows, roster] = await Promise.all([
+    db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1"),
+    activeVotingRoster(),
+  ]);
+  const target = targetRows?.[0];
+  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會 LINE 群"), { status: 409 });
+  if (target.purpose !== "production") {
+    throw Object.assign(new Error("會員委員會 LINE 群目前不是正式群，請先到系統設定重新指定"), { status: 409 });
+  }
+  const applicant = String(access.task.title || "").trim();
+  const eligibleMembers = (roster || [])
+    .filter((item: any) => ["vp", "committee"].includes(String(item.role || "")))
+    .map((item: any) => String(item.people?.display_name || "").trim())
+    .filter((name: string) => name && name !== applicant);
+  const taskMeta = parseTaskJson(access.task.result_summary);
+  const content = buildCaseFeedbackNoticeText({
+    caseType: access.task.category,
+    applicant,
+    profession: taskMeta.profession || workflow.form?.profession || "",
+    interviewDate: workflow.form?.interviewDate || "",
+    leadInterviewer: workflow.form?.leadInterviewer || "",
+    companionInterviewer: workflow.form?.companionInterviewer || "",
+    eligibleMembers,
+  });
+  let lineMessage;
+  try {
+    lineMessage = buildLineMentionAllMessage(content);
+  } catch (error) {
+    throw Object.assign(error as Error, { status: 413 });
+  }
+  const messageHash = await sha256Text(caseFeedbackNoticeFingerprintSource(content));
+  const prior = await findCaseFeedbackLineDelivery(access.task.id);
+  if (workflow.feedbackNotified && prior?.status !== "sent") {
+    throw Object.assign(new Error("本案已存在先前的委員回饋通知紀錄；為避免重複發送，請先確認案件歷程"), { status: 409 });
+  }
+  if (prior?.status === "sent") {
+    const sentAt = prior.sent_at || new Date().toISOString();
+    const state = await markCaseFeedbackNoticeSent(access, prior, target, sentAt, context);
+    return {
+      ...state,
+      message: `委員回饋通知先前已送達「${target.display_name}」，系統已阻擋重複發送`,
+      lineTarget: publicLineTarget(target),
+      lineSentAt: sentAt,
+      alreadySent: true,
+    };
+  }
+  const { delivery } = await beginCaseFeedbackLineDelivery(access.task, target, messageHash, context);
+  let response: Response;
+  try {
+    response = await lineRequest("/v2/bot/message/push", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
+      body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
+    });
+  } catch (error) {
+    const message = String((error as Error)?.message || error).slice(0, 1000);
+    await finishCaseFeedbackLineDelivery(delivery.id, { status: "failed", failed_at: new Date().toISOString(), error_code: "NETWORK", error_message: message });
+    throw Object.assign(new Error(`LINE 平台連線失敗：${message}`), { status: 502 });
+  }
+  const payload = await response.json().catch(() => ({}));
+  const acceptedRequestId = response.headers.get("x-line-accepted-request-id") || "";
+  if (!response.ok && !(response.status === 409 && acceptedRequestId)) {
+    const message = String(payload.message || `LINE HTTP ${response.status}`).slice(0, 1000);
+    await finishCaseFeedbackLineDelivery(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      error_code: `HTTP_${response.status}`,
+      error_message: message,
+      line_request_id: response.headers.get("x-line-request-id") || null,
+    });
+    throw Object.assign(new Error(`LINE 委員回饋通知發送失敗：${message}`), { status: 502 });
+  }
+  const sentAt = new Date().toISOString();
+  await finishCaseFeedbackLineDelivery(delivery.id, {
+    status: "sent",
+    sent_at: sentAt,
+    failed_at: null,
+    error_code: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  let state;
+  try {
+    state = await markCaseFeedbackNoticeSent(access, delivery, target, sentAt, context);
+  } catch (error) {
+    throw Object.assign(new Error(`LINE 已送達「${target.display_name}」，但案件剛由其他裝置更新；請重新整理確認，勿立即重送`), { status: 409, cause: error });
+  }
+  return {
+    ...state,
+    message: `委員回饋通知已由正式 LINE OA 發送到「${target.display_name}」`,
+    lineTarget: publicLineTarget(target),
+    lineSentAt: sentAt,
+    alreadySent: false,
+  };
+}
+
 async function openVoteSnapshot(access: any, existing: any, workflow: any, context: Context, materializeLegacy = false) {
   if (context.role !== "vp" && !materializeLegacy) throw Object.assign(new Error("只有副主席可以開啟投票"), { status: 403 });
   if (String(access.task.title || "").trim() === context.name) {
@@ -3505,8 +3699,12 @@ async function caseStatesApi(request: Request, context: Context) {
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
 
-  if (["vote-notice", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+  if (["feedback-notice", "vote-notice", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
+  }
+
+  if (body.kind === "feedback-notice") {
+    return sendCaseFeedbackNotice(access, existing, context);
   }
 
   if (body.kind === "vote-notice") {

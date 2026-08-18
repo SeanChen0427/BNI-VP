@@ -13,7 +13,7 @@
   <script src="core/calendar-domain.js?v=1"></script>
   <script src="core/case-domain.js?v=5"></script>
   <script src="assets/js/task-store.js?v=5"></script>
-  <script src="assets/js/case-state-store.js?v=9"></script>
+  <script src="assets/js/case-state-store.js?v=10"></script>
   <script src="services/case-files.js?v=4"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,10 +67,11 @@
             <button id="downloadWord" class="ghost" disabled>下載保存檔</button>
           </div>
           <div class="notice-compose">
-            <div><b>委員回饋通知</b><small>正式版由 LINE Bot 傳送至富聯會員委員會群；目前只模擬並保存紀錄。</small></div>
+            <div><b>委員回饋通知</b><small>正式 LINE OA 會發送至後台已綁定的會員委員會群，並真正 @所有人。</small></div>
             <button id="copyFeedbackNotice" class="ghost">複製文案</button>
-            <button id="sendFeedbackNotice" class="primary vp-control">模擬 LINE Bot 通知</button>
+            <button id="sendFeedbackNotice" class="primary vp-control">通知委員（正式 LINE OA）</button>
           </div>
+          <div class="vote-line-state" id="feedbackLineState">將使用正式 LINE OA 發送至後台已綁定的會員委員會群，並真正 @所有人。</div>
           <pre id="feedbackNoticePreview" class="message-preview"></pre>
         </section>
 
@@ -162,7 +163,7 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=20"></script>
+  <script src="assets/js/case-workflow.js?v=21"></script>
   <script src="assets/js/workspace-nav.js?v=6"></script>
 </body>
 </html>

@@ -27,7 +27,7 @@ test("所有排程頁面都載入最新版 Supabase task 與 case state store", 
     "apps/vice-chair/member-care.html",
     "apps/vice-chair/monthly-meeting.html",
   ].includes(page))) {
-    assert.match(read(page), /assets\/js\/case-state-store\.js\?v=9/, `${page} 未載入 case-state-store v9`);
+    assert.match(read(page), /assets\/js\/case-state-store\.js\?v=10/, `${page} 未載入 case-state-store v10`);
   }
 });
 
