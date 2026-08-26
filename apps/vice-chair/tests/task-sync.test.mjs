@@ -21,7 +21,7 @@ test("所有排程頁面都載入最新版 Supabase task 與 case state store", 
     "apps/vice-chair/departure-form.html",
   ];
   for (const page of pages) {
-    assert.match(read(page), /assets\/js\/task-store\.js\?v=5/, `${page} 未載入 task-store v5`);
+    assert.match(read(page), /assets\/js\/task-store\.js\?v=6/, `${page} 未載入 task-store v6`);
   }
   for (const page of pages.filter(page => ![
     "apps/vice-chair/member-care.html",
@@ -74,6 +74,13 @@ test("舊裝置更新單筆工作不會推斷刪除另一台的新工作", async
           const index = serverTasks.findIndex(task => task.id === incoming.id);
           serverTasks[index] = { ...incoming, _revision: serverTasks[index]._revision + 1 };
         }
+      } else if (body.action === "complete-record-only") {
+        const index = serverTasks.findIndex(task => task.id === body.id);
+        serverTasks[index] = {
+          ...serverTasks[index],
+          completed: true,
+          _revision: serverTasks[index]._revision + 1,
+        };
       } else if (body.action === "delete") {
         serverTasks = serverTasks.filter(task => task.id !== body.id);
       }
@@ -95,6 +102,10 @@ test("舊裝置更新單筆工作不會推斷刪除另一台的新工作", async
   assert.deepEqual(requests[0].tasks.map(task => task.id), ["task-a"]);
   assert.equal("deletedIds" in requests[0], false);
   assert.equal(JSON.stringify(context.window.FulianTaskStore.all().map(task => task.id)), '["task-a","task-b"]');
+
+  await context.window.FulianTaskStore.completeRecordOnly("task-a");
+  assert.equal(requests.at(-1).action, "complete-record-only");
+  assert.equal(context.window.FulianTaskStore.all().find(task => task.id === "task-a").completed, true);
 
   const deleteSequence = [];
   context.window.FulianCaseStateStore = {
@@ -156,8 +167,17 @@ test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {
   assert.match(stateStore, /FulianCaseStateStore/);
   assert.match(caseFiles, /\/api\/task-file/);
   assert.match(caseFiles, /FulianCaseStateStore\?\.[a-z]+\(\)/);
+  assert.match(caseFiles, /FulianTaskStore\.completeRecordOnly\(caseId\)/);
+  assert.doesNotMatch(caseFiles, /target\.completed = true/);
+  const taskStore = read("apps/vice-chair/assets/js/task-store.js");
+  assert.match(taskStore, /completeRecordOnly: async function \(id\)/);
+  assert.match(taskStore, /action: "complete-record-only", id/);
   assert.match(edge, /path === "\/api\/case-states"/);
   assert.match(edge, /path === "\/api\/task-file"/);
+  assert.match(edge, /async function completeRecordOnlyTask/);
+  assert.match(edge, /body\.action === "complete-record-only"/);
+  assert.match(edge, /\["midterm", "departure"\]/);
+  assert.match(edge, /!workflow\.wordSaved \|\| !workflow\.closed/);
   assert.match(edge, /只有副主席或本案受指派人員可以保存訪談草稿/);
   assert.equal(
     edge.match(/function decodeBase64\(/g)?.length,

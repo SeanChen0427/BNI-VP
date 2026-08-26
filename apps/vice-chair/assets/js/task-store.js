@@ -199,6 +199,20 @@
         throw error;
       }
     },
+    completeRecordOnly: async function (id) {
+      await queue.catch(() => undefined);
+      try {
+        const tasks = await api({ action: "complete-record-only", id });
+        retryTasks.delete(id);
+        syncFailed = retryTasks.size > 0;
+        conflictBlocked = false;
+        if (!syncFailed) queue = Promise.resolve(tasks);
+        return tasks;
+      } catch (error) {
+        showError(error.message);
+        throw error;
+      }
+    },
     flush: function () {
       return queue;
     },

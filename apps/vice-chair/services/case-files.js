@@ -133,19 +133,10 @@
       await window.FulianCaseStateStore?.flush();
     }
     if (closeWithoutDecision) {
-      const tasks = domain.parseJson(storage.getItem(domain.TASK_STORAGE_KEY), []);
-      const target = Array.isArray(tasks)
-        ? tasks.find(item => item.id === caseId)
-        : null;
-      if (target) {
-        target.completed = true;
-        target.completedAt = now.toISOString();
-        target.stage = "已完成";
-        storage.setItem(domain.TASK_STORAGE_KEY, JSON.stringify(tasks));
+      if (typeof window === "undefined" || typeof window.FulianTaskStore?.completeRecordOnly !== "function") {
+        throw new Error("案件完成服務尚未更新，請重新整理頁面後再試");
       }
-    }
-    if (typeof window !== "undefined") {
-      await window.FulianTaskStore?.flush();
+      await window.FulianTaskStore.completeRecordOnly(caseId);
     }
     return state;
   }

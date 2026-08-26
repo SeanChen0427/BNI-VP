@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.6",
+      publishedAt: "2026-08-26",
+      title: "修正期中與離會訪談重試結案",
+      level: "important",
+      changes: Object.freeze([
+        "修正 Supabase 暫時斷線後重試完成訪談，持續誤報「這項工作已在其他裝置更新」的問題。",
+        "期中輔導與離會訪談改由伺服器依正式案件編號完成結案，不再用瀏覽器的舊版本覆寫整筆工作。",
+        "Word 與案件階段已保存時可安全重試；重複操作只會確認同一案件完成，不會建立重複案件。"
+      ]),
+      impact: "保留既有訪談內容、Word、分工、排程及已完成資料；不修改回饋、投票、會員或 PALMS 資料。"
+    }),
+    Object.freeze({
       version: "1.0.5",
       publishedAt: "2026-08-18",
       title: "委員回饋通知改為正式 LINE OA",

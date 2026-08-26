@@ -2968,11 +2968,52 @@ async function completeAssignedTask(input: any, context: Context) {
   if (!updated?.length) throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
 }
 
+async function completeRecordOnlyTask(sourceReference: string, context: Context) {
+  const id = String(sourceReference || "").trim();
+  if (!id) throw new Error("缺少要完成的案件編號");
+  const rows = await db(
+    `tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,title,category,lead_person_id,status,revision&limit=1`,
+  );
+  const row = rows?.[0];
+  if (!row) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
+  if (!["midterm", "departure"].includes(row.category)) {
+    throw Object.assign(new Error("此案件必須依正式回饋與投票流程完成"), { status: 409 });
+  }
+  const leadership = ["admin", "vp"].includes(context.role);
+  if (!leadership && row.lead_person_id !== context.personId) {
+    throw Object.assign(new Error("只有副主席、Admin 或本案主要負責人可以完成"), { status: 403 });
+  }
+  if (row.status === "completed") return;
+  const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow&limit=1`);
+  const workflow = states?.[0]?.workflow || {};
+  if (!workflow.wordSaved || !workflow.closed) {
+    throw Object.assign(new Error("訪談 Word 或案件階段尚未成功保存，不能結案"), { status: 409 });
+  }
+  const updated = await db(`tasks?id=eq.${row.id}&revision=eq.${row.revision}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      status: "completed",
+      completed_at: new Date().toISOString(),
+      completed_by: context.personId,
+      revision: Number(row.revision) + 1,
+    }),
+  });
+  if (updated?.length) return;
+  const latest = await db(`tasks?id=eq.${row.id}&select=status&limit=1`);
+  if (latest?.[0]?.status === "completed") return;
+  throw Object.assign(new Error("案件剛由其他裝置更新，請重新操作完成訪談"), { status: 409 });
+}
+
 async function tasksApi(request: Request, context: Context) {
   if (request.method === "GET") return taskResponse(context);
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
-  if (!["upsert", "import", "delete"].includes(body.action)) throw new Error("不支援的排程動作");
+  if (!["upsert", "import", "delete", "complete-record-only"].includes(body.action)) throw new Error("不支援的排程動作");
+  if (body.action === "complete-record-only") {
+    await completeRecordOnlyTask(body.id, context);
+    return taskResponse(context);
+  }
   if (body.action === "delete") {
     leadership(context);
     const id = String(body.id || "").trim();
