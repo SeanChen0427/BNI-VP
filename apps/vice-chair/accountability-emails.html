@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>當責信待寄中心｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/accountability-emails.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=7"></script>
+  <script src="assets/js/supabase-data.js?v=2"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← 回工作台</a>
+    <div class="brand-title"><strong>富聯分會</strong><span>會員委員會工作台・副主席專用</span></div>
+    <div class="session"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" data-auth-logout>登出</button></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><span>ACCOUNTABILITY EMAIL DESK</span><h1>當責信待寄中心</h1><p>正式出席資料達門檻後建立提醒與可複製草稿；副主席貼到正式信箱人工寄出，系統本身不會發信。</p></div>
+      <div class="hero-mark" aria-hidden="true">信</div>
+    </section>
+
+    <aside class="copy-only-note"><b>沒有核准關卡</b><span>第 4 次缺席與第 9 次代理和其他級別一樣，資料完整後可直接預覽與複製。這裡不會自動寄信，也不會自動變更會員資格或專業類別。</span></aside>
+
+    <section class="access-notice" id="accessNotice" hidden><b>只有副主席或 Admin 可以使用當責信待寄中心</b><span>會員委員介面不顯示會員收件資訊或正式信件內容。</span></section>
+
+    <div id="accountabilityApp">
+      <section class="summary-grid" aria-label="當責信任務摘要">
+        <article><small>待寄送</small><strong id="pendingCount">—</strong><span>可直接複製</span></article>
+        <article><small>待補資料</small><strong id="missingCount">—</strong><span>缺少必要欄位</span></article>
+        <article><small>開放行業別</small><strong id="openCategoryCount">—</strong><span>第 4 次缺席／第 9 次代理</span></article>
+        <article><small>已寄送</small><strong id="sentCount">—</strong><span>人工寄發留痕</span></article>
+      </section>
+
+      <section class="toolbar">
+        <div class="filters" role="group" aria-label="篩選任務">
+          <button type="button" class="active" data-filter="active">待處理</button>
+          <button type="button" data-filter="all">全部</button>
+          <button type="button" data-filter="sent">已寄送</button>
+          <button type="button" data-filter="held">暫緩／不適用</button>
+        </div>
+        <button type="button" class="refresh" id="refreshTasks">重新同步正式出席資料</button>
+      </section>
+
+      <div class="desk-layout">
+        <section class="task-panel" aria-labelledby="taskListTitle">
+          <header><div><small>EMAIL QUEUE</small><h2 id="taskListTitle">待寄任務</h2></div><span id="taskListCount">讀取中</span></header>
+          <div class="task-list" id="taskList" aria-live="polite"><div class="loading-card">正在核對 PALMS 與已確認週次…</div></div>
+        </section>
+
+        <section class="preview-panel" id="previewPanel" aria-labelledby="previewTitle">
+          <div class="preview-empty" id="previewEmpty"><b>選擇一筆當責信任務</b><span>右側會顯示次數、期間、主旨與完整內文。</span></div>
+          <div id="previewContent" hidden>
+            <header class="preview-head">
+              <div><small id="previewEyebrow">ACCOUNTABILITY NOTICE</small><h2 id="previewTitle"></h2><p id="previewMember"></p></div>
+              <span class="status-badge" id="previewStatus"></span>
+            </header>
+            <dl class="source-grid">
+              <div><dt>通知原因</dt><dd id="previewReason"></dd></div>
+              <div><dt>累計期間</dt><dd id="previewPeriod"></dd></div>
+              <div><dt>觸發日期</dt><dd id="previewTrigger"></dd></div>
+              <div><dt>資料來源</dt><dd id="previewSource"></dd></div>
+            </dl>
+            <div class="missing-alert" id="missingAlert" hidden></div>
+            <label class="mail-field"><span><b>收件人</b><small>由正式會員資料帶入；空白時請到信箱選擇</small></span><input id="previewRecipient" readonly></label>
+            <label class="mail-field"><span><b>副本</b><small>實際對象仍依寄送當下規範選擇</small></span><input id="previewCc" readonly></label>
+            <label class="mail-field"><span><b>主旨</b><button type="button" data-copy="subject">複製主旨</button></span><textarea id="previewSubject" rows="2" readonly></textarea></label>
+            <label class="mail-field body-field"><span><b>內文</b><button type="button" data-copy="body">複製內文</button></span><textarea id="previewBody" rows="17" readonly></textarea></label>
+            <p class="template-meta" id="templateMeta"></p>
+            <div class="preview-actions">
+              <button type="button" class="primary" id="copyAll">全部複製</button>
+              <button type="button" class="sent" id="markSent">標記已人工寄送</button>
+              <button type="button" id="holdTask">暫緩</button>
+              <button type="button" id="notApplicable">不適用</button>
+              <button type="button" id="restoreTask" hidden>恢復待寄送</button>
+            </div>
+            <p class="outcome-note" id="outcomeNote" hidden></p>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="core/accountability-email-domain.js?v=1"></script>
+  <script src="assets/js/accountability-emails.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=7"></script>
+</body>
+</html>

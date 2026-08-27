@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-08-10",
+  "updated": "2026-08-27",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -17,6 +17,7 @@
   "canonicalDocuments": {
     "currentDecisions": "docs/decision-log.md",
     "requirements": "docs/requirements-draft.md",
+    "accountabilityEmailWorkflow": "docs/accountability-email-workflow.md",
     "handoff": "docs/HANDOFF.md",
     "openQuestions": "docs/OPEN_QUESTIONS.md",
     "architecture": "docs/ARCHITECTURE_MAP.md",
@@ -32,6 +33,7 @@
     "interviewCompletionFeedback": "services/interview-completion.js",
     "monthlyMeetingCareAssignments": "core/monthly-meeting-domain.js",
     "weeklyAttendanceReconciliation": "core/attendance-domain.js",
+    "accountabilityEmailRules": "core/accountability-email-domain.js",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
     "lineCommitteeWorkDigest": "supabase/functions/_shared/committee-work-digest.mjs",
     "userFacingReleaseNotes": "assets/js/release-notes.js",
@@ -52,6 +54,7 @@
     "case-workflow.html": "回饋、投票、董顧確認與結案",
     "member-care.html": "BNI 分析橋接與會員關懷",
     "attendance.html": "每週點名與出席公告",
+    "accountability-emails.html": "副主席當責信待寄提醒、複製與人工寄送留痕",
     "routine-reminders.html": "交流群與會員委員會群的常態通知、測試發送及發送紀錄",
     "terminal-form.html": "終期輔導／續約訪談",
     "midterm-form.html": "期中輔導",

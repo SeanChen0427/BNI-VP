@@ -4,6 +4,7 @@ import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analy
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/attendance-domain.js";
+import "../../../apps/vice-chair/core/accountability-email-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
@@ -46,6 +47,7 @@ const GEMINI_MAX_ATTEMPTS = 3;
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
+const accountabilityEmailDomain = (globalThis as any).FulianAccountabilityEmailDomain;
 const messageTemplateDomain = (globalThis as any).FulianMessageTemplateDomain;
 
 type Provider = typeof PROVIDERS[number];
@@ -4117,6 +4119,275 @@ const COMMITTEE_BOARD_LIMIT = 200;
 const BOARD_CLIENT_REFERENCE = /^notice-[0-9]{10,16}-[a-z0-9-]{4,64}$/;
 const UUID_REFERENCE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+type AccountabilityTotals = { late: number; proxy: number; absence: number };
+
+function accountabilityTotals(value: any = {}): AccountabilityTotals {
+  return {
+    late: Math.max(0, Number(value.late) || 0),
+    proxy: Math.max(0, Number(value.proxy) || 0),
+    absence: Math.max(0, Number(value.absence) || 0),
+  };
+}
+
+function addAccountabilityTotals(base: AccountabilityTotals, addition: any): AccountabilityTotals {
+  const next = accountabilityTotals(addition);
+  return {
+    late: base.late + next.late,
+    proxy: base.proxy + next.proxy,
+    absence: base.absence + next.absence,
+  };
+}
+
+function highestReachedAccountabilityRules(totals: AccountabilityTotals) {
+  return ["absence", "proxy"].map((reason) => {
+    const current = accountabilityEmailDomain.countFor(reason, totals);
+    const reached = accountabilityEmailDomain.thresholds(reason).filter((value: number) => value <= current);
+    return reached.length ? accountabilityEmailDomain.ruleFor(reason, reached[reached.length - 1]) : null;
+  }).filter(Boolean);
+}
+
+function accountabilityPerson(row: any) {
+  const person = Array.isArray(row?.people) ? row.people[0] : row?.people;
+  return person || {};
+}
+
+function accountabilityTaskResponse(row: any) {
+  const member = Array.isArray(row?.members) ? row.members[0] : row?.members;
+  const person = accountabilityPerson(member);
+  return {
+    id: row.id,
+    memberId: row.member_id,
+    memberName: person.display_name || "",
+    profession: row.profession || member?.profession || "",
+    reason: row.reason,
+    occurrence: Number(row.occurrence),
+    title: row.title,
+    riskLevel: row.risk_level,
+    status: row.status,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    triggerDate: row.trigger_on,
+    sourceType: row.source_type,
+    sourceFingerprint: row.source_fingerprint,
+    templateKey: row.template_key,
+    templateVersion: row.template_version,
+    subject: row.draft_subject,
+    body: row.draft_body,
+    recipientEmail: row.recipient_email || person.email || "",
+    ccEmails: Array.isArray(row.cc_emails) ? row.cc_emails : [],
+    missingFields: Array.isArray(row.missing_fields) ? row.missing_fields : [],
+    holdReason: row.hold_reason || "",
+    outcomeReason: row.outcome_reason || "",
+    lastCopiedAt: row.last_copied_at,
+    sentAt: row.sent_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+async function insertAccountabilityEvents(rows: any[]) {
+  if (!rows.length) return;
+  await db("accountability_email_events", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(rows),
+  });
+}
+
+async function syncAccountabilityEmailTasks(context: Context) {
+  leadership(context);
+  const baseline = await latestAttendancePalms();
+  const [memberRows, sessions, existingRows] = await Promise.all([
+    db("members?status=eq.active&select=id,profession,people!inner(id,display_name,email)&order=created_at.asc"),
+    db(`attendance_sessions?status=eq.confirmed&meeting_date=gt.${baseline.periodEnd}&meeting_date=lte.${taipeiDay()}&select=id,meeting_date,attendance_records(*)&order=meeting_date.asc`),
+    db("accountability_email_tasks?select=member_id,reason,occurrence,trigger_on,source_type"),
+  ]);
+  const members = (memberRows || []).map((row: any) => {
+    const person = accountabilityPerson(row);
+    return {
+      id: row.id,
+      name: String(person.display_name || "").replace(/\s+/g, ""),
+      email: String(person.email || "").trim(),
+      profession: String(row.profession || ""),
+    };
+  });
+  const missingMembers = members.filter((member: any) => !baseline.members.has(member.name));
+  if (missingMembers.length) {
+    throw Object.assign(new Error(`半年 PALMS 與現任會員對帳失敗：缺少 ${missingMembers.map((member: any) => member.name).join("、")}`), { status: 409 });
+  }
+  const memberById = new Map(members.map((member: any) => [member.id, member]));
+  const totalsByMember = new Map(members.map((member: any) => [member.id, accountabilityTotals(baseline.members.get(member.name))]));
+  const existingBaselineLevels = new Set((existingRows || []).map((row: any) => `${row.member_id}:${row.reason}:${row.occurrence}`));
+  const candidates: any[] = [];
+
+  const appendCandidate = (member: any, rule: any, triggerDate: string, sourceType: string, sessionId: string | null) => {
+    const draft = accountabilityEmailDomain.renderDraft({
+      memberName: member.name,
+      reason: rule.reason,
+      occurrence: rule.occurrence,
+      periodStart: baseline.periodStart,
+      periodEnd: sourceType === "palms_baseline" ? baseline.periodEnd : triggerDate,
+      triggerDate,
+      noticeDate: triggerDate,
+    });
+    candidates.push({
+      member_id: member.id,
+      reason: rule.reason,
+      occurrence: rule.occurrence,
+      title: draft.title,
+      risk_level: draft.risk,
+      status: draft.complete ? "pending_send" : "pending_data",
+      profession: member.profession,
+      period_start: baseline.periodStart,
+      period_end: sourceType === "palms_baseline" ? baseline.periodEnd : triggerDate,
+      trigger_on: triggerDate,
+      source_type: sourceType,
+      source_report_import_id: baseline.importId,
+      source_attendance_session_id: sessionId,
+      source_fingerprint: `${baseline.importId}:${sessionId || "baseline"}:${rule.reason}:${rule.occurrence}`,
+      template_key: draft.templateKey,
+      template_version: draft.templateVersion,
+      draft_subject: draft.subject,
+      draft_body: draft.body,
+      recipient_email: member.email || null,
+      cc_emails: [],
+      missing_fields: draft.missing,
+      created_by: context.personId,
+    });
+  };
+
+  for (const member of members) {
+    const totals = totalsByMember.get(member.id)!;
+    for (const rule of highestReachedAccountabilityRules(totals)) {
+      const levelKey = `${member.id}:${rule.reason}:${rule.occurrence}`;
+      if (!existingBaselineLevels.has(levelKey)) appendCandidate(member, rule, baseline.periodEnd, "palms_baseline", null);
+    }
+  }
+
+  for (const session of sessions || []) {
+    for (const record of session.attendance_records || []) {
+      const member = memberById.get(record.member_id);
+      if (!member) continue;
+      const before = totalsByMember.get(member.id)!;
+      const after = addAccountabilityTotals(before, operationalCounts(record));
+      for (const rule of accountabilityEmailDomain.crossings(before, after)) {
+        appendCandidate(member, rule, session.meeting_date, "confirmed_attendance", session.id);
+      }
+      totalsByMember.set(member.id, after);
+    }
+  }
+
+  if (candidates.length) {
+    const inserted = await db("accountability_email_tasks?on_conflict=member_id,reason,occurrence,trigger_on", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Prefer: "resolution=ignore-duplicates,return=representation",
+      },
+      body: JSON.stringify(candidates),
+    });
+    await insertAccountabilityEvents((inserted || []).map((row: any) => ({
+      task_id: row.id,
+      event_type: "generated",
+      actor_id: context.personId,
+      detail: {
+        sourceType: row.source_type,
+        sourceFingerprint: row.source_fingerprint,
+        templateVersion: row.template_version,
+      },
+    })));
+  }
+}
+
+async function accountabilityEmailTasks(context: Context) {
+  await syncAccountabilityEmailTasks(context);
+  const rows = await db("accountability_email_tasks?select=*,members!inner(id,profession,people!inner(display_name,email))&order=trigger_on.desc,created_at.desc");
+  return (rows || []).map(accountabilityTaskResponse);
+}
+
+async function accountabilityEmailTask(id: string) {
+  if (!UUID_REFERENCE.test(id)) throw new Error("當責信任務識別碼格式不正確");
+  const rows = await db(`accountability_email_tasks?id=eq.${encodeURIComponent(id)}&select=*&limit=1`);
+  const task = rows?.[0];
+  if (!task) throw Object.assign(new Error("找不到指定的當責信任務"), { status: 404 });
+  return task;
+}
+
+async function updateAccountabilityEmailTask(id: string, patch: any) {
+  const rows = await db(`accountability_email_tasks?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify(patch),
+  });
+  if (!rows?.[0]) throw Object.assign(new Error("當責信任務已更新，請重新整理"), { status: 409 });
+  return rows[0];
+}
+
+function accountabilityReason(value: unknown) {
+  const reason = String(value || "").trim();
+  if (!reason || [...reason].length > 500) throw new Error("請填寫 500 字內的處理原因");
+  return reason;
+}
+
+async function accountabilityEmailsApi(request: Request, context: Context) {
+  leadership(context);
+  if (request.method === "GET") {
+    const tasks = await accountabilityEmailTasks(context);
+    return { tasks, generatedAt: new Date().toISOString(), sendsEmail: false, requiresApproval: false };
+  }
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  const id = String(body.id || "");
+  const task = await accountabilityEmailTask(id);
+  const now = new Date().toISOString();
+  let eventType = "";
+  let detail: any = {};
+
+  if (body.action === "record-copy") {
+    await updateAccountabilityEmailTask(id, { last_copied_at: now, last_copied_by: context.personId });
+    eventType = "copied";
+    detail = { field: ["subject", "body", "all"].includes(body.field) ? body.field : "all", templateVersion: task.template_version };
+  } else if (body.action === "mark-sent") {
+    if (!Array.isArray(task.missing_fields) || task.missing_fields.length) throw new Error("必要資料尚未補齊，不能標記已寄送");
+    if (!["pending_send", "held"].includes(task.status)) throw new Error("這筆任務目前不能標記已寄送");
+    await updateAccountabilityEmailTask(id, {
+      status: "sent",
+      sent_at: now,
+      sent_by: context.personId,
+      sent_subject: task.draft_subject,
+      sent_body: task.draft_body,
+      hold_reason: null,
+      outcome_reason: null,
+    });
+    eventType = "sent";
+    detail = { templateVersion: task.template_version, sentAt: now };
+  } else if (body.action === "hold") {
+    if (task.status === "sent") throw new Error("已寄送任務不可改為暫緩");
+    const reason = accountabilityReason(body.reason);
+    await updateAccountabilityEmailTask(id, { status: "held", hold_reason: reason, outcome_reason: null });
+    eventType = "held";
+    detail = { reason };
+  } else if (body.action === "not-applicable") {
+    if (task.status === "sent") throw new Error("已寄送任務不可改為不適用");
+    const reason = accountabilityReason(body.reason);
+    await updateAccountabilityEmailTask(id, { status: "not_applicable", outcome_reason: reason, hold_reason: null });
+    eventType = "not_applicable";
+    detail = { reason };
+  } else if (body.action === "restore") {
+    if (!["held", "not_applicable"].includes(task.status)) throw new Error("這筆任務不需要恢復");
+    const status = Array.isArray(task.missing_fields) && task.missing_fields.length ? "pending_data" : "pending_send";
+    await updateAccountabilityEmailTask(id, { status, hold_reason: null, outcome_reason: null });
+    eventType = "restored";
+    detail = { status };
+  } else {
+    throw new Error("不支援的當責信操作");
+  }
+
+  await insertAccountabilityEvents([{ task_id: id, event_type: eventType, actor_id: context.personId, detail }]);
+  const tasks = await accountabilityEmailTasks(context);
+  return { tasks, message: body.action === "mark-sent" ? "已保存人工寄送紀錄" : "當責信任務已更新" };
+}
+
 function boardContent(value: unknown) {
   const content = String(value || "").trim();
   if (!content) throw new Error("留言內容不可空白");
@@ -4263,6 +4534,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
     else if (path === "/api/line-reminders") result = await lineRemindersApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
+    else if (path === "/api/accountability-emails") result = await accountabilityEmailsApi(request, context);
     else if (path === "/api/announcements") result = await committeeBoardApi(request, context);
     else throw Object.assign(new Error("找不到指定的應用服務"), { status: 404 });
     return respond(request, 200, result);
