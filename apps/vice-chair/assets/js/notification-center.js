@@ -10,6 +10,13 @@
   const $ = selector => document.querySelector(selector);
   let items = [];
   let monthlyDataStatus = null;
+  let accountabilityTasks = [];
+
+  function escapeHtml(value) {
+    return String(value ?? "").replace(/[&<>'"]/g, character => ({
+      "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;"
+    }[character]));
+  }
 
   function parse(key, fallback) {
     try {
@@ -129,6 +136,42 @@
     return date.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
+  function accountabilityItems() {
+    if (!["vp", "admin"].includes(session.role)) return [];
+    return accountabilityTasks
+      .filter(task => ["pending_data", "pending_send", "held"].includes(task.status))
+      .map(task => {
+        const reason = task.reason === "absence" ? "缺席" : "代理";
+        const status = task.status === "pending_data" ? "待補資料" : task.status === "held" ? "已暫緩" : "待寄送";
+        return {
+          id: `accountability-${task.id}-${task.status}-${task.updatedAt || ""}`,
+          title: `${task.memberName}－${reason}第 ${task.occurrence} 次當責信${status}`,
+          detail: task.riskLevel === "open_category"
+            ? `開放行業別（專業類別）通知・${task.periodStart} 至 ${task.periodEnd}`
+            : `${task.title}・${task.periodStart} 至 ${task.periodEnd}`,
+          icon: "信",
+          tone: task.riskLevel === "open_category" || task.status === "pending_data" ? "urgent" : "workflow",
+          link: `accountability-emails.html?task=${encodeURIComponent(task.id)}`,
+          priority: task.riskLevel === "open_category" ? 0 : task.status === "pending_data" ? 1 : 2,
+          time: task.updatedAt || task.createdAt || new Date().toISOString()
+        };
+      });
+  }
+
+  async function loadAccountabilityTasks() {
+    if (!["vp", "admin"].includes(session.role)) return;
+    try {
+      const identity = `${session.role}:${session.name}`;
+      const response = await fetch(`/api/accountability-emails?identity=${encodeURIComponent(identity)}`, { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || `HTTP ${response.status}`);
+      accountabilityTasks = Array.isArray(data.tasks) ? data.tasks : [];
+    } catch (error) {
+      console.warn("當責信提醒暫時無法同步", error);
+      accountabilityTasks = [];
+    }
+  }
+
   function buildItems() {
     const tasks = parse(TASK_KEY, []);
     const taskItems = (Array.isArray(tasks) ? tasks : []).filter(relevantTask).map(taskItem);
@@ -144,7 +187,7 @@
           time: monthlyDataStatus.generatedAt
         }))
       : [];
-    items = [...dataItems, ...taskItems, ...announcementItems()].sort((a, b) => a.priority - b.priority || new Date(b.time) - new Date(a.time));
+    items = [...accountabilityItems(), ...dataItems, ...taskItems, ...announcementItems()].sort((a, b) => a.priority - b.priority || new Date(b.time) - new Date(a.time));
   }
 
   function render() {
@@ -156,11 +199,11 @@
     badge.hidden = unread === 0;
     $("#notificationList").innerHTML = items.length ? items.map(item => `
       <button type="button" class="notification-item ${item.tone} ${read.has(item.id) ? "" : "unread"}" data-notification="${item.id}">
-        <span class="notification-icon">${item.icon}</span>
-        <span class="notification-copy"><strong>${item.title}</strong><span>${item.detail}</span></span>
-        <time>${timeText(item.time)}</time>
+        <span class="notification-icon">${escapeHtml(item.icon)}</span>
+        <span class="notification-copy"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.detail)}</span></span>
+        <time>${escapeHtml(timeText(item.time))}</time>
       </button>
-    `).join("") : `<div class="notification-empty"><b>目前沒有提醒</b><span>新案件、期限、投票或公告會顯示在這裡。</span></div>`;
+    `).join("") : `<div class="notification-empty"><b>目前沒有提醒</b><span>當責信、新案件、期限、投票或公告會顯示在這裡。</span></div>`;
     $("#notificationList").querySelectorAll("[data-notification]").forEach(button => {
       button.onclick = () => openItem(button.dataset.notification);
     });
@@ -207,5 +250,6 @@
     monthlyDataStatus = event.detail;
     render();
   });
+  await loadAccountabilityTasks();
   render();
 })();

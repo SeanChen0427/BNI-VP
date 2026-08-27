@@ -50,6 +50,8 @@
 - `monthly_attendance_summaries`：單月 PALMS 衍生的月會出席摘要。
 - `analysis_snapshots`：分析草稿及不可改寫的已發布版本。
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
+- `accountability_email_tasks`：缺席第 2／3／4 次與代理第 6／7／8／9 次的跨裝置待寄任務、資料期間、版本化草稿、收件快照及人工寄送紀錄；不代表系統已寄信，也不變更會員或專業類別狀態。
+- `accountability_email_events`：當責信任務的產生、複製、暫緩、不適用、恢復與人工寄送稽核；採只新增事件，不由瀏覽器直接讀寫。
 - `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、測試／正式環境與四種用途路由，不保存聊天內容。
 - `line_reminder_rules`：交流群兩種常態提醒的開關、Asia/Taipei 發送時間、例會星期、提前天數及文案；僅 service role 可讀寫，初始一律關閉。
 - `line_reminder_deliveries`：常態通知的排程／人工測試發送稽核，以 delivery key 與 LINE retry key 防重複；不保存 Channel Access Token。

@@ -10,7 +10,7 @@ test("登入帳密、設定紀錄與測試資料重置只提供 Admin", () => {
   const settings = read("apps/vice-chair/assets/js/settings.js");
   const preview = read("apps/vice-chair/preview-server.mjs");
   const edge = read("supabase/functions/app-api/index.ts");
-  const resetHandler = edge.match(/async function testResetApi[\s\S]*?\n}\n\nDeno\.serve/)[0];
+  const resetHandler = edge.match(/async function testResetApi[\s\S]*?\n}\n\nconst COMMITTEE_BOARD_KIND/)[0];
 
   assert.match(page, /id="credentialsCard" hidden/);
   assert.match(page, /id="auditCard" hidden/);
