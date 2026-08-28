@@ -41,24 +41,16 @@ export function buildVoteCallText({
   profession,
   deadlineAt,
   ballotUrl,
-  isTest = false,
 }) {
   const label = CASE_TYPE_LABELS[String(caseType || "")];
   if (!label) throw new Error("案件類型不適用投票呼喚");
   const memberName = requiredText(applicant, "案件申請者姓名尚未填寫");
   const professionName = requiredText(profession, "案件專業別尚未填寫");
   const url = requiredText(ballotUrl, "投票網址尚未建立");
-  const title = isTest
-    ? `@All 【測試${label}投票｜不列入正式紀錄】`
-    : `@All 【${label}投票】`;
-  const testNotice = isTest
-    ? "\n⚠️ 這是功能測試，不建立正式案件、不列入正式票數。"
-    : "";
-  return normalizeVoteCallText(`${title}
+  return normalizeVoteCallText(`@All 【${label}投票】
 申請者：${memberName}
 專業別：${professionName}
 ${url}
-${testNotice}
 請各位委員針對表述回饋及相關文件，開始進行投票！
 投票截止：${formatVoteCallDeadline(deadlineAt)}
 會員委員及副主席擁有各一票投票權，董事顧問有最終裁量權。
@@ -90,20 +82,17 @@ export function buildVoteCallReplyMessages({
   profession,
   deadlineAt,
   ballotUrl,
-  isTest = false,
 }) {
   const label = CASE_TYPE_LABELS[String(caseType || "")];
   if (!label) throw new Error("案件類型不適用投票圖卡");
   const memberName = requiredText(applicant, "案件申請者姓名尚未填寫");
   const professionName = requiredText(profession, "案件專業別尚未填寫");
   const url = requiredText(ballotUrl, "投票網址尚未建立");
-  const headline = isTest ? "測試投票圖卡已建立" : "委員投票已開放";
-  const title = isTest ? `測試${label}投票` : `${label}投票`;
-  const notice = isTest ? "本票只供功能測試，不列入正式紀錄。" : "請選擇自己的姓名後完成投票。";
+  const title = `${label}投票`;
   return [
     {
       type: "textV2",
-      text: `{all}\n${headline}：${memberName}`,
+      text: `{all}\n委員投票已開放：${memberName}`,
       substitution: {
         all: { type: "mention", mentionee: { type: "all" } },
       },
@@ -117,11 +106,11 @@ export function buildVoteCallReplyMessages({
         header: {
           type: "box",
           layout: "vertical",
-          backgroundColor: isTest ? "#5B6472" : "#9F171C",
+          backgroundColor: "#9F171C",
           paddingAll: "18px",
           contents: [
             { type: "text", text: title, color: "#FFFFFF", weight: "bold", size: "xl" },
-            { type: "text", text: isTest ? "不列入正式紀錄" : "會員委員會", color: "#FFFFFFCC", size: "sm", margin: "sm" },
+            { type: "text", text: "會員委員會", color: "#FFFFFFCC", size: "sm", margin: "sm" },
           ],
         },
         body: {
@@ -133,7 +122,7 @@ export function buildVoteCallReplyMessages({
             { type: "text", text: professionName, color: "#666666", size: "sm", wrap: true },
             { type: "separator", margin: "md" },
             { type: "text", text: `截止：${formatVoteCallDeadline(deadlineAt)}`, color: "#9F171C", weight: "bold", size: "sm", wrap: true },
-            { type: "text", text: notice, color: "#777777", size: "xs", wrap: true },
+            { type: "text", text: "請選擇自己的姓名後完成投票。", color: "#777777", size: "xs", wrap: true },
           ],
         },
         footer: {
@@ -144,7 +133,7 @@ export function buildVoteCallReplyMessages({
             {
               type: "button",
               style: "primary",
-              color: isTest ? "#5B6472" : "#9F171C",
+              color: "#9F171C",
               height: "sm",
               action: { type: "uri", label: "前往投票", uri: url },
             },

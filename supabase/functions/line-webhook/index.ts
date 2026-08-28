@@ -101,7 +101,7 @@ async function processVoteCallEvent(event: {
   const ballotUrl = extractVoteCallUrl(event.text);
   if (!token || !ballotUrl) return;
   const targets = await db(
-    `line_group_targets?oa_channel=eq.committee&line_group_id=eq.${encodeURIComponent(event.groupId)}&status=eq.active&route_key=eq.committee&select=id,purpose&limit=1`,
+    `line_group_targets?oa_channel=eq.committee&line_group_id=eq.${encodeURIComponent(event.groupId)}&status=eq.active&route_key=eq.committee&purpose=eq.production&select=id,purpose&limit=1`,
   );
   const target = targets?.[0];
   if (!target) return;
@@ -110,7 +110,7 @@ async function processVoteCallEvent(event: {
     sha256Text(voteCallFingerprintSource(normalizeVoteCallText(event.text))),
   ]);
   const calls = await db(
-    `case_vote_calls?token_sha256=eq.${tokenHash}&message_sha256=eq.${messageHash}&group_target_id=eq.${target.id}&status=in.(awaiting_reply,reply_failed)&select=*&limit=1`,
+    `case_vote_calls?token_sha256=eq.${tokenHash}&message_sha256=eq.${messageHash}&group_target_id=eq.${target.id}&is_test=eq.false&environment=eq.production&status=in.(awaiting_reply,reply_failed)&select=*&limit=1`,
   );
   const call = calls?.[0];
   if (!call || call.environment !== target.purpose) return;
@@ -139,7 +139,6 @@ async function processVoteCallEvent(event: {
     profession: call.profession_snapshot,
     deadlineAt: call.deadline_at,
     ballotUrl,
-    isTest: Boolean(call.is_test),
   });
   let response: Response;
   try {

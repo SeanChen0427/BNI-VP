@@ -77,7 +77,7 @@ function publicStatus(call: any) {
 async function findCall(token: string) {
   const tokenHash = await sha256(token);
   const rows = await db(
-    `case_vote_calls?token_sha256=eq.${tokenHash}&select=id,snapshot_id,is_test,case_type,applicant_snapshot,profession_snapshot,deadline_at,status&limit=1`,
+    `case_vote_calls?token_sha256=eq.${tokenHash}&is_test=eq.false&environment=eq.production&select=id,snapshot_id,case_type,applicant_snapshot,profession_snapshot,deadline_at,status&limit=1`,
   );
   return rows?.[0] || null;
 }
@@ -94,12 +94,9 @@ async function ballotState(call: any, token: string) {
   const voters = await db(
     `case_vote_call_voters?call_id=eq.${call.id}&is_recused=eq.false&select=person_id,display_name_snapshot,role&order=display_name_snapshot.asc`,
   );
-  const votes = call.is_test
-    ? await db(`case_vote_test_votes?call_id=eq.${call.id}&select=voter_person_id`)
-    : await db(`votes?snapshot_id=eq.${call.snapshot_id}&select=voter_person_id`);
+  const votes = await db(`votes?snapshot_id=eq.${call.snapshot_id}&select=voter_person_id`);
   const voted = new Set((votes || []).map((item: any) => item.voter_person_id));
   return {
-    isTest: Boolean(call.is_test),
     caseType: call.case_type,
     applicant: call.applicant_snapshot,
     profession: call.profession_snapshot,
@@ -167,7 +164,7 @@ Deno.serve(async (request) => {
         }
       }
       if (!personId) return json(404, { message: "這個姓名不在本次投票資格名單中" }, origin);
-      await db(call.is_test ? "rpc/edge_cast_test_case_vote" : "rpc/edge_cast_public_case_vote", {
+      await db("rpc/edge_cast_public_case_vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ p_call_id: call.id, p_voter_person_id: personId, p_choice: choice }),

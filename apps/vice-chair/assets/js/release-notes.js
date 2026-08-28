@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.11",
+      publishedAt: "2026-08-28",
+      title: "LINE 投票測試器已退場",
+      level: "normal",
+      changes: Object.freeze([
+        "正式 LINE 投票已完成驗收，系統設定不再顯示獨立投票測試器。",
+        "舊測試呼喚與測試連結不再產生圖卡或接受投票。",
+        "日後請從正式案件按「啟動投票流程並複製文案」，再貼到已指定的會員委員會正式群。"
+      ]),
+      impact: "正式案件、正式票、具名票向、結果圖、回饋、Word 與結案紀錄均不受影響。"
+    }),
+    Object.freeze({
       version: "1.0.10",
       publishedAt: "2026-08-28",
       title: "投票結果圖與副主席具名票向",

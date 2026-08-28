@@ -3694,7 +3694,6 @@ async function prepareCaseVoteCall(access: any, existing: any, context: Context,
     profession,
     deadlineAt: snapshot.deadline_at,
     ballotUrl,
-    isTest: false,
   });
   const [tokenHash, messageHash] = await Promise.all([
     sha256Text(token),
@@ -4883,143 +4882,6 @@ async function committeeBoardApi(request: Request, context: Context) {
   throw new Error("不支援的留言板操作");
 }
 
-async function voteTestState(context: Context) {
-  leadership(context);
-  const [memberRows, targetRows] = await Promise.all([
-    db("members?status=eq.active&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&order=created_at.asc"),
-    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.test&select=*&limit=1"),
-  ]);
-  const target = targetRows?.[0] || null;
-  const calls = target
-    ? await db(`case_vote_calls?is_test=eq.true&group_target_id=eq.${target.id}&select=id,status,applicant_snapshot,profession_snapshot,deadline_at,created_at,replied_at,failed_at,error_message&order=created_at.desc&limit=1`)
-    : [];
-  const latest = calls?.[0] || null;
-  const votes = latest
-    ? await db(`case_vote_test_votes?call_id=eq.${latest.id}&select=id`)
-    : [];
-  return {
-    configured: Boolean(lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)),
-    target: target ? publicLineTarget(target) : null,
-    subjects: (memberRows || []).map((member: any) => ({
-      id: member.id,
-      name: member.people?.display_name || "",
-      profession: member.profession || "",
-    })).filter((member: any) => member.name),
-    latest: latest ? {
-      id: latest.id,
-      status: latest.status,
-      applicant: latest.applicant_snapshot,
-      profession: latest.profession_snapshot,
-      deadlineAt: latest.deadline_at,
-      createdAt: latest.created_at,
-      repliedAt: latest.replied_at,
-      failedAt: latest.failed_at,
-      error: latest.error_message || "",
-      voteCount: (votes || []).length,
-    } : null,
-  };
-}
-
-async function voteTestApi(request: Request, context: Context) {
-  leadership(context);
-  if (request.method === "GET") return voteTestState(context);
-  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
-  const body = await requestBody(request);
-  if (body.action === "delete") {
-    const callId = String(body.callId || "");
-    if (!UUID_REFERENCE.test(callId)) throw new Error("測試投票識別碼格式不正確");
-    await db(`case_vote_calls?id=eq.${callId}&is_test=eq.true`, {
-      method: "DELETE",
-      headers: { Prefer: "return=minimal" },
-    });
-    return { ...(await voteTestState(context)), message: "測試投票與測試票數已清除" };
-  }
-  if (body.action !== "prepare") throw new Error("不支援的測試投票操作");
-  const subjectId = String(body.subjectId || "");
-  if (!UUID_REFERENCE.test(subjectId)) throw new Error("請選擇一位現任會員作為畫面測試對象");
-  const [subjects, targets, roster] = await Promise.all([
-    db(`members?id=eq.${subjectId}&status=eq.active&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.test&select=*&limit=1"),
-    activeVotingRoster(),
-  ]);
-  const subject = subjects?.[0];
-  const target = targets?.[0];
-  if (!subject) throw Object.assign(new Error("這位會員已不在現任會員名單，請重新選擇"), { status: 409 });
-  if (!target) throw Object.assign(new Error("請先在 LINE 群組管理指定會員委員會測試群"), { status: 409 });
-  if (!lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)) {
-    throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
-  }
-  const applicant = String(subject.people?.display_name || "").trim();
-  const profession = String(subject.profession || "").trim();
-  if (!applicant || !profession) throw Object.assign(new Error("測試會員缺少姓名或專業別"), { status: 409 });
-  const voters = (roster || []).filter((item: any) => ["vp", "committee"].includes(String(item.role || "")));
-  if (!voters.length) throw Object.assign(new Error("目前沒有在任投票委員可供測試"), { status: 409 });
-  const token = randomVoteToken();
-  const ballotUrl = publicVoteUrl(token);
-  const createdAt = new Date();
-  const deadlineAt = new Date(createdAt.getTime() + 45 * 60 * 1000).toISOString();
-  const callText = buildVoteCallText({
-    caseType: "renewal",
-    applicant,
-    profession,
-    deadlineAt,
-    ballotUrl,
-    isTest: true,
-  });
-  const [tokenHash, messageHash] = await Promise.all([
-    sha256Text(token),
-    sha256Text(voteCallFingerprintSource(callText)),
-  ]);
-  await db(`case_vote_calls?is_test=eq.true&group_target_id=eq.${target.id}&status=in.(preparing,awaiting_reply,replying,replied,reply_failed)`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-    body: JSON.stringify({ status: "revoked", error_message: "由設定頁重新建立測試投票" }),
-  });
-  const callId = crypto.randomUUID();
-  try {
-    await db("case_vote_calls", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({
-        id: callId,
-        group_target_id: target.id,
-        environment: "test",
-        is_test: true,
-        case_type: "renewal",
-        applicant_snapshot: applicant,
-        profession_snapshot: profession,
-        deadline_at: deadlineAt,
-        token_sha256: tokenHash,
-        message_sha256: messageHash,
-        status: "awaiting_reply",
-        created_by: context.personId,
-        created_by_auth_user_id: context.userId,
-        copied_at: createdAt.toISOString(),
-      }),
-    });
-    await db("case_vote_call_voters", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify(voters.map((item: any) => ({
-        call_id: callId,
-        person_id: item.person_id,
-        display_name_snapshot: String(item.people?.display_name || "").trim(),
-        role: item.role,
-        is_recused: item.person_id === subject.people?.id,
-      }))),
-    });
-  } catch (error) {
-    await db(`case_vote_calls?id=eq.${callId}&is_test=eq.true`, { method: "DELETE" }).catch(() => undefined);
-    throw error;
-  }
-  return {
-    ...(await voteTestState(context)),
-    callText,
-    ballotUrl,
-    message: `測試呼喚已建立；請將完整文案貼到「${target.display_name}」`,
-  };
-}
-
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors(request) });
   if (!supabaseUrl || !anonKey || !serviceKey) return respond(request, 500, { message: "Supabase Edge API 環境設定不完整" });
@@ -5047,7 +4909,6 @@ Deno.serve(async (request) => {
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
-    else if (path === "/api/vote-test") result = await voteTestApi(request, context);
     else if (path === "/api/line-reminders") result = await lineRemindersApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
     else if (path === "/api/accountability-emails") result = await accountabilityEmailsApi(request, context);
