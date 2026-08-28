@@ -1,8 +1,16 @@
-import { collectGroupEvents, resolveLineWebhookChannel } from "./domain.mjs";
+import { collectGroupEvents, collectVoteCallEvents, resolveLineWebhookChannel } from "./domain.mjs";
 import { LINE_OA_CHANNELS } from "../_shared/line-channel-domain.mjs";
+import {
+  buildVoteCallReplyMessages,
+  extractVoteCallToken,
+  extractVoteCallUrl,
+  normalizeVoteCallText,
+  voteCallFingerprintSource,
+} from "../_shared/case-vote-call-domain.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const committeeAccessToken = Deno.env.get("LINE_COMMITTEE_CHANNEL_ACCESS_TOKEN") || "";
 const channelSecrets = [
   { channel: LINE_OA_CHANNELS.VICE_CHAIR, secret: Deno.env.get("LINE_CHANNEL_SECRET") || "" },
   { channel: LINE_OA_CHANNELS.COMMITTEE, secret: Deno.env.get("LINE_COMMITTEE_CHANNEL_SECRET") || "" },
@@ -65,6 +73,112 @@ async function recordGroupEvent(event: { groupId: string; kind: string; occurred
   });
 }
 
+function hex(bytes: ArrayBuffer) {
+  return [...new Uint8Array(bytes)].map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Text(value: string) {
+  return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function finishVoteCall(callId: string, patch: Record<string, unknown>) {
+  await db(`case_vote_calls?id=eq.${callId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function processVoteCallEvent(event: {
+  groupId: string;
+  text: string;
+  replyToken: string;
+  webhookEventId: string;
+  lineMessageId: string;
+}) {
+  if (!committeeAccessToken) return;
+  const token = extractVoteCallToken(event.text);
+  const ballotUrl = extractVoteCallUrl(event.text);
+  if (!token || !ballotUrl) return;
+  const targets = await db(
+    `line_group_targets?oa_channel=eq.committee&line_group_id=eq.${encodeURIComponent(event.groupId)}&status=eq.active&route_key=eq.committee&select=id,purpose&limit=1`,
+  );
+  const target = targets?.[0];
+  if (!target) return;
+  const [tokenHash, messageHash] = await Promise.all([
+    sha256Text(token),
+    sha256Text(voteCallFingerprintSource(normalizeVoteCallText(event.text))),
+  ]);
+  const calls = await db(
+    `case_vote_calls?token_sha256=eq.${tokenHash}&message_sha256=eq.${messageHash}&group_target_id=eq.${target.id}&status=in.(awaiting_reply,reply_failed)&select=*&limit=1`,
+  );
+  const call = calls?.[0];
+  if (!call || call.environment !== target.purpose) return;
+  if (new Date(call.deadline_at).getTime() <= Date.now()) {
+    await finishVoteCall(call.id, { status: "expired", error_message: "投票呼喚貼出時已超過截止時間" });
+    return;
+  }
+  const claimed = await db(
+    `case_vote_calls?id=eq.${call.id}&status=in.(awaiting_reply,reply_failed)`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "replying",
+        webhook_event_id: event.webhookEventId || null,
+        line_message_id: event.lineMessageId || null,
+        failed_at: null,
+        error_message: null,
+      }),
+    },
+  );
+  if (!claimed?.[0]) return;
+  const messages = buildVoteCallReplyMessages({
+    caseType: call.case_type,
+    applicant: call.applicant_snapshot,
+    profession: call.profession_snapshot,
+    deadlineAt: call.deadline_at,
+    ballotUrl,
+    isTest: Boolean(call.is_test),
+  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${committeeAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ replyToken: event.replyToken, messages }),
+    });
+  } catch (error) {
+    await finishVoteCall(call.id, {
+      status: "reply_failed",
+      failed_at: new Date().toISOString(),
+      error_message: String((error as Error)?.message || error).slice(0, 1000),
+    });
+    return;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    await finishVoteCall(call.id, {
+      status: "reply_failed",
+      failed_at: new Date().toISOString(),
+      line_request_id: response.headers.get("x-line-request-id") || null,
+      error_message: String(payload?.message || `LINE HTTP ${response.status}`).slice(0, 1000),
+    });
+    return;
+  }
+  await finishVoteCall(call.id, {
+    status: "replied",
+    replied_at: new Date().toISOString(),
+    failed_at: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || null,
+    line_message_id: payload?.sentMessages?.[1]?.id || payload?.sentMessages?.[0]?.id || event.lineMessageId || null,
+  });
+}
+
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json(405, { message: "Method not allowed" });
   if (!supabaseUrl || !serviceKey || !channelSecrets.length) {
@@ -83,8 +197,11 @@ Deno.serve(async (request) => {
   try { payload = JSON.parse(rawBody); }
   catch { return json(400, { message: "Invalid JSON" }); }
   try {
-    // Only opaque group IDs and timestamps are retained. User message content is ignored.
+    // 普通聊天內容不落地；只有包含一次性 Token 且完整雜湊相符的投票呼喚會觸發 Reply。
     await Promise.all(collectGroupEvents(payload).map(event => recordGroupEvent(event, oaChannel)));
+    if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
+      await Promise.all(collectVoteCallEvents(payload).map(event => processVoteCallEvent(event)));
+    }
     return json(200, { ok: true });
   } catch (error) {
     console.error("LINE webhook persistence failed", String((error as Error)?.message || error));

@@ -300,12 +300,13 @@ function renderLineGroups(){
   const targets=lineGroupsState.targets||[];
   const active=targets.filter(item=>item.status==="active");
   const candidates=targets.filter(item=>item.availableForAssignment&&item.status!=="active");
-  $("#lineGroupRoutes").innerHTML=Object.entries(LINE_ROUTE_LABELS).map(([routeKey,label])=>{
-    const target=active.find(item=>item.routeKey===routeKey);
+  const environments=[{key:"test",label:"測試群"},{key:"production",label:"正式群"}];
+  $("#lineGroupRoutes").innerHTML=Object.entries(LINE_ROUTE_LABELS).flatMap(([routeKey,label])=>environments.map(environment=>{
+    const target=active.find(item=>item.routeKey===routeKey&&item.environment===environment.key);
     return target
-      ?`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>${escapeHtml(target.displayName)}・${escapeHtml(target.oaName||LINE_CHANNEL_LABELS[target.oaChannel]||"LINE 助理")}</small></div><em>${target.environment==="test"?"測試群":"正式群"}</em><button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button></article>`
-      :`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>尚未指定群組・應由${escapeHtml(LINE_CHANNEL_LABELS[LINE_ROUTE_CHANNELS[routeKey]])}</small></div><em>未啟用</em></article>`;
-  }).join("");
+      ?`<article class="line-group-route"><div><b>${escapeHtml(label)}・${environment.label}</b><small>${escapeHtml(target.displayName)}・${escapeHtml(target.oaName||LINE_CHANNEL_LABELS[target.oaChannel]||"LINE 助理")}</small></div><em>${environment.label}</em><button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button></article>`
+      :`<article class="line-group-route"><div><b>${escapeHtml(label)}・${environment.label}</b><small>尚未指定群組・應由${escapeHtml(LINE_CHANNEL_LABELS[LINE_ROUTE_CHANNELS[routeKey]])}</small></div><em>未啟用</em></article>`;
+  })).join("");
   $("#lineGroupDiscovered").innerHTML=candidates.length?candidates.map(item=>{
     const routeOptions=Object.entries(LINE_ROUTE_LABELS).filter(([routeKey])=>LINE_ROUTE_CHANNELS[routeKey]===item.oaChannel).map(([routeKey,label])=>`<option value="${escapeHtml(routeKey)}">${escapeHtml(label)}</option>`).join("");
     return`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${escapeHtml(item.oaName||LINE_CHANNEL_LABELS[item.oaChannel]||"LINE 助理")}・${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途">${routeOptions}</select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`
@@ -313,7 +314,7 @@ function renderLineGroups(){
   document.querySelectorAll("[data-assign-line-group]").forEach(button=>button.onclick=()=>assignLineGroup(button.dataset.assignLineGroup,button.dataset.name));
   document.querySelectorAll("[data-disable-line-group]").forEach(button=>button.onclick=()=>disableLineGroup(button.dataset.disableLineGroup,button.dataset.name));
   const channels=lineGroupsState.channels||{};
-  $("#lineGroupStatus").textContent=`目前已啟用 ${active.length}/4 個群組用途。副主席秘書Bot${channels.viceChair?"已設定":"待設定"}；會員委員秘書Bot${channels.committee?"已設定":"待設定"}。`;
+  $("#lineGroupStatus").textContent=`目前已啟用 ${active.length}/8 個「用途＋環境」群組。副主席秘書Bot${channels.viceChair?"已設定":"待設定"}；會員委員秘書Bot${channels.committee?"已設定":"待設定"}。`;
 }
 async function loadLineGroups(){
   $("#lineGroupStatus").textContent="正在讀取 LINE Bot 狀態…";
@@ -323,19 +324,94 @@ async function assignLineGroup(id,name){
   const routeKey=document.querySelector(`[data-line-route="${id}"]`)?.value||"";
   const environment=document.querySelector(`[data-line-environment="${id}"]`)?.value||"test";
   const label=LINE_ROUTE_LABELS[routeKey]||routeKey;
-  if(!confirm(`確認將「${name}」指定為「${label}」${environment==="test"?"測試群":"正式群"}？\n\n同一用途原有群組會被停用，避免誤發。`))return;
+  if(!confirm(`確認將「${name}」指定為「${label}」${environment==="test"?"測試群":"正式群"}？\n\n只有相同「用途＋環境」的原群組會被停用；測試群與正式群可同時保留。`))return;
   $("#lineGroupStatus").textContent="正在向 LINE 核對群組…";
-  try{const result=await lineGroupsApi("POST",{action:"assign",targetId:id,routeKey,environment});log(`${session.name}確認 LINE 群組：${name}｜${label}`);toast(result.message);await loadLineGroups()}catch(error){$("#lineGroupStatus").textContent=error.message;toast("LINE 群組確認失敗")}
+  try{const result=await lineGroupsApi("POST",{action:"assign",targetId:id,routeKey,environment});log(`${session.name}確認 LINE 群組：${name}｜${label}`);toast(result.message);await loadLineGroups();await loadVoteTest(true)}catch(error){$("#lineGroupStatus").textContent=error.message;toast("LINE 群組確認失敗")}
 }
 async function disableLineGroup(id,name){
   if(!confirm(`停用「${name}」的系統發送權限？\n\nBot 不會被踢出 LINE 群組，但系統將無法再發送到該群。`))return;
   $("#lineGroupStatus").textContent="正在停用群組…";
-  try{const result=await lineGroupsApi("POST",{action:"disable",targetId:id});log(`${session.name}停用 LINE 群組：${name}`);toast(result.message);await loadLineGroups()}catch(error){$("#lineGroupStatus").textContent=error.message;toast("停用失敗")}
+  try{const result=await lineGroupsApi("POST",{action:"disable",targetId:id});log(`${session.name}停用 LINE 群組：${name}`);toast(result.message);await loadLineGroups();await loadVoteTest(true)}catch(error){$("#lineGroupStatus").textContent=error.message;toast("停用失敗")}
 }
 function initLineGroups(){
   if(!canManageLineGroups)return;
   $("#lineBotGroups").hidden=false;
   loadLineGroups();
 }
-if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initNewMemberRegistration();initDeparture();initLineGroups()}
+let voteTestState={configured:false,target:null,subjects:[],latest:null};
+let voteTestCallText="";
+let voteTestPoll=null;
+function voteTestIdentity(){return`${session.role}:${session.name}`}
+async function voteTestApi(method="GET",payload=null){
+  const options={method,headers:{"content-type":"application/json"},cache:"no-store"};
+  if(payload)options.body=JSON.stringify({identity:voteTestIdentity(),...payload});
+  const suffix=method==="GET"?`?identity=${encodeURIComponent(voteTestIdentity())}`:"";
+  const response=await fetch(`/api/vote-test${suffix}`,options),data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.message||"投票測試服務無法使用");
+  return data;
+}
+function voteTestStatusLabel(status){
+  return({awaiting_reply:"等待把完整文案貼到測試群",replying:"Bot 正在回覆圖卡",replied:"Bot 已回覆圖卡，可從 LINE 開啟投票",reply_failed:"Bot 回覆失敗，請將相同完整文案再貼一次",expired:"測試已逾時",revoked:"測試已被新版取代"})[status]||status||"尚未建立";
+}
+function renderVoteTest(){
+  const selected=$("#voteTestSubject").value;
+  $("#voteTestSubject").innerHTML=`<option value="">請選擇一位現任會員</option>${(voteTestState.subjects||[]).map(item=>`<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)}・${escapeHtml(item.profession||"未設定專業別")}</option>`).join("")}`;
+  if((voteTestState.subjects||[]).some(item=>item.id===selected))$("#voteTestSubject").value=selected;
+  $("#voteTestTarget").textContent=voteTestState.target?`${voteTestState.target.displayName}・會員委員秘書Bot`:"尚未指定會員委員會測試群";
+  $("#prepareVoteTest").disabled=!(voteTestState.configured&&voteTestState.target&&$("#voteTestSubject").value);
+  const latest=voteTestState.latest;
+  const current=$("#voteTestCurrent");
+  current.dataset.status=latest?.status||"";
+  current.textContent=latest?`${latest.applicant}・${voteTestStatusLabel(latest.status)}・已投 ${latest.voteCount||0} 票`:"尚未建立測試投票。";
+  $("#deleteVoteTest").disabled=!latest;
+  $("#voteTestActions").hidden=!(voteTestCallText||latest);
+  if(!voteTestCallText)$("#copyVoteTest").disabled=true;
+  const waiting=["awaiting_reply","replying","reply_failed"].includes(latest?.status);
+  clearInterval(voteTestPoll);voteTestPoll=null;
+  if(waiting)voteTestPoll=setInterval(()=>{if(!document.hidden)loadVoteTest(true)},5000);
+}
+async function loadVoteTest(silent=false){
+  if(!silent)$("#voteTestStatus").textContent="正在讀取投票測試器…";
+  try{
+    const previous=voteTestState.latest?.status;
+    voteTestState=await voteTestApi();renderVoteTest();
+    if(!silent)$("#voteTestStatus").textContent=voteTestState.target?"選擇會員後產生文案，再完整貼到測試群。":"請先在上方指定會員委員會測試群。";
+    if(silent&&previous!==voteTestState.latest?.status&&voteTestState.latest?.status==="replied"){$("#voteTestStatus").textContent="Bot 已成功回覆投票圖卡，現在可到 LINE 點圖卡測試。";toast("測試圖卡已回覆")}
+  }catch(error){$("#voteTestStatus").textContent=`載入失敗：${error.message}`}
+}
+async function copyVoteTestText(){
+  if(!voteTestCallText)return toast("請重新產生測試呼喚");
+  try{await navigator.clipboard.writeText(voteTestCallText);$("#voteTestStatus").textContent="完整文案已複製，請原樣貼到會員委員會測試群。";toast("測試呼喚已複製")}
+  catch{$("#voteTestPreview").focus();$("#voteTestStatus").textContent="瀏覽器未允許自動複製，請長按或全選下方完整文案後複製。";toast("請手動複製文案")}
+}
+async function prepareVoteTest(){
+  const subjectId=$("#voteTestSubject").value;
+  if(!subjectId)return;
+  const button=$("#prepareVoteTest");button.disabled=true;button.textContent="正在建立…";$("#voteTestStatus").textContent="正在建立獨立測試投票…";
+  try{
+    const data=await voteTestApi("POST",{action:"prepare",subjectId});
+    voteTestState=data;voteTestCallText=data.callText||"";
+    $("#voteTestPreview").textContent=voteTestCallText;$("#voteTestPreview").hidden=!voteTestCallText;$("#copyVoteTest").disabled=!voteTestCallText;
+    renderVoteTest();await copyVoteTestText();
+  }catch(error){$("#voteTestStatus").textContent=error.message;toast("測試呼喚建立失敗")}
+  button.textContent="產生並複製測試呼喚";renderVoteTest();
+}
+async function deleteVoteTest(){
+  const latest=voteTestState.latest;if(!latest)return;
+  if(!confirm(`清除「${latest.applicant}」這筆獨立測試投票與所有測試票數？\n\n正式案件與正式票數不受影響。`))return;
+  try{
+    voteTestState=await voteTestApi("POST",{action:"delete",callId:latest.id});voteTestCallText="";
+    $("#voteTestPreview").textContent="";$("#voteTestPreview").hidden=true;renderVoteTest();$("#voteTestStatus").textContent="測試投票已清除。";toast("測試資料已清除");
+  }catch(error){$("#voteTestStatus").textContent=error.message;toast("測試清除失敗")}
+}
+function initVoteTest(){
+  if(!canManageLineGroups)return;
+  $("#voteTestCard").hidden=false;
+  $("#voteTestSubject").onchange=renderVoteTest;
+  $("#prepareVoteTest").onclick=prepareVoteTest;
+  $("#copyVoteTest").onclick=copyVoteTestText;
+  $("#deleteVoteTest").onclick=deleteVoteTest;
+  loadVoteTest();
+}
+if(!FulianAuth.can("view")){location.href="login.html"}else{render();initTestDataReset();initNewMemberRegistration();initDeparture();initLineGroups();initVoteTest()}
 })();

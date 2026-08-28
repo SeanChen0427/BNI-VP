@@ -9,6 +9,9 @@
   const canDelete = session.role === "vp" || session.role === "admin";
   const canViewArchive = session.role === "vp";
   const canManageDecision = session.role === "vp";
+  window.addEventListener("fulian:storage-cleanup-warning",event=>{
+    alert(`案件資料已刪除，但有 ${event.detail?.count||1} 個伺服器 Word 檔暫時清理失敗。系統已保留待處理紀錄，不會靜默忽略。`);
+  });
   const typeMap = {
     renewal: { label: "續約", icon: "續", form: "terminal-form.html", flow: true },
     new: { label: "新會員", icon: "新", form: "new-member-form.html", flow: true },

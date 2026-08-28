@@ -126,6 +126,9 @@ verify_jwt = true
 [functions.line-webhook]
 verify_jwt = false
 
+[functions.public-vote]
+verify_jwt = false
+
 [functions.line-reminder-cron]
 verify_jwt = false
 

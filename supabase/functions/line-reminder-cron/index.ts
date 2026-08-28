@@ -146,7 +146,7 @@ Deno.serve(async request => {
   try {
     const [rules, targets] = await Promise.all([
       db("line_reminder_rules?enabled=eq.true&select=*&order=reminder_key.asc"),
-      db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
+      db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
     ]);
     const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, target]));
     const now = new Date();

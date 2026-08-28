@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#9f171c">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://fahrblkukuhgveiptufn.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>會員委員投票｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="stylesheet" href="assets/css/public-vote.css?v=1">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+</head>
+<body>
+  <main class="ballot-shell">
+    <header class="ballot-brand">
+      <img src="assets/images/fulian-favicon.png" alt="富聯分會">
+      <div><strong>富聯分會</strong><span>會員委員會投票</span></div>
+    </header>
+
+    <section class="ballot-card" aria-live="polite">
+      <div class="test-banner" id="testBanner" hidden>功能測試・不列入正式紀錄</div>
+      <span class="eyebrow" id="caseLabel">正在讀取投票資料</span>
+      <h1 id="applicant">請稍候…</h1>
+      <p class="profession" id="profession"></p>
+      <div class="ballot-meta"><span id="deadline">—</span><span id="voteCount">—</span></div>
+
+      <div class="ballot-status" id="ballotStatus">正在確認這份投票連結…</div>
+
+      <form id="ballotForm" hidden>
+        <label class="identity-field">第一步：選擇你是誰
+          <select id="voter" required><option value="">請選擇姓名</option></select>
+          <small>本流程和原 Google 表單相同，由投票者自行選擇身分；同一姓名只能投一票。</small>
+        </label>
+        <fieldset>
+          <legend>第二步：選擇一項</legend>
+          <label class="choice"><input type="radio" name="choice" value="approve"><span><b id="approveLabel">同意</b><small>確認支持本案</small></span></label>
+          <label class="choice"><input type="radio" name="choice" value="reject"><span><b id="rejectLabel">不同意</b><small>確認不支持本案</small></span></label>
+        </fieldset>
+        <button type="submit" id="submitVote" disabled>確認送出這一票</button>
+      </form>
+    </section>
+    <p class="privacy-note">此頁不需要登入，也不會取得你的 LINE 帳號。系統只依你選擇的姓名記錄一票。</p>
+  </main>
+  <script src="assets/js/public-vote.js?v=1"></script>
+</body>
+</html>
