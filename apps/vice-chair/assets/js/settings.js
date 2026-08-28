@@ -287,6 +287,7 @@ const LINE_ROUTE_LABELS={attendance:"每週出席公告",committee:"會員委員
 const LINE_ROUTE_CHANNELS={attendance:"vice_chair",committee:"committee",leadership:"vice_chair",exchange:"vice_chair"};
 const LINE_CHANNEL_LABELS={vice_chair:"副主席秘書Bot",committee:"會員委員秘書Bot"};
 let lineGroupsState={configured:false,channels:{viceChair:false,committee:false},targets:[]};
+const lineRouteViewEnvironment={};
 function lineGroupIdentity(){return`${session.role}:${session.name}`}
 async function lineGroupsApi(method="GET",payload=null){
   const options={method,headers:{"content-type":"application/json"},cache:"no-store"};
@@ -301,20 +302,24 @@ function renderLineGroups(){
   const active=targets.filter(item=>item.status==="active");
   const candidates=targets.filter(item=>item.availableForAssignment&&item.status!=="active");
   const environments=[{key:"test",label:"測試群"},{key:"production",label:"正式群"}];
-  $("#lineGroupRoutes").innerHTML=Object.entries(LINE_ROUTE_LABELS).flatMap(([routeKey,label])=>environments.map(environment=>{
-    const target=active.find(item=>item.routeKey===routeKey&&item.environment===environment.key);
-    return target
-      ?`<article class="line-group-route"><div><b>${escapeHtml(label)}・${environment.label}</b><small>${escapeHtml(target.displayName)}・${escapeHtml(target.oaName||LINE_CHANNEL_LABELS[target.oaChannel]||"LINE 助理")}</small></div><em>${environment.label}</em><button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button></article>`
-      :`<article class="line-group-route"><div><b>${escapeHtml(label)}・${environment.label}</b><small>尚未指定群組・應由${escapeHtml(LINE_CHANNEL_LABELS[LINE_ROUTE_CHANNELS[routeKey]])}</small></div><em>未啟用</em></article>`;
-  })).join("");
+  $("#lineGroupRoutes").innerHTML=Object.entries(LINE_ROUTE_LABELS).map(([routeKey,label])=>{
+    if(!["test","production"].includes(lineRouteViewEnvironment[routeKey])){
+      lineRouteViewEnvironment[routeKey]=active.some(item=>item.routeKey===routeKey&&item.environment==="production")?"production":active.some(item=>item.routeKey===routeKey&&item.environment==="test")?"test":"production";
+    }
+    const environmentKey=lineRouteViewEnvironment[routeKey],environment=environments.find(item=>item.key===environmentKey);
+    const target=active.find(item=>item.routeKey===routeKey&&item.environment===environmentKey);
+    const options=environments.map(item=>`<option value="${item.key}"${item.key===environmentKey?" selected":""}>${item.label}</option>`).join("");
+    return`<article class="line-group-route"><div><b>${escapeHtml(label)}</b><small>${target?`${escapeHtml(target.displayName)}・${escapeHtml(target.oaName||LINE_CHANNEL_LABELS[target.oaChannel]||"LINE 助理")}`:`${environment.label}尚未指定・應由${escapeHtml(LINE_CHANNEL_LABELS[LINE_ROUTE_CHANNELS[routeKey]])}`}</small></div><select data-line-route-view="${escapeHtml(routeKey)}" aria-label="查看${escapeHtml(label)}群組環境">${options}</select><em>${target?"已啟用":"未啟用"}</em>${target?`<button type="button" data-disable-line-group="${escapeHtml(target.id)}" data-name="${escapeHtml(target.displayName)}">停用</button>`:""}</article>`;
+  }).join("");
   $("#lineGroupDiscovered").innerHTML=candidates.length?candidates.map(item=>{
     const routeOptions=Object.entries(LINE_ROUTE_LABELS).filter(([routeKey])=>LINE_ROUTE_CHANNELS[routeKey]===item.oaChannel).map(([routeKey,label])=>`<option value="${escapeHtml(routeKey)}">${escapeHtml(label)}</option>`).join("");
     return`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${escapeHtml(item.oaName||LINE_CHANNEL_LABELS[item.oaChannel]||"LINE 助理")}・${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途">${routeOptions}</select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`
   }).join(""):`<div class="line-group-empty">目前沒有可指定群組。邀請對應的 LINE 助理後，請在群內傳一則普通訊息。</div>`;
   document.querySelectorAll("[data-assign-line-group]").forEach(button=>button.onclick=()=>assignLineGroup(button.dataset.assignLineGroup,button.dataset.name));
   document.querySelectorAll("[data-disable-line-group]").forEach(button=>button.onclick=()=>disableLineGroup(button.dataset.disableLineGroup,button.dataset.name));
+  document.querySelectorAll("[data-line-route-view]").forEach(select=>select.onchange=()=>{lineRouteViewEnvironment[select.dataset.lineRouteView]=select.value;renderLineGroups()});
   const channels=lineGroupsState.channels||{};
-  $("#lineGroupStatus").textContent=`目前已啟用 ${active.length}/8 個「用途＋環境」群組。副主席秘書Bot${channels.viceChair?"已設定":"待設定"}；會員委員秘書Bot${channels.committee?"已設定":"待設定"}。`;
+  $("#lineGroupStatus").textContent=`目前已啟用 ${active.length} 個群組；每項用途可用下拉選擇查看測試群／正式群。副主席秘書Bot${channels.viceChair?"已設定":"待設定"}；會員委員秘書Bot${channels.committee?"已設定":"待設定"}。`;
 }
 async function loadLineGroups(){
   $("#lineGroupStatus").textContent="正在讀取 LINE Bot 狀態…";

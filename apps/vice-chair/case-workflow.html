@@ -13,13 +13,13 @@
   <script src="core/calendar-domain.js?v=1"></script>
   <script src="core/case-domain.js?v=8"></script>
   <script src="assets/js/task-store.js?v=7"></script>
-  <script src="assets/js/case-state-store.js?v=12"></script>
+  <script src="assets/js/case-state-store.js?v=13"></script>
   <script src="services/case-files.js?v=5"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/case-workflow.css?v=2">
-  <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=5">
+  <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=6">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
   <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
 </head>
@@ -91,17 +91,24 @@
         </section>
 
         <section class="card vote-card" id="voteSection">
-          <div class="section-title"><span>04</span><div><h2>系統投票</h2><p>副主席複製完整呼喚貼到正式群，會員委員秘書Bot會用 Reply 回覆免登入投票圖卡</p></div></div>
+          <div class="section-title"><span>04</span><div><h2>系統投票</h2><p>副主席選擇發布群組並複製完整呼喚，會員委員秘書Bot會用 Reply 回覆免登入投票圖卡</p></div></div>
           <div class="vote-locked" id="voteLocked"><b>投票尚未開啟</b><span>需先完成回饋門檻，再由副主席開啟。</span></div>
           <div id="voteWorkspace" hidden>
             <div class="vote-topline">
               <span id="voteSnapshot">投票資格快照 7 人</span>
               <span id="deadlineLabel">截止時間尚未設定</span>
               <div class="vote-notice-actions">
+                <label class="vote-destination vp-control">投票圖卡發布群組
+                  <select id="voteCallEnvironment" aria-describedby="voteCallEnvironmentHint">
+                    <option value="production">正式群</option>
+                    <option value="test">測試群（仍列入正式票）</option>
+                  </select>
+                  <small id="voteCallEnvironmentHint">預設發布到正式群。</small>
+                </label>
                 <button id="copyVoteNotice" class="primary vp-control">啟動投票流程並複製文案</button>
               </div>
             </div>
-            <div class="vote-line-state" id="voteLineState">按下後會建立一次性投票網址；請將完整文案原樣貼到正式群，等待 Bot 回覆圖卡。</div>
+            <div class="vote-line-state" id="voteLineState">按下後會建立一次性投票網址；請將完整文案原樣貼到所選群組，等待 Bot 回覆圖卡。</div>
             <pre id="voteNoticePreview" class="message-preview vote-notice-preview" tabindex="0"></pre>
             <div class="vote-grid">
               <div class="my-vote">
@@ -109,8 +116,8 @@
                 <label><input type="radio" name="vote" value="approve"><span id="approveLabel">同意續約</span></label>
                 <label><input type="radio" name="vote" value="reject"><span id="rejectLabel">不同意續約</span></label>
                 <button id="submitVote" class="primary">確認送出票</button>
-                <small id="voteActionHint" class="vote-action-hint">請等會員委員秘書Bot在正式群回覆投票圖卡。</small>
-                <small>每位有資格者一票；初版可覆蓋自己的示範票，正式版將鎖定並保留更正紀錄。</small>
+                <small id="voteActionHint" class="vote-action-hint">請等會員委員秘書Bot在所選群組回覆投票圖卡。</small>
+                <small>每位有資格者一票；送出後再次投票會提醒已投，不能自行覆蓋正式票。</small>
               </div>
               <div class="vote-result">
                 <div class="result-numbers"><div><small>已投票</small><strong id="voteCount">0</strong></div><div><small>最低參與</small><strong id="quorum">4</strong></div><div><small>同意</small><strong id="approveCount">0</strong></div><div><small>不同意</small><strong id="rejectCount">0</strong></div></div>
@@ -171,7 +178,7 @@
   </main>
   <div id="toast"></div>
   <script src="assets/js/vote-result-image.js?v=1"></script>
-  <script src="assets/js/case-workflow.js?v=25"></script>
+  <script src="assets/js/case-workflow.js?v=26"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

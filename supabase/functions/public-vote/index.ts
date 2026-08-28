@@ -77,7 +77,7 @@ function publicStatus(call: any) {
 async function findCall(token: string) {
   const tokenHash = await sha256(token);
   const rows = await db(
-    `case_vote_calls?token_sha256=eq.${tokenHash}&is_test=eq.false&environment=eq.production&select=id,snapshot_id,case_type,applicant_snapshot,profession_snapshot,deadline_at,status&limit=1`,
+    `case_vote_calls?token_sha256=eq.${tokenHash}&is_test=eq.false&environment=in.(test,production)&select=id,snapshot_id,case_type,applicant_snapshot,profession_snapshot,deadline_at,status&limit=1`,
   );
   return rows?.[0] || null;
 }
