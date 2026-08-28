@@ -32,17 +32,7 @@ test("投票呼喚包含一次性網址、截止時間與可精準比對的完�
   assert.equal(extractVoteCallUrl(text), ballotUrl);
   assert.equal(normalizeVoteCallText(`\r\n${text.replaceAll("\n", "\r\n")}\r\n`), text);
   assert.match(voteCallFingerprintSource(text), /^case-vote-reply-card-v1\n/);
-
-  const testText = buildVoteCallText({
-    caseType: "renewal",
-    applicant: "測試會員",
-    profession: "測試專業",
-    deadlineAt: "2026-08-29T10:00:00Z",
-    ballotUrl,
-    isTest: true,
-  });
-  assert.match(testText, /測試續約投票｜不列入正式紀錄/);
-  assert.match(testText, /不建立正式案件、不列入正式票數/);
+  assert.doesNotMatch(text, /測試投票|不列入正式紀錄/);
 });
 
 test("Bot 以一次 Reply 同時真正 @所有人並回覆 Flex 投票圖卡", () => {
@@ -99,6 +89,8 @@ test("Webhook 只接受委員會群的 Token 與完整文案雜湊，並呼叫 R
   assert.match(domain, /collectVoteCallEvents/);
   assert.match(handler, /extractVoteCallToken\(event\.text\)/);
   assert.match(handler, /voteCallFingerprintSource\(normalizeVoteCallText\(event\.text\)\)/);
+  assert.match(handler, /purpose=eq\.production/);
+  assert.match(handler, /is_test=eq\.false&environment=eq\.production/);
   assert.match(handler, /group_target_id=eq\.\$\{target\.id\}/);
   assert.match(handler, /status=in\.\(awaiting_reply,reply_failed\)/);
   assert.match(handler, /status: "replying"/);
@@ -130,20 +122,29 @@ test("免登入頁以雜湊 Token 與別名選人，正式票仍寫入同一份 
   assert.match(script, /請確認：你選擇/);
 });
 
-test("設定頁測試器與正式票完全分離，測試群可和正式群並存", () => {
-  const migration = read("supabase/migrations/20260828160000_case_vote_reply_calls.sql");
+test("正式上線後 LINE 投票測試器已完整退場", () => {
+  const retirement = read("supabase/migrations/20260828171000_retire_line_vote_tester.sql");
   const edge = read("supabase/functions/app-api/index.ts");
+  const publicVote = read("supabase/functions/public-vote/index.ts");
+  const webhook = read("supabase/functions/line-webhook/index.ts");
+  const callDomain = read("supabase/functions/_shared/case-vote-call-domain.mjs");
   const settings = read("apps/vice-chair/assets/js/settings.js");
   const html = read("apps/vice-chair/settings.html");
+  const ballotHtml = read("apps/vice-chair/public-vote.html");
+  const ballotScript = read("apps/vice-chair/assets/js/public-vote.js");
 
-  assert.match(migration, /line_group_targets_one_active_route_environment/);
-  assert.match(migration, /\(route_key, purpose\)/);
-  assert.match(migration, /create table public\.case_vote_test_votes/);
-  assert.match(migration, /is_test and environment = 'test' and task_id is null/);
-  assert.match(edge, /path === "\/api\/vote-test"/);
-  assert.match(edge, /purpose=eq\.test/);
-  assert.match(edge, /case_vote_test_votes/);
-  assert.match(settings, /voteTestApi/);
+  assert.match(retirement, /delete from public\.case_vote_calls\s+where is_test/);
+  assert.match(retirement, /drop function if exists public\.edge_cast_test_case_vote/);
+  assert.match(retirement, /check \(not is_test\)/);
+  assert.doesNotMatch(edge, /\/api\/vote-test|voteTestApi|case_vote_test_votes/);
+  assert.doesNotMatch(settings, /voteTest|\/api\/vote-test/);
+  assert.doesNotMatch(html, /LINE 投票測試器|voteTestCard/);
+  assert.doesNotMatch(ballotHtml, /testBanner|功能測試・不列入正式紀錄/);
+  assert.doesNotMatch(ballotScript, /isTest|testBanner/);
+  assert.doesNotMatch(callDomain, /isTest|測試投票圖卡/);
+  assert.doesNotMatch(publicVote, /case_vote_test_votes|edge_cast_test_case_vote/);
+  assert.match(publicVote, /is_test=eq\.false&environment=eq\.production/);
+  assert.match(webhook, /purpose=eq\.production/);
+  assert.match(webhook, /is_test=eq\.false&environment=eq\.production/);
   assert.match(settings, /測試群與正式群可同時保留/);
-  assert.match(html, /不建立續約案件、不產生 Word、不寫入正式 votes/);
 });

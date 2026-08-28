@@ -31,8 +31,7 @@
   function render(data){
     state=data;
     const copy=labels[data.caseType]||{case:"委員投票",approve:"同意",reject:"不同意"};
-    $("#testBanner").hidden=!data.isTest;
-    $("#caseLabel").textContent=data.isTest?`測試${copy.case}・不列入正式紀錄`:copy.case;
+    $("#caseLabel").textContent=copy.case;
     $("#applicant").textContent=data.applicant;
     $("#profession").textContent=data.profession;
     $("#deadline").textContent=dateLabel(data.deadlineAt);
@@ -49,7 +48,7 @@
     });
     const ready=data.status==="replied";
     $("#ballotForm").hidden=!ready;
-    if(ready)setStatus(data.isTest?"測試投票已開放，請選擇自己的姓名。":"投票已開放，請確認姓名後送出。","ready");
+    if(ready)setStatus("投票已開放，請確認姓名後送出。","ready");
     else if(data.status==="expired")setStatus("這份投票已截止。","error");
     else if(data.status==="revoked")setStatus("這份投票連結已更新，請由最新 LINE 圖卡重新進入。","error");
     else setStatus("投票圖卡尚未完成開放，請回 LINE 群組稍候。","");
