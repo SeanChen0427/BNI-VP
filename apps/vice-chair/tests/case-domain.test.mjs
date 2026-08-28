@@ -87,6 +87,9 @@ assert.deepEqual(domain.eligibleMembers(committee, "委員乙"), [
 ]);
 assert.equal(domain.majorityThreshold(7), 4);
 assert.equal(domain.majorityThreshold(6), 4);
+assert.equal(domain.voteAccessReady({}), false);
+assert.equal(domain.voteAccessReady({ voteNoticeSent: true }), true);
+assert.equal(domain.voteAccessReady({ voteNoticeCopiedAt: "2026-08-28T01:00:00Z" }), true);
 assert.deepEqual(domain.voteDeadlineStatus("", 0), {
   valid: false,
   expired: false,
@@ -184,6 +187,20 @@ assert.deepEqual(
     feedback: {"測試委員甲": "已完成回饋"},
     votingOpen: true,
     voteNoticeSent: true,
+    voterSnapshot: activeCommittee,
+    votes: {},
+  }, {
+    userName: "測試委員甲",
+    committee: activeCommittee,
+  }),
+  ["vote"]
+);
+assert.deepEqual(
+  domain.pendingActions(assignedTask, {
+    wordSaved: true,
+    feedback: {"測試委員甲": "已完成回饋"},
+    votingOpen: true,
+    voteNoticeCopiedAt: "2026-08-28T01:00:00Z",
     voterSnapshot: activeCommittee,
     votes: {},
   }, {

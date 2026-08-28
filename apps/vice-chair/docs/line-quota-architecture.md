@@ -1,0 +1,542 @@
+# LINE Bot 訊息額度架構設計
+
+- 建立日期：2026-08-19
+- 分支：`codex/line-bot-groups`
+- 文件性質：設計決策紀錄與實作規格
+- 適用範圍：`supabase/functions/line-webhook/`、`supabase/functions/app-api/`、`supabase/functions/line-reminder-cron/`、副主席工作台前端
+
+---
+
+## 一、問題定義
+
+### 1.1 約束條件
+
+- 本系統不營利，無任何預算，只能使用 LINE 官方帳號免費方案。
+- 台灣輕用量方案：月費 0 元，免費訊息 200 則，不可加購。
+- 需求判準不是「省額度」，而是「副主席不用記、不用搬、不用貼」。額度只是成本，不是目標。
+
+### 1.2 LINE 計費模型
+
+- 計費單位是「收件人次」，不是 API 呼叫次數。傳一次到 45 人群組約扣 45 則。
+- 同一次 API 請求內放多個 message object，仍只按收件人數計一次；分次發送則重新扣量。
+- Reply API（使用 `replyToken` 回覆）不計入月額度，且與群組人數無關。
+- 自動回應訊息不計入免費額度。
+- LINE Notify 已於 2025-03-31 終止服務，不可作為免費替代通道。
+
+### 1.3 現況數據
+
+LINE Official Account Manager 顯示（截至 2026-08-18）：
+
+| 日期 | 付費計算 Push 則數 |
+|---|---|
+| 8/08 | 8 |
+| 8/10 | 56 |
+| 8/11 | 43 |
+| 8/17 | 44 |
+| 8/18 | 44 |
+| **合計** | **195 / 200** |
+
+另有 3 則自動回應，不計入免費額度。8/10 的 56 則同時包含排程與多次測試紀錄，代表正式環境的測試發送也是額度流失來源。
+
+單日扣量 43～44 則，與大群真人數（44 位會員 ＋ 1 位董顧 ＋ 1 個 Bot ＝ 46 人，Bot 不計為收件者）相符，實務上佐證了「按收件人次計費」的計費模型。
+
+### 1.4 人數口徑
+
+- 系統內 43 位已進入最新 BNI／PALMS 分析，另有 1 位新會員待 PALMS，實際作業會員數 44 位。
+- 加董顧 1 位、Bot 1 個，LINE 群組成員顯示應為 46。
+- 大群實際收件者約 45 位。此數字會隨會員增減變動，不得寫死。
+- 會員委員會：副主席 1 位 ＋ 委員 6 位 ＝ 7 位；若委員群含董顧則為 8 位。
+
+### 1.5 現行發送點盤點
+
+以下行號為 `codex/line-bot-groups` 分支當前狀態，所有發送皆為 `push` 至 `line_group_id`，且每次 `messages: [單一物件]`。
+
+| 功能 | 程式位置 | 目標群 | 頻率 |
+|---|---|---|---|
+| 每週例會鬧鐘 `weekly_meeting_alarm` | `supabase/functions/line-reminder-cron/index.ts:98` | 交流群 | 每週 |
+| 月底資料 Key-in 提醒 `monthly_data_entry` | 同上 | 交流群 | 每月 |
+| 委員會月會提醒 `monthly_committee_meeting` | 同上 | 委員群 | 每月 |
+| 委員工作進度摘要 `sendCommitteeWorkDigest` | `supabase/functions/app-api/index.ts:710` | 委員群 | 待確認 |
+| 排程提醒測試發送 `sendLineReminderTest` | `supabase/functions/app-api/index.ts:992` | 依設定 | 不可控 |
+| 每週出席紀錄公告 `sendLineAttendance` | `supabase/functions/app-api/index.ts:1136` | 公告群 | 每週 |
+| 案件回饋通知 `sendCaseFeedbackNotice` | `supabase/functions/app-api/index.ts:3288` | 委員群 | 每案 1 |
+| 案件投票通知 `sendCaseVoteNotice` | `supabase/functions/app-api/index.ts:3446` | 委員群 | 每案 0–1（人工複製路徑不用 OA 額度） |
+| 通過結果公告 `sendCaseResultAnnouncement` | `supabase/functions/app-api/index.ts:3627` | 公告群 | 每案 1 |
+
+三個排程提醒鍵定義於 `supabase/functions/_shared/line-reminder-domain.mjs:1`。
+
+### 1.6 月用量推算
+
+以大群 45 位真人、委員群 8 位計算。
+
+固定作業（四週月份）：
+
+| 用途 | 計算 | 則數 |
+|---|---|---|
+| 每週出席公告 | 4 × 45 | 180 |
+| 每週例會提醒 | 4 × 45 | 180 |
+| 每月 Key-in 提醒 | 1 × 45 | 45 |
+| 每月委員會提醒 | 1 × 8 | 8 |
+| **小計** | | **413** |
+| 每週委員工作摘要 | 4 × 8 | ＋32 |
+| **一般例行合計** | | **445** |
+
+每件走完整決策流程的案件（續約／新會員／轉換行業別），若開票通知使用 OA，另需：委員回饋 8 ＋ 委員投票 8 ＋ 通過公告 45 ＝ 61 則；若改用人工複製後貼送，則為 53 則。
+
+結論：
+
+- 絕對最低自動需求（僅三項排程提醒）：233（四週）／278（五週）
+- 正常固定作業：413～543
+- 有 1～2 件決策案件的月份：500～665
+
+200 則只夠發約 4 次大群訊息。**現行設計在架構上無法運作，且會隨分會人數線性惡化。**
+
+---
+
+## 二、已驗證的技術事實
+
+### 2.1 Webhook 已收到所有群組訊息事件
+
+`supabase/functions/line-webhook/domain.mjs:7-21`：
+
+```js
+export function collectGroupEvents(payload) {
+  const groups = new Map();
+  for (const event of Array.isArray(payload?.events) ? payload.events : []) {
+    const groupId = event?.source?.type === "group" ? event.source.groupId : "";
+    if (!validLineGroupId(groupId)) continue;
+    groups.set(groupId, {
+      groupId,
+      kind: event.type === "leave" ? "leave" : "present",
+      occurredAt: ...,
+    });
+  }
+  return [...groups.values()];
+}
+```
+
+第 10 行的過濾條件是 `source.type === "group"`，**沒有過濾 `event.type`**。因此群組內任何成員的任何一則訊息事件，都已經送達本 webhook，且每一筆都附帶一個可用的 `replyToken`。第 14 行將所有非 `leave` 事件壓為 `"present"`，只保留 groupId 與時間戳，`replyToken` 從未被讀取，直接丟棄。
+
+**這是本設計的基礎：免費的 reply token 已經在流入系統，只是沒有被使用。**
+
+### 2.2 Reply token 特性
+
+- 一次性，使用後即失效。
+- 短效，必須在收到事件後極短時間內用掉（以 LINE 官方文件為準）。
+- **不可囤積**：綁定「該事件發生的當下」，無法儲存後延遲使用。
+- 因此任何「讓低活躍群偶爾產生一次回應、系統存起來慢慢用」的設計都不成立。
+
+### 2.3 Reply 支援真正的 @All
+
+`textV2` message 的 mention object 支援 `mentionee.type = "all"`，且可用於 reply message、push message、群組與多人聊天室。
+
+系統已有現成產生器：`supabase/functions/app-api/line-message.mjs:26` 的 `buildLineMentionAllMessage`。push 與 reply 使用相同的 message 格式，可直接複用，不需修改。
+
+### 2.4 一群一 OA 限制
+
+同一個 LINE 群組同時只能存在一個 LINE 官方帳號。衍生兩個結論：
+
+- 不同群組可由不同 OA 負責，各自擁有獨立的 200 則免費額度。
+- **跨 Bot 接力不可行**：A Bot 在甲群收到的 replyToken，B Bot 無法使用，更不能用於乙群。replyToken 綁定 channel、事件與會話。
+
+### 2.5 群組推播不需要好友關係
+
+Bot 只要在群組內即可 push 至該 groupId，會員無須加官方帳號好友。因此多 OA 架構對會員端幾乎無感，成本集中在後端 Token 與路由管理。
+
+---
+
+## 三、決策摘要
+
+| 群組 | 內容 | 機制 | 月成本 | 副主席操作 |
+|---|---|---|---|---|
+| 交流群（約 45 人） | 每週例會提醒、每月 Key-in 提醒 | **機會性投遞**（免費 Reply） | 0 | 無 |
+| 委員群（8 人） | 委員會提醒、工作摘要、案件回饋、案件投票 | **第二個 OA 直接 Push** | 72／200 | 無 |
+| 公告群（約 45 人） | 每週出席公告 | **點名後順手分享**（Web Share API） | 0 | 點名完點一下 |
+| 公告群（約 45 人） | 通過結果公告 | 維持 Push | 45–90 | 無 |
+
+額度分配：
+
+- 副主席助理（交流群 ＋ 公告群）：55–100／200
+- 會員委員會助理（委員群）：72／200
+
+### 已否決的方案與理由
+
+| 方案 | 否決理由 |
+|---|---|
+| 副主席在群組輸入指令觸發 Reply | 若需人工在群組打字，等同自己貼公告，多餘。群組每天自然產生大量 replyToken，不需人為製造。 |
+| LIFF Share Target Picker ＋ 一次性指令 | 工程成本高（LINE Login channel、LIFF App、scope、前端部署），僅省下打字，且會在群組永久留下無意義的指令訊息。Web Share API 可用十行程式碼達成近似效果。 |
+| 開多個 OA 分攤大群額度 | 無法解決「發送次數 × 人數」的乘法問題，只是延後破功時間。委員群例外，理由見 3.2。 |
+| 全面改用 Email／Calendar／PWA | 有效但改變會員既有習慣，且分會溝通中心在 LINE。列為未來備案，非本次範圍。 |
+| Bot 只 Push 給副主席再轉傳 | LINE 轉傳會失去 mention，@All 效果消失。 |
+
+### 3.1 為何交流群適用機會性投遞
+
+交流群定位為「大群／交流／聊天、打招呼與歡迎新人」（見 `apps/vice-chair/docs/line-templates.md:22`），每日必有大量訊息。經產品負責人確認：交流群基本上每天一定會有一堆人講話。
+
+同時，佔用最大額度的兩項提醒（例會提醒 180 則、Key-in 提醒 45 則，合計 225 則，約佔固定作業 54.5%）目標群皆為交流群。最高成本與最高命中率重合。
+
+### 3.2 為何委員群適合第二個 OA
+
+委員會人數不隨分會規模成長（副主席 1 ＋ 委員 6 ＋ 董顧 1 ＝ 8），這與分會有 44 人或 100 人無關。
+
+```
+委員群月需求 = 8 × (1 委員會提醒 + 4 工作摘要 + 4 案件通知) = 72 則
+200 ÷ 9 次發送 ≈ 22 人才會破功
+```
+
+委員群封閉、活躍度不確定，不適合依賴機會性投遞。直接 Push、獨立額度池、完全自動，且永久安全。
+
+### 3.3 為何公告群的出席公告採人工分享
+
+公告群定位為「核心群發布公告；會員已讀即可，不需回應」（見 `apps/vice-chair/docs/line-templates.md:21`），設計上就不會產生訊息事件，因此永遠取不到 replyToken。結合 2.2 的「token 不可囤積」，公告群只有兩條路：花額度 Push，或人工發送。
+
+產品負責人決策採人工分享，理由：出席公告的發布時機緊接在會後點名之後，副主席人已在系統內、手已在操作，追加一個分享動作幾乎零成本。人工成本的真正來源是 context switch 與記憶負擔，而非按鍵數；此時機兩者皆無。
+
+取捨：以個人身分分享會失去 @All mention 通知。公告群本就不期待互動，判定可接受。此項待最終確認（見第八節）。
+
+---
+
+## 四、機會性投遞設計
+
+### 4.1 流程
+
+```
+排程時間到（例：週一 19:00）
+   ↓
+系統產生公告內容，寫入 pending_announcements
+（不發送、不扣額度，設定投遞窗口 19:00–23:00）
+   ↓
+交流群任何成員發出任何訊息
+   ↓
+Webhook 收到 message 事件（含 replyToken）
+   ↓
+同步查詢：該群是否有 status='pending' 且在窗口內的公告
+   ↓
+有 → 原子性佔位 → 立即以該 replyToken 回覆 @All 公告 → 扣 0 則
+   ↓
+窗口到期仍未命中 → 進入降級鏈（見第七節）
+```
+
+觸發者為群組內任意成員，其本人不會察覺觸發了任何機制。LINE 的 reply message 不會呈現為「引用回覆」樣式，視覺上與一般 bot 訊息無異。
+
+### 4.2 資料表
+
+```sql
+create table pending_announcements (
+  id uuid primary key default gen_random_uuid(),
+  line_group_id text not null,
+  oa_channel text not null default 'vice_chair',
+  announcement_kind text not null,
+  message_payload jsonb not null,
+  content_hash text not null,
+  window_start timestamptz not null,
+  window_end timestamptz not null,
+  status text not null default 'pending',
+  delivery_mode text,
+  delivered_at timestamptz,
+  attempt_count integer not null default 0,
+  last_error text,
+  created_at timestamptz not null default now()
+);
+
+create index pending_announcements_lookup
+  on pending_announcements (line_group_id, status, window_end);
+
+create unique index pending_announcements_dedupe
+  on pending_announcements (line_group_id, content_hash)
+  where status = 'pending';
+```
+
+欄位說明：
+
+- `announcement_kind`：對應 `LINE_REMINDER_KEYS`（`weekly_meeting_alarm`／`monthly_data_entry`／`monthly_committee_meeting`）或其他公告類型。
+- `message_payload`：完整的 LINE message object（`buildLineMentionAllMessage` 的輸出），投遞時直接使用，確保排程當下的內容與實際發出的內容一致。
+- `content_hash`：內容指紋，用於去重。系統既有的 `sha256Text` 與 fingerprint 機制可複用（參考 `app-api/index.ts:3597` 的 `announcementHash` 作法）。
+- `status`：`pending` → `delivered`（Reply 成功）／`pushed`（降級 Push）／`manual`（降級人工）／`expired`／`cancelled`。
+- `delivery_mode`：`reply`／`push`／`manual`，供稽核與命中率統計。
+- RLS：本表可能含會員資料，必須設定與現有敏感資料表一致的存取政策。
+
+### 4.3 Webhook 改動
+
+在 `supabase/functions/line-webhook/` 內新增投遞邏輯。現有的簽章驗證（`domain.mjs:39` `verifyLineSignature`）與群組事件記錄（`index.ts` `recordGroupEvent`）維持不變。
+
+判斷條件：
+
+```
+event.type === "message"
+  && event.source?.type === "group"
+  && typeof event.replyToken === "string"
+```
+
+處理步驟：
+
+1. 以 `event.source.groupId` 查詢待投遞公告：
+   `status = 'pending' AND now() BETWEEN window_start AND window_end`，依 `created_at` 取最舊一筆。
+2. **原子性佔位**（關鍵）：
+   ```sql
+   UPDATE pending_announcements
+      SET status = 'delivered', delivery_mode = 'reply', delivered_at = now()
+    WHERE id = $1 AND status = 'pending'
+   RETURNING *;
+   ```
+   若回傳 0 列，代表已被同時間的另一個事件搶先，直接略過本次。此步驟用於防止同一秒多則訊息造成的重複投遞。
+3. 呼叫 `POST https://api.line.me/v2/bot/message/reply`，body 為 `{ replyToken, messages: [message_payload] }`。
+4. Reply 失敗時將 `status` 回滾為 `pending`、`attempt_count += 1`、記錄 `last_error`，讓下一個事件重試。
+
+實作限制：
+
+- **必須同步完成**，不可丟入背景佇列。replyToken 短效，非同步處理會導致 token 失效。
+- 單一 webhook 請求內即使有多個事件，一次只投遞一則公告，避免洗版。
+- 需對 LINE API 呼叫設定 fetch timeout（建議 3 秒內），確保 webhook 能及時回應 200，避免 LINE 端逾時重送。
+- 現有的 `collectGroupEvents` 回傳結構不含 `replyToken`；若沿用該函式，需擴充其輸出，或在 `index.ts` 另行走一次原始 `payload.events`。
+
+### 4.4 隱私影響
+
+機會性投遞只使用 `event.source.groupId`、`event.replyToken`、`event.timestamp` 三個欄位，**不讀取任何訊息內容**。`line-webhook/index.ts` 現有註解「Only opaque group IDs and timestamps are retained. User message content is ignored.」在新增 `replyToken` 後仍然成立，僅需補充說明 replyToken 為即用即棄、不落地儲存。
+
+### 4.5 群組活躍度日誌（可選但建議）
+
+目前 `line_group_targets.last_event_at` 每次收到事件即覆寫，只保留最後一筆，無法統計活躍度分布。
+
+若需以實測數據驗證命中率與最佳窗口長度，可追加一張只含 `line_group_id` 與 `occurred_at` 兩個欄位的事件日誌表。此改動不影響任何現有行為，隱私面與現況完全相同（不觸及訊息內容），累積兩週即可得出各群組在任意時間窗口內的活躍機率。
+
+---
+
+## 五、排程端改動
+
+`supabase/functions/line-reminder-cron/index.ts:98` 目前直接呼叫 push。需改為依群組設定選擇投遞策略。
+
+在 `line_group_targets` 增加投遞策略欄位：
+
+```sql
+alter table line_group_targets
+  add column delivery_strategy text not null default 'push',
+  add column opportunistic_window_minutes integer not null default 240;
+```
+
+- `delivery_strategy = 'opportunistic'`：不 push，改寫入 `pending_announcements`，`window_start = now()`，`window_end = now() + opportunistic_window_minutes`。
+- `delivery_strategy = 'push'`：維持現行直接推播。
+
+同一支 cron 每次執行時追加一段過期掃描：查出 `status = 'pending' AND window_end < now()` 的紀錄，依降級鏈處理。掃描頻率需與 cron 實際執行頻率相符（待確認，見第八節）。
+
+三個排程鍵的目標分派：
+
+| 提醒鍵 | 目標群 | 策略 |
+|---|---|---|
+| `weekly_meeting_alarm` | 交流群 | `opportunistic` |
+| `monthly_data_entry` | 交流群 | `opportunistic` |
+| `monthly_committee_meeting` | 委員群 | `push`（會員委員會助理） |
+
+另註：目前系統設定的 Key-in 提醒為「會議前三天 17:30」，與「到期前一天提醒」的需求陳述不一致。此為既有規則落差，需獨立確認（見第八節）。
+
+---
+
+## 六、多 OA 架構
+
+### 6.1 帳號分工
+
+| OA | Channel | 負責群組 | 額度用途 |
+|---|---|---|---|
+| 副主席助理 | 現有 | 交流群、公告群 | 結果公告 Push、私訊備援 |
+| 會員委員會助理 | 新增 | 委員群 | 委員會提醒、工作摘要、案件回饋與投票 |
+
+中央排程系統決定使用哪一個 OA、哪個群組與哪一池額度。兩個 Bot 之間不互相呼叫。
+
+### 6.2 資料與設定
+
+```sql
+alter table line_group_targets
+  add column oa_channel text not null default 'vice_chair';
+```
+
+環境變數：
+
+| 變數 | 用途 |
+|---|---|
+| `LINE_CHANNEL_ACCESS_TOKEN` | 副主席助理（現有） |
+| `LINE_CHANNEL_SECRET` | 副主席助理（現有） |
+| `LINE_COMMITTEE_CHANNEL_ACCESS_TOKEN` | 會員委員會助理（新增） |
+| `LINE_COMMITTEE_CHANNEL_SECRET` | 會員委員會助理（新增） |
+
+`supabase/functions/app-api/index.ts:359` 的 `lineRequest` 目前綁定單一 token，需擴充為依 `oa_channel` 選取對應憑證。所有 push 呼叫點（第 710、992、1136、3288、3446、3627 行）皆須改為攜帶目標群組的 `oa_channel`。
+
+Webhook 需支援兩組 channel secret，各自驗證各自的簽章。可採兩個獨立 endpoint，或單一 endpoint 以路徑參數區分。
+
+### 6.3 部署前置作業
+
+**因一群一 OA 限制，委員群若目前已有副主席助理在內，必須先將其移出，才能加入會員委員會助理。** 順序顛倒會導致無法加入。
+
+### 6.4 灰色地帶說明
+
+多開官方帳號本質上是分攤免費額度上限。本案的功能分離具有實質依據（公告／交流 對 委員會工作，權限範圍與資料敏感度不同），且為非營利分會委員會使用，判定風險低。此為已知的取捨，記錄於此以備日後檢視。
+
+---
+
+## 七、降級鏈與額度守門員
+
+### 7.1 降級鏈
+
+```
+【第一順位】機會性投遞
+  窗口內群組有訊息事件 → 免費 Reply ＋ 真 @All → 0 則 → 無人操作
+      ↓ 窗口到期未命中
+【第二順位】額度檢查
+  剩餘額度足夠 → 自動 Push → 扣群組人數 → 無人操作
+      ↓ 額度不足
+【第三順位】私訊副主席（1 則）
+  系統推送「公告已備妥」＋ 內容 → 副主席自行貼至群組
+      ↓ 逾時未處理
+【第四順位】轉通知會員委員會主席或值班委員（1 則）
+      ↓
+【第五順位】工作台顯示待發清單，人工處理
+```
+
+### 7.2 額度守門員
+
+現行所有發送皆無事前檢查。需在每次 push 前加入：
+
+| 查詢 | API |
+|---|---|
+| 本月額度 | `GET /v2/bot/message/quota` |
+| 本月已用量 | `GET /v2/bot/message/quota/consumption` |
+| 群組真人數 | `GET /v2/bot/group/{groupId}/members/count` |
+
+規則：
+
+- 三項結果快取約 10 分鐘，避免每次發送都多打三次 API。
+- 群組人數即時讀取，**不得寫死 44 或 45**，隨分會增減自動重算。
+- 發送前於工作台顯示「本次將扣 N 則，發送後剩餘 M 則」。
+- 保留至少 20 則緊急額度（供私訊備援與異常通知），一般群發不得吃掉此保留額。
+- 額度不足時自動切換至降級鏈，不得靜默失敗。
+- 每個 `oa_channel` 各自獨立計算額度。
+
+### 7.3 測試發送防護
+
+`supabase/functions/app-api/index.ts:992` 的 `sendLineReminderTest` 目前直接呼叫真實 push API，是 8/10 當日 56 則異常扣量的來源之一。
+
+規格：正式環境的測試發送預設為 dry-run，僅回傳訊息預覽而不呼叫 LINE API；如需真實發送，只允許發給單一測試帳號，不得對群組群發。
+
+---
+
+## 八、公告群人工分享設計
+
+### 8.1 觸發時機
+
+出席公告的發布時機緊接在會後點名之後。系統在點名完成的頁面直接呈現分享入口，不需要另行提醒或排程。
+
+### 8.2 實作方式
+
+使用瀏覽器原生 Web Share API，不需要 LIFF、不需要 LINE Login channel、不需要任何 LINE 端設定：
+
+```js
+const text = buildAttendanceAnnouncementText(announcement);
+if (navigator.share) {
+  await navigator.share({ text });
+} else {
+  await navigator.clipboard.writeText(text);
+  // 顯示「已複製，請貼至公告群」
+}
+```
+
+操作路徑：點名完成 → 點「分享出席公告到 LINE」→ 原生分享選單 → 選 LINE → 選公告群 → 送出。共三次點擊，不需複製、不需切換 App 尋找內容、不需長按貼上。
+
+實作注意：
+
+- Web Share API 需 HTTPS 環境（正式部署已符合）。
+- 不支援的瀏覽器須降級為 clipboard 複製，並顯示明確提示。
+- 分享行為在系統端無法確認是否真的送出，採信任模式：點擊分享後即標記為已發布，並記錄操作者與時間供稽核。
+- 系統既有的 copy-only 公版機制（commit `cba61c9`）可作為此路徑的內容來源。
+
+### 8.3 已知限制
+
+以副主席個人身分分享，訊息不含 mention object，會員不會收到 @All 通知。若後續判定出席公告必須有 @All，此路徑不成立，須改回 Push（每次約 45 則）。
+
+---
+
+## 九、額度預算與成長性
+
+以現行 45 位大群收件者計算：
+
+| 項目 | OA | 月則數 |
+|---|---|---|
+| 交流群例會提醒（4 次） | 副主席助理 | 0 |
+| 交流群 Key-in 提醒（1 次） | 副主席助理 | 0 |
+| 公告群出席公告（4 次） | — | 0（人工分享） |
+| 公告群通過結果公告（1–2 案） | 副主席助理 | 45–90 |
+| 私訊備援與異常通知 | 副主席助理 | ~10 |
+| **副主席助理小計** | | **55–100／200** |
+| 委員會提醒（1 次） | 會員委員會助理 | 8 |
+| 委員工作摘要（4 次） | 會員委員會助理 | 32 |
+| 案件回饋＋投票（2 案） | 會員委員會助理 | 32 |
+| **會員委員會助理小計** | | **72／200** |
+
+成長性：
+
+| 分會人數 | 副主席助理 | 會員委員會助理 |
+|---|---|---|
+| 45 | 55–100 | 72 |
+| 60 | 70–130 | 72 |
+| 80 | 90–170 | 72 |
+| 100 | 110–210 | 72 |
+
+會員委員會助理不隨分會人數變動。副主席助理唯一隨人數成長的項目是「通過結果公告」，其發布時機同樣落在副主席結案操作的當下，因此在逼近額度時可沿用 8.2 的人工分享路徑降至 0 則。
+
+**此架構在設計上沒有人數天花板。**
+
+---
+
+## 十、待確認事項
+
+| 編號 | 項目 | 影響 |
+|---|---|---|
+| A1 | LINE OA 回應模式是否設為「Bot」（Webhook 開啟、自動回應訊息關閉）。8 月有 3 則自動回應紀錄，顯示自動回應功能目前為開啟狀態。 | 直接決定 webhook 是否收到完整 message 事件，機會性投遞成立與否的前提 |
+| A2 | `replyToken` 官方文件載明的有效期限實際值 | 決定 webhook 同步處理的時間預算與 timeout 設定 |
+| A3 | 委員群目前是否已有副主席助理在內 | 決定第二個 OA 的部署順序（見 6.3） |
+| A4 | 出席公告是否必須有 @All mention | 若必須，8.2 的人工分享路徑不成立 |
+| A5 | `line-reminder-cron` 的實際執行頻率 | 決定過期掃描的即時性與窗口設計 |
+| A6 | `sendCommitteeWorkDigest` 的實際觸發方式（手動或排程）與頻率 | 影響委員群額度估算 |
+| A7 | Key-in 提醒現行設定為「會議前三天 17:30」，與「到期前一天提醒」的需求陳述不一致 | 需確認正式規則後重新排程 |
+| A8 | 交流群與公告群的實際成員數（含是否含董顧、來賓） | 額度估算基準，且應改為即時 API 讀取而非固定值 |
+
+---
+
+## 十一、風險與限制
+
+| 風險 | 說明 | 緩解 |
+|---|---|---|
+| 送達時間為窗口而非時刻 | 機會性投遞的實際送達時間取決於群組活躍度，例會提醒可能在 19:03 或 21:40 送達 | 對「前一天提醒」用途判定可接受；窗口到期有降級鏈保底 |
+| 交流群長期靜默 | 連假、農曆年期間可能整段窗口無訊息 | 降級至 Push 或私訊備援；可將窗口長度設為可調參數 |
+| 併發重複投遞 | 同一秒多則訊息觸發多個 webhook 並行 | 以 `UPDATE ... WHERE status='pending' RETURNING` 做原子性佔位 |
+| Webhook 延遲 | 同步呼叫 LINE Reply API 增加回應時間，可能觸發 LINE 端逾時重送 | 設定 fetch timeout，確保整體處理在秒級完成 |
+| 公告群無法使用免費通道 | 群組定位即為不回應，永遠無 replyToken，且 token 不可囤積 | 已決策改為人工分享，並限縮該群內容為正式決議 |
+| 多 OA 為額度分攤手段 | 屬灰色地帶 | 功能分離具實質依據，記錄於 6.4 備查 |
+| 人工分享無法系統驗證 | 系統無法確認副主席是否真的送出 | 採信任模式並記錄操作稽核 |
+
+---
+
+## 十二、待處理的安全事項
+
+在 2026-08-19 的唯讀盤查過程中，Supabase CLI 曾將 legacy `service_role` 金鑰完整輸出至工具結果。該金鑰未被寫入任何檔案，repository 亦已確認乾淨（`.gitignore` 正確排除 `.env`、`.env.*`，git 追蹤清單中無任何憑證檔案），但基於安全考量應視為已暴露。
+
+`service_role` 金鑰可繞過全部 RLS，具備資料庫完整讀寫權限，涵蓋會員資料、訪談內容與投票明細。其嚴重性高於本文件討論的所有額度議題。
+
+金鑰輪替後需同步更新的位置：
+
+- `line-webhook` Edge Function 的 `SUPABASE_SERVICE_ROLE_KEY`
+- `app-api` Edge Function
+- `line-reminder-cron` Edge Function
+- 本機 `.env`（如有）
+
+此項與本文件的功能設計無相依關係，可獨立處理。
+
+---
+
+## 十三、相關文件
+
+| 主題 | 文件 |
+|---|---|
+| LINE 群組清單與公版訊息 | `apps/vice-chair/docs/line-templates.md` |
+| 現有通知需求盤點 | `apps/vice-chair/docs/requirements-draft.md:455` |
+| 上線、資料安全 | `apps/vice-chair/docs/architecture-hosting-security.md` |
+| 決策紀錄 | `apps/vice-chair/docs/decision-log.md` |
+| 變更紀錄 | `apps/vice-chair/CHANGELOG.md` |

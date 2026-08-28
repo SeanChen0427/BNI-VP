@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.8",
+      publishedAt: "2026-08-28",
+      title: "複製投票通知也可開放投票",
+      level: "important",
+      changes: Object.freeze([
+        "開票後可直接按「複製投票通知並開放」，不再強制先由會員委員秘書Bot發送。",
+        "複製成功後會保存操作人、時間與投票截止版本，委員可立即進入系統投票。",
+        "畫面會明確提醒副主席將文字人工貼到會員委員會群；不會把複製誤標為 LINE OA 已送達。",
+        "若修改投票截止時間，必須依新時間重新複製或發送通知。"
+      ]),
+      impact: "不改動既有投票、資格快照、回饋或 LINE 送達紀錄；只新增開票通知的人工複製通道。"
+    }),
+    Object.freeze({
       version: "1.0.7",
       publishedAt: "2026-08-27",
       title: "新增當責信待寄中心",

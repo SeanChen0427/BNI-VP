@@ -96,8 +96,45 @@ test("後端只以正式案件、正式委員會群與投票快照發送", () =>
   assert.match(workflow, /FulianCaseStateStore\.sendVoteNotice/);
   assert.doesNotMatch(workflow, /已模擬 LINE Bot 通知委員投票/);
   assert.match(html, /id="copyVoteNotice"/);
-  assert.match(html, /通知委員（正式 LINE OA）/);
+  assert.match(html, /通知委員（會員委員秘書Bot）/);
   assert.match(html, /id="voteNoticePreview"/);
-  assert.match(html, /case-state-store\.js\?v=10/);
-  assert.match(html, /case-workflow\.js\?v=21/);
+  assert.match(html, /case-state-store\.js\?v=11/);
+  assert.match(html, /case-workflow\.js\?v=23/);
+});
+
+test("複製投票通知可留存人工貼送紀錄並開放送票", () => {
+  const edge = read("supabase/functions/app-api/index.ts");
+  const migration = read("supabase/migrations/20260828090000_vote_notice_copy_unlock.sql");
+  const store = read("apps/vice-chair/assets/js/case-state-store.js");
+  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
+  const html = read("apps/vice-chair/case-workflow.html");
+
+  assert.match(edge, /body\.kind === "vote-notice-copy"/);
+  assert.match(edge, /rpc\/edge_mark_task_vote_notice_copied/);
+  assert.match(edge, /p_expected_revision: expectedRevision/);
+  assert.match(edge, /currentWorkflow\.voteNoticeSent \|\| currentWorkflow\.voteNoticeCopiedAt/);
+  assert.match(edge, /delete proposed\.voteNoticeCopiedAt/);
+  assert.match(edge, /voteNoticeCopiedDeadline", "voterSnapshot"/);
+
+  assert.match(migration, /create or replace function public\.edge_mark_task_vote_notice_copied/);
+  assert.match(migration, /p_expected_revision <> target_state\.revision/);
+  assert.match(migration, /target_snapshot\.deadline_at <> p_deadline/);
+  assert.match(migration, /voteNoticeCopiedAt/);
+  assert.match(migration, /voteNoticeCopiedDeadline'[\s\S]*?snapshot\.deadline_at/);
+  assert.match(migration, /vote_notice_copied/);
+  assert.match(
+    migration,
+    /voteNoticeSent'[\s\S]*?<> 'true'[\s\S]*?and nullif\(btrim\(coalesce\(target_state\.workflow->>'voteNoticeCopiedAt'/,
+  );
+  assert.match(migration, /to service_role/);
+
+  assert.match(store, /markVoteNoticeCopied: taskId => postAction\(taskId, "vote-notice-copy", \{\}\)/);
+  const copyStart = workflow.indexOf('$("#copyVoteNotice").addEventListener');
+  const copyEnd = workflow.indexOf('$("#sendVoteNotice").addEventListener', copyStart);
+  const copyHandler = workflow.slice(copyStart, copyEnd);
+  assert.match(copyHandler, /navigator\.clipboard\.writeText\(voteNotice\(\)\)/);
+  assert.match(copyHandler, /FulianCaseStateStore\.markVoteNoticeCopied\(CASE_ID\)/);
+  assert.match(copyHandler, /state=loadState\(\);render\(\)/);
+  assert.match(workflow, /caseDomain\.voteAccessReady\(state\)/);
+  assert.match(html, /複製投票通知並開放/);
 });

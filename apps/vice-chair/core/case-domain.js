@@ -119,6 +119,10 @@
     return Object.keys(state?.votes || {}).length;
   }
 
+  function voteAccessReady(state) {
+    return Boolean(state?.voteNoticeSent || state?.voteNoticeCopiedAt);
+  }
+
   function assignedMembers(task) {
     return [task?.lead, ...(task?.companions || [])].filter(Boolean);
   }
@@ -210,7 +214,7 @@
     ) {
       return STAGES.ADVISOR;
     }
-    if (state?.votingOpen || state?.voteNoticeSent) return STAGES.VOTE;
+    if (state?.votingOpen || voteAccessReady(state)) return STAGES.VOTE;
     if (state?.wordSaved || state?.feedbackNotified || hasFeedback(state)) {
       return STAGES.FEEDBACK;
     }
@@ -256,7 +260,7 @@
     if (
       requiresDecisionWorkflow(task) &&
       state?.votingOpen &&
-      state?.voteNoticeSent &&
+      voteAccessReady(state) &&
       voterSnapshot.includes(normalizedName) &&
       !Object.prototype.hasOwnProperty.call(state?.votes || {}, normalizedName)
     ) {
@@ -330,6 +334,7 @@
     hasFeedback,
     feedbackCount,
     voteCount,
+    voteAccessReady,
     assignedMembers,
     sameTaskIdentity,
     linkedCareTask,

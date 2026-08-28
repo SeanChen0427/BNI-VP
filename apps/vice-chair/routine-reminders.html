@@ -22,13 +22,13 @@
 <body>
   <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・LINE 常態通知</span></div><label>目前登入身份<input id="loginIdentity" readonly></label></header>
   <main>
-    <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>LINE 常態通知</h1><p>管理交流群與會員委員會群的固定提醒，並可先預覽每週委員工作進度再確認發送。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
+    <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>LINE 常態通知</h1><p>副主席秘書Bot管理交流群；會員委員秘書Bot延續原本的委員會提醒、工作摘要與案件通知做法。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
 
     <section class="form-card target-card">
       <div class="section-head"><span>01</span><div><h2>通知群組連線</h2><p>系統依通知類型固定選擇交流群或會員委員會群，不會讓前台臨時指定其他群組</p></div></div>
       <div class="target-list">
         <div class="target-state" id="exchangeTargetState"><div><small>交流群常態通知</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理交流群</a></div>
-        <div class="target-state" id="committeeTargetState"><div><small>會員委員會通知</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理委員會群</a></div>
+        <div class="target-state" id="committeeTargetState"><div><small>會員委員秘書Bot</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理委員會群</a></div>
       </div>
     </section>
 
@@ -90,7 +90,7 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/routine-reminders.js?v=6"></script>
+  <script src="assets/js/routine-reminders.js?v=7"></script>
   <script src="assets/js/workspace-nav.js?v=7"></script>
 </body>
 </html>

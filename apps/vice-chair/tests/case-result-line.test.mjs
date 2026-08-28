@@ -57,7 +57,7 @@ test("後端只允許通過、董顧確認與既有正式公告群，且成功�
   assert.match(sendSection, /workflow\.advisorStatus !== "confirmed"/);
   assert.match(sendSection, /snapshot\.result !== "approved"/);
   assert.match(sendSection, /投票不通過的案件不發布公告群/);
-  assert.match(sendSection, /route_key=eq\.attendance&purpose=eq\.production/);
+  assert.match(sendSection, /route_key=eq\.attendance&oa_channel=eq\.vice_chair&purpose=eq\.production/);
   assert.match(sendSection, /X-Line-Retry-Key/);
   assert.match(sendSection, /messages: \[lineMessage\]/);
   assert.match(sendSection, /await finishCaseResultLineDelivery\(delivery\.id,\s*\{\s*status: "sent"[\s\S]*?state = await markCaseResultAnnouncementSent/);

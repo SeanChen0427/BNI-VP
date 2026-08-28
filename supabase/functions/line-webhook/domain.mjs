@@ -48,3 +48,12 @@ export async function verifyLineSignature(rawBody, signature, channelSecret) {
   const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(rawBody));
   return constantTimeEqual(base64(new Uint8Array(digest)), signature);
 }
+
+export async function resolveLineWebhookChannel(rawBody, signature, channelSecrets) {
+  for (const candidate of Array.isArray(channelSecrets) ? channelSecrets : []) {
+    const channel = String(candidate?.channel || "").trim();
+    const secret = String(candidate?.secret || "");
+    if (channel && secret && await verifyLineSignature(rawBody, signature, secret)) return channel;
+  }
+  return null;
+}

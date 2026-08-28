@@ -52,7 +52,7 @@
 - `attendance_sessions`／`attendance_records`：每週點名草稿、確認狀態、PALMS 基準期間與 LINE 公告快照。這些資料只作 PALMS 截止日後的公告暫時增量；新 PALMS 涵蓋後即停止加計，歷史紀錄不刪除。
 - `accountability_email_tasks`：缺席第 2／3／4 次與代理第 6／7／8／9 次的跨裝置待寄任務、資料期間、版本化草稿、收件快照及人工寄送紀錄；不代表系統已寄信，也不變更會員或專業類別狀態。
 - `accountability_email_events`：當責信任務的產生、複製、暫緩、不適用、恢復與人工寄送稽核；採只新增事件，不由瀏覽器直接讀寫。
-- `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、測試／正式環境與四種用途路由，不保存聊天內容。
+- `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、所屬 OA（`vice_chair`／`committee`）、測試／正式環境與四種用途路由，不保存聊天內容。`committee` 只能由會員委員秘書Bot擁有，其餘路由只能由副主席秘書Bot擁有；相同 LINE 群組在 Bot 換接期間依 OA 分開保留歷史目標。
 - `line_reminder_rules`：交流群兩種常態提醒的開關、Asia/Taipei 發送時間、例會星期、提前天數及文案；僅 service role 可讀寫，初始一律關閉。
 - `line_reminder_deliveries`：常態通知的排程／人工測試發送稽核，以 delivery key 與 LINE retry key 防重複；不保存 Channel Access Token。
 - `case_feedback_line_deliveries`：訪談後委員回饋通知的正式會員委員會群發送稽核；每案只允許一筆成功通知，不保存完整文案。
@@ -62,7 +62,7 @@
 - `departure_interview_preferences`：歷史離會會員的選擇性補訪設定，只記錄「可安排／不安排」及操作者；不得修改 `members.status`、`departed_on` 或 PALMS 對帳結果。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
 - `deleted_task_references`：副主席／Admin 明確刪除案件後的識別碼封存標記；只保存來源、案件編號、原任務 UUID 與刪除時間，阻止舊裝置把 localStorage 殘影再次匯回，不保存會員內容或訪談資料。
-- `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。
+- `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。投票通知的人工複製通道只在 `workflow` 保存 `voteNoticeCopiedAt`、`voteNoticeCopiedBy` 與對應截止版本，作為開放送票與稽核旗標；不代表 LINE OA 送達。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
 - `cases`＋`tasks.case_id`：工作台決議案件與正式案件主檔的對照。
 - `case_feedback`：每位副主席／委員在每案各自一筆回饋，案件＋回饋者唯一。
