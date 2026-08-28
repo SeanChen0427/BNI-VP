@@ -20,6 +20,12 @@ import {
 } from "./line-message.mjs";
 import { LINE_REMINDER_KEYS, nextRuleOccurrence, reminderRouteKey, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
 import { buildCommitteeWorkDigest } from "../_shared/committee-work-digest.mjs";
+import {
+  LINE_OA_CHANNELS,
+  lineChannelForRoute,
+  lineChannelLabel,
+  normalizeLineChannel,
+} from "../_shared/line-channel-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -81,8 +87,14 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const anonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-function lineAccessToken() {
-  return Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
+function lineAccessToken(oaChannel: string) {
+  if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
+    return Deno.env.get("LINE_COMMITTEE_CHANNEL_ACCESS_TOKEN") || "";
+  }
+  if (oaChannel === LINE_OA_CHANNELS.VICE_CHAIR) {
+    return Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
+  }
+  return "";
 }
 
 async function serviceFetch(path: string, options: RequestInit = {}) {
@@ -355,9 +367,19 @@ async function sha256Text(value: string) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-async function lineRequest(path: string, options: RequestInit = {}) {
-  const token = lineAccessToken();
-  if (!token) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
+function lineTargetChannel(row: any, routeKey = row?.route_key) {
+  const channel = normalizeLineChannel(row?.oa_channel);
+  if (!channel) throw Object.assign(new Error("LINE 群組缺少所屬 Bot 設定，請重新綁定群組"), { status: 409 });
+  const required = routeKey ? lineChannelForRoute(routeKey) : channel;
+  if (required && required !== channel) {
+    throw Object.assign(new Error(`「${routeKey}」路由必須由${lineChannelLabel(required)}負責，請重新綁定群組`), { status: 409 });
+  }
+  return channel;
+}
+
+async function lineRequest(oaChannel: string, path: string, options: RequestInit = {}) {
+  const token = lineAccessToken(oaChannel);
+  if (!token) throw Object.assign(new Error(`${lineChannelLabel(oaChannel)} Channel Access Token 尚未設定`), { status: 503 });
   const response = await fetch(`https://api.line.me${path}`, {
     ...options,
     headers: {
@@ -370,6 +392,7 @@ async function lineRequest(path: string, options: RequestInit = {}) {
 }
 
 function publicLineTarget(row: any) {
+  const oaChannel = normalizeLineChannel(row.oa_channel) || LINE_OA_CHANNELS.VICE_CHAIR;
   return {
     id: row.id,
     displayName: row.display_name || "待確認 LINE 群組",
@@ -379,13 +402,17 @@ function publicLineTarget(row: any) {
     availableForAssignment: row.status === "discovered" || (row.status === "disabled" && !row.left_at),
     lastEventAt: row.last_event_at,
     verifiedAt: row.verified_at || null,
+    oaChannel,
+    oaName: lineChannelLabel(oaChannel),
+    channelConfigured: Boolean(lineAccessToken(oaChannel)),
   };
 }
 
 async function refreshLineGroupName(row: any) {
-  if (!lineAccessToken() || (row.display_name && row.display_name !== "待確認 LINE 群組")) return row;
+  const oaChannel = normalizeLineChannel(row.oa_channel) || LINE_OA_CHANNELS.VICE_CHAIR;
+  if (!lineAccessToken(oaChannel) || (row.display_name && row.display_name !== "待確認 LINE 群組")) return row;
   try {
-    const response = await lineRequest(`/v2/bot/group/${encodeURIComponent(row.line_group_id)}/summary`);
+    const response = await lineRequest(oaChannel, `/v2/bot/group/${encodeURIComponent(row.line_group_id)}/summary`);
     if (!response.ok) return row;
     const summary = await response.json().catch(() => ({}));
     const displayName = String(summary.groupName || "").trim().slice(0, 200);
@@ -424,11 +451,11 @@ async function lineAttendanceState(currentSession: any, context: Context) {
   }
   return {
     visible: true,
-    configured: Boolean(lineAccessToken()),
+    configured: Boolean(lineAccessToken(LINE_OA_CHANNELS.VICE_CHAIR)),
     target: activeTarget ? publicLineTarget(activeTarget) : null,
     discoveredTargets: targets.filter((target: any) => target.status === "discovered").map(publicLineTarget),
     delivery,
-    ready: Boolean(lineAccessToken() && activeTarget && currentSession?.status === "confirmed" && currentSession?.announcement_snapshot && delivery?.status !== "sent"),
+    ready: Boolean(lineAccessToken(LINE_OA_CHANNELS.VICE_CHAIR) && activeTarget && currentSession?.status === "confirmed" && currentSession?.announcement_snapshot && delivery?.status !== "sent"),
   };
 }
 
@@ -443,7 +470,12 @@ async function assignLineTarget(targetId: string, routeKey: string, environment:
   const rows = await db(`line_group_targets?id=eq.${encodeURIComponent(targetId)}&status=in.(discovered,active,disabled)&select=*&limit=1`);
   let target = rows?.[0];
   if (!target) throw Object.assign(new Error("這個 LINE 群組已更新，請重新整理後再操作"), { status: 409 });
-  const summaryResponse = await lineRequest(`/v2/bot/group/${encodeURIComponent(target.line_group_id)}/summary`);
+  const requiredChannel = lineChannelForRoute(routeKey);
+  const targetChannel = normalizeLineChannel(target.oa_channel);
+  if (!requiredChannel || targetChannel !== requiredChannel) {
+    throw Object.assign(new Error(`「${routeKey}」用途只能指定由${lineChannelLabel(requiredChannel)}發現的群組`), { status: 409 });
+  }
+  const summaryResponse = await lineRequest(targetChannel, `/v2/bot/group/${encodeURIComponent(target.line_group_id)}/summary`);
   const summary = await summaryResponse.json().catch(() => ({}));
   if (!summaryResponse.ok) {
     throw Object.assign(new Error("LINE Bot 目前無法確認此群組，請確認 Bot 仍在測試群中"), { status: 502 });
@@ -488,7 +520,11 @@ async function lineGroupsApi(request: Request, context: Context) {
   if (request.method === "GET") {
     const rows = await db("line_group_targets?select=*&order=last_event_at.desc&limit=30");
     const targets = await Promise.all((rows || []).map(refreshLineGroupName));
-    return { configured: Boolean(lineAccessToken()), targets: targets.map(publicLineTarget) };
+    const channels = {
+      viceChair: Boolean(lineAccessToken(LINE_OA_CHANNELS.VICE_CHAIR)),
+      committee: Boolean(lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)),
+    };
+    return { configured: channels.viceChair || channels.committee, channels, targets: targets.map(publicLineTarget) };
   }
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
@@ -586,7 +622,7 @@ async function committeeWorkDigestState(target: any) {
   return {
     ...preview,
     target: target ? publicLineTarget(target) : null,
-    ready: Boolean(lineAccessToken() && target),
+    ready: Boolean(target && lineAccessToken(lineTargetChannel(target, "committee"))),
     delivery: publicCommitteeWorkDigestDelivery(deliveries?.[0]),
   };
 }
@@ -600,7 +636,11 @@ async function lineRemindersState() {
   const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, publicLineTarget(target)]));
   const workDigest = await committeeWorkDigestState((targets || []).find((target: any) => target.route_key === "committee") || null);
   return {
-    configured: Boolean(lineAccessToken()),
+    configured: Boolean(lineAccessToken(LINE_OA_CHANNELS.VICE_CHAIR) || lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)),
+    channels: {
+      viceChair: Boolean(lineAccessToken(LINE_OA_CHANNELS.VICE_CHAIR)),
+      committee: Boolean(lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)),
+    },
     schedulerReady: Boolean(Deno.env.get("LINE_REMINDER_CRON_SECRET")),
     target: targetByRoute.exchange || null,
     targets: {
@@ -689,14 +729,15 @@ async function beginCommitteeWorkDigestDelivery(target: any, sourceHash: string,
 }
 
 async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintInput: unknown, context: Context) {
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   const content = String(contentInput || "").trim();
   if (!content || [...content].length > 4500) throw new Error("工作進度文案必須為 1 至 4,500 字");
   const sourceFingerprint = String(sourceFingerprintInput || "");
   if (!/^[0-9a-f]{64}$/.test(sourceFingerprint)) throw new Error("工作進度預覽版本不正確，請重新產生");
-  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1");
+  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1");
   const target = targets?.[0];
-  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會群"), { status: 409 });
+  if (!target) throw Object.assign(new Error("尚未將會員委員秘書Bot綁定至會員委員會群"), { status: 409 });
+  const oaChannel = lineTargetChannel(target, "committee");
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
   const latest = await buildCommitteeWorkDigestPreview();
   if (latest.sourceFingerprint !== sourceFingerprint) {
     throw Object.assign(new Error("案件或分工已在其他裝置更新，請重新產生預覽後再發送"), { status: 409 });
@@ -706,7 +747,7 @@ async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintI
   const message = buildLineMentionAllMessage(content);
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
       body: JSON.stringify({ to: target.line_group_id, messages: [message] }),
@@ -729,7 +770,7 @@ async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintI
     line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
     line_message_id: payload?.sentMessages?.[0]?.id || null,
   });
-  return { message: `工作進度已發送到「${target.display_name}」`, state: await lineRemindersState() };
+  return { message: `工作進度已由會員委員秘書Bot發送到「${target.display_name}」`, state: await lineRemindersState() };
 }
 
 async function findCaseFeedbackLineDelivery(taskId: string) {
@@ -954,7 +995,6 @@ async function finishCaseResultLineDelivery(deliveryId: string, patch: any) {
 
 async function sendLineReminderTest(reminderKey: string, context: Context) {
   if (!LINE_REMINDER_KEYS.includes(reminderKey)) throw new Error("提醒類型不正確");
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   const routeKey = reminderRouteKey(reminderKey);
   const [rules, targets] = await Promise.all([
     db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(reminderKey)}&select=*&limit=1`),
@@ -964,6 +1004,8 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
   const target = targets?.[0];
   if (!rule) throw Object.assign(new Error("找不到指定提醒"), { status: 404 });
   if (!target) throw Object.assign(new Error(`尚未在後台指定${routeKey === "committee" ? "會員委員會群" : "交流群"}`), { status: 409 });
+  const oaChannel = lineTargetChannel(target, routeKey);
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error(`${lineChannelLabel(oaChannel)} Channel Access Token 尚未設定`), { status: 503 });
   const content = String(rule.message_template || "").trim();
   const message = rule.mention_all ? buildLineMentionAllMessage(content) : { type: "text", text: content };
   const id = crypto.randomUUID();
@@ -988,7 +1030,7 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
   const delivery = deliveryRows?.[0];
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Line-Retry-Key": retryKey },
       body: JSON.stringify({ to: target.line_group_id, messages: [message] }),
@@ -1011,7 +1053,7 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
     line_request_id: response.headers.get("x-line-request-id") || acceptedRequestId || null,
     line_message_id: payload?.sentMessages?.[0]?.id || null,
   });
-  return { message: `測試提醒已發送到「${target.display_name}」`, state: await lineRemindersState() };
+  return { message: `測試提醒已由${lineChannelLabel(oaChannel)}發送到「${target.display_name}」`, state: await lineRemindersState() };
 }
 
 async function lineRemindersApi(request: Request, context: Context) {
@@ -1029,8 +1071,11 @@ async function lineRemindersApi(request: Request, context: Context) {
   if (updates.some((rule: any) => rule.enabled)) {
     if (!Deno.env.get("LINE_REMINDER_CRON_SECRET")) throw Object.assign(new Error("Supabase 排程尚未啟用，請先保持提醒關閉"), { status: 409 });
     const requiredRoutes = new Set(updates.filter((rule: any) => rule.enabled).map((rule: any) => reminderRouteKey(rule.reminder_key)));
-    const targets = await db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=route_key");
-    const activeRoutes = new Set((targets || []).map((target: any) => target.route_key));
+    const targets = await db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=route_key,oa_channel");
+    const activeRoutes = new Set((targets || [])
+      .filter((target: any) => lineChannelForRoute(target.route_key) === normalizeLineChannel(target.oa_channel)
+        && Boolean(lineAccessToken(target.oa_channel)))
+      .map((target: any) => target.route_key));
     const missingRoute = [...requiredRoutes].find(route => !activeRoutes.has(route));
     if (missingRoute) throw Object.assign(new Error(`啟用提醒前，請先在系統設定指定${missingRoute === "committee" ? "會員委員會群" : "交流群"}`), { status: 409 });
   }
@@ -1109,15 +1154,16 @@ async function finishLineDelivery(deliveryId: string, patch: any) {
 async function sendLineAttendance(meetingDate: string, context: Context) {
   leadership(context);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   const [sessionRows, targetRows] = await Promise.all([
     db(`attendance_sessions?meeting_date=eq.${meetingDate}&status=eq.confirmed&select=id,meeting_date,status,announcement_snapshot&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.attendance&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.attendance&oa_channel=eq.vice_chair&select=*&limit=1"),
   ]);
   const session = sessionRows?.[0];
   const target = targetRows?.[0];
   if (!session?.announcement_snapshot) throw Object.assign(new Error("本週尚未完成最終確認，不能發送到 LINE"), { status: 409 });
   if (!target) throw Object.assign(new Error("尚未在後台設定每週出席公告群"), { status: 409 });
+  const oaChannel = lineTargetChannel(target, "attendance");
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error("副主席秘書Bot Channel Access Token 尚未設定"), { status: 503 });
   const announcement = String(session.announcement_snapshot);
   let lineMessage;
   try {
@@ -1129,7 +1175,7 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
   const delivery = await beginLineDelivery(session, target, announcementHash, context);
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -3267,7 +3313,6 @@ async function markCaseFeedbackNoticeSent(access: any, delivery: any, target: an
 
 async function sendCaseFeedbackNotice(access: any, existing: any, context: Context) {
   leadership(context);
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
     throw Object.assign(new Error("此案件類型不適用委員回饋通知"), { status: 409 });
   }
@@ -3277,14 +3322,16 @@ async function sendCaseFeedbackNotice(access: any, existing: any, context: Conte
   }
   await ensureTaskCase(access, context);
   const [targetRows, roster] = await Promise.all([
-    db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1"),
     activeVotingRoster(),
   ]);
   const target = targetRows?.[0];
-  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會 LINE 群"), { status: 409 });
+  if (!target) throw Object.assign(new Error("尚未將會員委員秘書Bot綁定至會員委員會 LINE 群"), { status: 409 });
   if (target.purpose !== "production") {
     throw Object.assign(new Error("會員委員會 LINE 群目前不是正式群，請先到系統設定重新指定"), { status: 409 });
   }
+  const oaChannel = lineTargetChannel(target, "committee");
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
   const applicant = String(access.task.title || "").trim();
   const eligibleMembers = (roster || [])
     .filter((item: any) => ["vp", "committee"].includes(String(item.role || "")))
@@ -3325,7 +3372,7 @@ async function sendCaseFeedbackNotice(access: any, existing: any, context: Conte
   const { delivery } = await beginCaseFeedbackLineDelivery(access.task, target, messageHash, context);
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
       body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
@@ -3366,7 +3413,7 @@ async function sendCaseFeedbackNotice(access: any, existing: any, context: Conte
   }
   return {
     ...state,
-    message: `委員回饋通知已由正式 LINE OA 發送到「${target.display_name}」`,
+    message: `委員回饋通知已由會員委員秘書Bot發送到「${target.display_name}」`,
     lineTarget: publicLineTarget(target),
     lineSentAt: sentAt,
     alreadySent: false,
@@ -3426,9 +3473,57 @@ async function markCaseVoteNoticeSent(access: any, delivery: any, snapshot: any,
   return caseStateResponse(access, latestRows?.[0], context);
 }
 
+async function markCaseVoteNoticeCopied(access: any, existing: any, context: Context, expectedRevision: number) {
+  leadership(context);
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員投票通知"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (expectedRevision !== Number(existing?.revision || 0)) {
+    throw Object.assign(new Error("案件已在其他裝置更新，通知文字已複製，請重新整理後再按一次開放投票"), { status: 409 });
+  }
+  if (!workflow.votingOpen || workflow.closed) {
+    throw Object.assign(new Error("投票尚未開啟或案件已結案"), { status: 409 });
+  }
+  if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
+  const snapshotRows = await db(
+    `vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`,
+  );
+  const snapshot = snapshotRows?.[0];
+  if (!snapshot) throw Object.assign(new Error("本案沒有進行中的正式投票快照"), { status: 409 });
+  if (!snapshot.deadline_at || new Date(snapshot.deadline_at).getTime() <= Date.now()) {
+    throw Object.assign(new Error("投票期限已截止，請先更新截止時間"), { status: 409 });
+  }
+  const copiedAt = new Date().toISOString();
+  try {
+    await db("rpc/edge_mark_task_vote_notice_copied", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_task_id: access.task.id,
+        p_actor: context.personId,
+        p_actor_auth_user_id: context.userId,
+        p_expected_revision: expectedRevision,
+        p_deadline: snapshot.deadline_at,
+        p_copied_at: copiedAt,
+      }),
+    });
+  } catch (error) {
+    if (String((error as any)?.message).includes("CASE_CONFLICT")) {
+      throw Object.assign(new Error("案件已在其他裝置更新，通知文字已複製，請重新整理後再按一次開放投票"), { status: 409 });
+    }
+    throw error;
+  }
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  const state = await caseStateResponse(access, latestRows?.[0], context);
+  return {
+    ...state,
+    message: "投票通知已複製，系統投票已開放；請將通知人工貼到會員委員會群",
+  };
+}
+
 async function sendCaseVoteNotice(access: any, existing: any, context: Context) {
   leadership(context);
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
     throw Object.assign(new Error("此案件類型不適用委員投票通知"), { status: 409 });
   }
@@ -3439,7 +3534,7 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
   const [snapshotRows, targetRows] = await Promise.all([
     db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.committee&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1"),
   ]);
   const snapshot = snapshotRows?.[0];
   const target = targetRows?.[0];
@@ -3447,10 +3542,12 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   if (!snapshot.deadline_at || new Date(snapshot.deadline_at).getTime() <= Date.now()) {
     throw Object.assign(new Error("投票期限已截止，請先更新截止時間"), { status: 409 });
   }
-  if (!target) throw Object.assign(new Error("尚未在後台指定會員委員會 LINE 群"), { status: 409 });
+  if (!target) throw Object.assign(new Error("尚未將會員委員秘書Bot綁定至會員委員會 LINE 群"), { status: 409 });
   if (target.purpose !== "production") {
     throw Object.assign(new Error("會員委員會 LINE 群目前不是正式群，請先到系統設定重新指定"), { status: 409 });
   }
+  const oaChannel = lineTargetChannel(target, "committee");
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
   const taskMeta = parseTaskJson(access.task.result_summary);
   const content = buildCaseVoteNoticeText({
     caseType: access.task.category,
@@ -3483,7 +3580,7 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   const { delivery } = await beginCaseVoteLineDelivery(access.task, snapshot, target, messageHash, context);
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
       body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
@@ -3524,7 +3621,7 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   }
   return {
     ...state,
-    message: `投票通知已由正式 LINE OA 發送到「${target.display_name}」`,
+    message: `投票通知已由會員委員秘書Bot發送到「${target.display_name}」`,
     lineTarget: publicLineTarget(target),
     lineSentAt: sentAt,
     alreadySent: false,
@@ -3612,7 +3709,6 @@ async function markCaseResultAnnouncementSent(access: any, delivery: any, target
 
 async function sendCaseResultAnnouncement(access: any, existing: any, context: Context) {
   leadership(context);
-  if (!lineAccessToken()) throw Object.assign(new Error("LINE Channel Access Token 尚未設定"), { status: 503 });
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
     throw Object.assign(new Error("此案件類型不適用正式結果公告"), { status: 409 });
   }
@@ -3624,7 +3720,7 @@ async function sendCaseResultAnnouncement(access: any, existing: any, context: C
   if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
   const [snapshotRows, targetRows] = await Promise.all([
     db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=*&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.attendance&purpose=eq.production&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.attendance&oa_channel=eq.vice_chair&purpose=eq.production&select=*&limit=1"),
   ]);
   const snapshot = snapshotRows?.[0];
   const target = targetRows?.[0];
@@ -3633,6 +3729,8 @@ async function sendCaseResultAnnouncement(access: any, existing: any, context: C
     throw Object.assign(new Error(snapshot.result === "rejected" ? "投票不通過的案件不發布公告群" : "本案尚未形成通過決議"), { status: 409 });
   }
   if (!target) throw Object.assign(new Error("尚未在後台指定正式公告群"), { status: 409 });
+  const oaChannel = lineTargetChannel(target, "attendance");
+  if (!lineAccessToken(oaChannel)) throw Object.assign(new Error("副主席秘書Bot Channel Access Token 尚未設定"), { status: 503 });
 
   const announcedAt = new Date().toISOString();
   const { input, snapshot: payloadSnapshot } = await caseResultAnnouncementPayload(access, existing, announcedAt);
@@ -3664,7 +3762,7 @@ async function sendCaseResultAnnouncement(access: any, existing: any, context: C
   );
   let response: Response;
   try {
-    response = await lineRequest("/v2/bot/message/push", {
+    response = await lineRequest(oaChannel, "/v2/bot/message/push", {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Line-Retry-Key": delivery.retry_key },
       body: JSON.stringify({ to: target.line_group_id, messages: [lineMessage] }),
@@ -3742,7 +3840,7 @@ async function caseStatesApi(request: Request, context: Context) {
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
 
-  if (["feedback-notice", "vote-notice", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+  if (["feedback-notice", "vote-notice", "vote-notice-copy", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
   }
 
@@ -3752,6 +3850,10 @@ async function caseStatesApi(request: Request, context: Context) {
 
   if (body.kind === "vote-notice") {
     return sendCaseVoteNotice(access, existing, context);
+  }
+
+  if (body.kind === "vote-notice-copy") {
+    return markCaseVoteNoticeCopied(access, existing, context, expectedRevision);
   }
 
   if (body.kind === "result-announcement") {
@@ -3799,7 +3901,7 @@ async function caseStatesApi(request: Request, context: Context) {
   if (body.kind === "vote") {
     if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能參與投票"), { status: 403 });
     if (currentWorkflow.closed) throw Object.assign(new Error("案件已結案，無法投票"), { status: 409 });
-    if (!currentWorkflow.votingOpen || !currentWorkflow.voteNoticeSent) {
+    if (!currentWorkflow.votingOpen || !(currentWorkflow.voteNoticeSent || currentWorkflow.voteNoticeCopiedAt)) {
       throw Object.assign(new Error("投票尚未開放或尚未通知"), { status: 409 });
     }
     const choice = String(body.value || "");
@@ -3840,6 +3942,9 @@ async function caseStatesApi(request: Request, context: Context) {
     delete proposed.voteNoticeSentAt;
     delete proposed.voteNoticeTargetName;
     delete proposed.voteNoticeDeliveryId;
+    delete proposed.voteNoticeCopiedAt;
+    delete proposed.voteNoticeCopiedBy;
+    delete proposed.voteNoticeCopiedDeadline;
     await openVoteSnapshot(access, existing, proposed, context);
     const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
     return caseStateResponse(access, latestRows?.[0], context);
@@ -3902,6 +4007,15 @@ async function caseStatesApi(request: Request, context: Context) {
         workflow.voteNoticeTargetName = currentWorkflow.voteNoticeTargetName || "";
         workflow.voteNoticeDeliveryId = currentWorkflow.voteNoticeDeliveryId || "";
       }
+      if (!currentWorkflow.voteNoticeCopiedAt || deadlineChanged) {
+        delete workflow.voteNoticeCopiedAt;
+        delete workflow.voteNoticeCopiedBy;
+        delete workflow.voteNoticeCopiedDeadline;
+      } else {
+        workflow.voteNoticeCopiedAt = currentWorkflow.voteNoticeCopiedAt;
+        workflow.voteNoticeCopiedBy = currentWorkflow.voteNoticeCopiedBy || "";
+        workflow.voteNoticeCopiedDeadline = currentWorkflow.voteNoticeCopiedDeadline || "";
+      }
       if (currentWorkflow.resultAnnouncementSent) {
         workflow.resultAnnouncementSent = true;
         workflow.resultAnnouncementSentAt = currentWorkflow.resultAnnouncementSentAt || "";
@@ -3922,7 +4036,8 @@ async function caseStatesApi(request: Request, context: Context) {
     } else {
       if (access.assigned) {
         const protectedKeys = new Set([
-          "votingOpen", "voteNoticeSent", "voterSnapshot", "leadersSent",
+          "votingOpen", "voteNoticeSent", "voteNoticeCopiedAt", "voteNoticeCopiedBy",
+          "voteNoticeCopiedDeadline", "voterSnapshot", "leadersSent",
           "advisorStatus", "advisorNote", "resultAnnouncementSent",
           "resultAnnouncementSentAt", "resultAnnouncementTargetName",
           "resultAnnouncementDeliveryId", "closed",

@@ -1,8 +1,12 @@
-import { collectGroupEvents, verifyLineSignature } from "./domain.mjs";
+import { collectGroupEvents, resolveLineWebhookChannel } from "./domain.mjs";
+import { LINE_OA_CHANNELS } from "../_shared/line-channel-domain.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const channelSecret = Deno.env.get("LINE_CHANNEL_SECRET") || "";
+const channelSecrets = [
+  { channel: LINE_OA_CHANNELS.VICE_CHAIR, secret: Deno.env.get("LINE_CHANNEL_SECRET") || "" },
+  { channel: LINE_OA_CHANNELS.COMMITTEE, secret: Deno.env.get("LINE_COMMITTEE_CHANNEL_SECRET") || "" },
+].filter(item => item.secret);
 
 function json(status: number, payload: unknown) {
   return new Response(JSON.stringify(payload), {
@@ -30,9 +34,9 @@ async function db(path: string, options: RequestInit = {}) {
   return text ? JSON.parse(text) : null;
 }
 
-async function recordGroupEvent(event: { groupId: string; kind: string; occurredAt: string }) {
+async function recordGroupEvent(event: { groupId: string; kind: string; occurredAt: string }, oaChannel: string) {
   const encoded = encodeURIComponent(event.groupId);
-  const existingRows = await db(`line_group_targets?line_group_id=eq.${encoded}&select=id,status&limit=1`);
+  const existingRows = await db(`line_group_targets?oa_channel=eq.${encodeURIComponent(oaChannel)}&line_group_id=eq.${encoded}&select=id,status&limit=1`);
   const existing = existingRows?.[0];
   if (event.kind === "leave") {
     if (!existing) return;
@@ -47,7 +51,7 @@ async function recordGroupEvent(event: { groupId: string; kind: string; occurred
     await db("line_group_targets", {
       method: "POST",
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ line_group_id: event.groupId, last_event_at: event.occurredAt }),
+      body: JSON.stringify({ oa_channel: oaChannel, line_group_id: event.groupId, last_event_at: event.occurredAt }),
     });
     return;
   }
@@ -63,7 +67,7 @@ async function recordGroupEvent(event: { groupId: string; kind: string; occurred
 
 Deno.serve(async (request) => {
   if (request.method !== "POST") return json(405, { message: "Method not allowed" });
-  if (!supabaseUrl || !serviceKey || !channelSecret) {
+  if (!supabaseUrl || !serviceKey || !channelSecrets.length) {
     return json(503, { message: "LINE webhook is not configured" });
   }
   const declaredSize = Number(request.headers.get("content-length") || 0);
@@ -71,7 +75,8 @@ Deno.serve(async (request) => {
   const rawBody = await request.text();
   if (rawBody.length > 1024 * 1024) return json(413, { message: "Payload too large" });
   const signature = request.headers.get("x-line-signature") || "";
-  if (!await verifyLineSignature(rawBody, signature, channelSecret)) {
+  const oaChannel = await resolveLineWebhookChannel(rawBody, signature, channelSecrets);
+  if (!oaChannel) {
     return json(401, { message: "Invalid signature" });
   }
   let payload;
@@ -79,7 +84,7 @@ Deno.serve(async (request) => {
   catch { return json(400, { message: "Invalid JSON" }); }
   try {
     // Only opaque group IDs and timestamps are retained. User message content is ignored.
-    await Promise.all(collectGroupEvents(payload).map(recordGroupEvent));
+    await Promise.all(collectGroupEvents(payload).map(event => recordGroupEvent(event, oaChannel)));
     return json(200, { ok: true });
   } catch (error) {
     console.error("LINE webhook persistence failed", String((error as Error)?.message || error));

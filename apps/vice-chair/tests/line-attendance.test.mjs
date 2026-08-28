@@ -41,7 +41,8 @@ assert.match(lineAttendanceFingerprintSource("點名公告"), /^text-v2-mention-
 assert.throws(() => buildLineAttendanceMessage("字".repeat(5000)), /@所有人後超過 5,000 字/);
 
 assert.match(webhook, /x-line-signature/);
-assert.match(webhook, /verifyLineSignature\(rawBody/);
+assert.match(webhook, /resolveLineWebhookChannel\(rawBody/);
+assert.match(webhook, /LINE_COMMITTEE_CHANNEL_SECRET/);
 assert.match(webhook, /User message content is ignored/);
 assert.doesNotMatch(webhook, /message\.text/);
 assert.match(migration, /revoke all on table public\.line_group_targets, public\.attendance_line_deliveries/);
@@ -68,6 +69,6 @@ assert.match(settingsScript, /action:"assign"/);
 assert.match(settingsScript, /item\.availableForAssignment&&item\.status!=="active"/);
 assert.match(settingsScript, /已停用，可直接重新指定/);
 assert.match(settingsHtml, /已停用群組可直接重新啟用/);
-assert.match(settingsHtml, /assets\/js\/settings\.js\?v=13/);
+assert.match(settingsHtml, /assets\/js\/settings\.js\?v=14/);
 
 console.log("LINE attendance delivery tests passed");

@@ -78,5 +78,5 @@ test("後端只在 LINE 送達後標記回饋通知，且同案防止重送", ()
   assert.doesNotMatch(handler, /state\.feedbackNotified=true/);
   assert.doesNotMatch(workflow, /已模擬發送委員回饋通知/);
   assert.match(html, /id="feedbackLineState"/);
-  assert.match(html, /通知委員（正式 LINE OA）/);
+  assert.match(html, /通知委員（會員委員秘書Bot）/);
 });

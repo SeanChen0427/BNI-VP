@@ -1,10 +1,20 @@
 import { buildLineMentionAllMessage } from "../app-api/line-message.mjs";
 import { isRuleDue, reminderRouteKey, ruleDueDate } from "../_shared/line-reminder-domain.mjs";
+import { LINE_OA_CHANNELS, lineChannelForRoute, normalizeLineChannel } from "../_shared/line-channel-domain.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-const lineToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
 const cronSecret = Deno.env.get("LINE_REMINDER_CRON_SECRET") || "";
+
+function lineAccessToken(oaChannel: string) {
+  if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
+    return Deno.env.get("LINE_COMMITTEE_CHANNEL_ACCESS_TOKEN") || "";
+  }
+  if (oaChannel === LINE_OA_CHANNELS.VICE_CHAIR) {
+    return Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
+  }
+  return "";
+}
 
 function response(status: number, body: unknown) {
   return new Response(JSON.stringify(body), {
@@ -88,6 +98,10 @@ async function claimDelivery(rule: any, target: any, dueDate: string) {
 }
 
 async function sendReminder(rule: any, target: any, now: Date) {
+  const targetChannel = normalizeLineChannel(target.oa_channel);
+  if (!targetChannel || lineChannelForRoute(target.route_key) !== targetChannel) return "wrong-channel";
+  const lineToken = lineAccessToken(target.oa_channel);
+  if (!lineToken) return "missing-channel-token";
   const dueDate = ruleDueDate(rule, now);
   if (!dueDate) return "not-due";
   const delivery = await claimDelivery(rule, target, dueDate);
@@ -128,7 +142,7 @@ async function sendReminder(rule: any, target: any, now: Date) {
 Deno.serve(async request => {
   if (request.method !== "POST") return response(405, { message: "Method not allowed" });
   if (!cronSecret || request.headers.get("x-cron-secret") !== cronSecret) return response(401, { message: "Unauthorized" });
-  if (!supabaseUrl || !serviceKey || !lineToken) return response(503, { message: "Reminder service configuration incomplete" });
+  if (!supabaseUrl || !serviceKey) return response(503, { message: "Reminder service configuration incomplete" });
   try {
     const [rules, targets] = await Promise.all([
       db("line_reminder_rules?enabled=eq.true&select=*&order=reminder_key.asc"),

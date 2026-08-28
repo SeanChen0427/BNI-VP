@@ -36,9 +36,11 @@
   }
   function renderTarget(selector,route,label){
     const element=$(selector),target=routeTarget(route);
-    element.className=`target-state ${target?"ready":"missing"}`;
+    element.className=`target-state ${target?.channelConfigured?"ready":"missing"}`;
     element.querySelector("strong").textContent=target?target.displayName:`尚未指定${label}`;
-    element.querySelector("span").textContent=target?`${target.environment==="test"?"測試群":"正式群"}・此用途的通知只會送到這裡`:`請先將 Bot 加入群組並在設定頁指定「${label}」用途`;
+    element.querySelector("span").textContent=target
+      ?`${target.oaName||"LINE 助理"}・${target.environment==="test"?"測試群":"正式群"}・${target.channelConfigured?"已可發送":"後端憑證尚未設定"}`
+      :`請先將${route==="committee"?"會員委員秘書Bot":"副主席秘書Bot"}加入群組並在設定頁指定「${label}」用途`;
   }
   function preview(){
     $("#weeklyPreview").textContent=`@所有人\n${$("#weeklyMessage").value.trim()}`;
@@ -54,7 +56,7 @@
       digestFingerprint=item.sourceFingerprint||"";
       digestDirty=false;
     }
-    $("#workDigestTarget").textContent=target?`${target.displayName}・${target.environment==="production"?"正式群":"測試群"}`:"尚未指定會員委員會群";
+    $("#workDigestTarget").textContent=target?`${target.displayName}・${target.oaName||"會員委員秘書Bot"}・${target.environment==="production"?"正式群":"測試群"}`:"尚未指定會員委員會群";
     $("#workDigestCounts").textContent=item.counts?`進行中 ${item.counts.active}・逾期 ${item.counts.overdue}・回饋 ${item.counts.feedback}・投票 ${item.counts.vote}`:"尚未取得案件資料";
     $("#workDigestGeneratedAt").textContent=formatDateTime(item.generatedAt);
     $("#workDigestPreview").textContent=`@所有人\n${message.value.trim()}`;
@@ -73,7 +75,7 @@
     renderNextReminder("#committeeNextReminder",committee);
     renderTarget("#exchangeTargetState","exchange","交流群常態通知");
     renderTarget("#committeeTargetState","committee","會員委員會通知");
-    document.querySelectorAll("[data-test]").forEach(button=>button.disabled=!targetForRule(button.dataset.test)||!state.configured);
+    document.querySelectorAll("[data-test]").forEach(button=>button.disabled=!targetForRule(button.dataset.test)?.channelConfigured);
     $("#saveState").textContent=state.rules.some(item=>item.enabled)?"已有提醒啟用":"所有提醒目前關閉";
     $("#saveDetail").textContent=state.schedulerReady?"Supabase 排程服務已就緒":"排程尚未啟用；現在可先設定與測試";
     $("#deliveryList").innerHTML=state.deliveries.length?state.deliveries.map(item=>`<article><b>${escapeHtml(labels[item.reminderKey]||item.reminderKey)}</b><span>${item.triggerSource==="manual_test"?"人工測試":"自動排程"}</span><time>${escapeHtml(new Date(item.requestedAt).toLocaleString("zh-TW"))}</time><em class="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status]||item.status)}</em>${item.errorMessage?`<span>${escapeHtml(item.errorMessage)}</span>`:""}</article>`).join(""):`<article><span>尚無發送紀錄</span></article>`;
@@ -90,7 +92,7 @@
   }
   $("#saveRules").onclick=async()=>{
     const rules=collect();
-    const missing=rules.find(item=>item.enabled&&!targetForRule(item.reminderKey));
+    const missing=rules.find(item=>item.enabled&&!targetForRule(item.reminderKey)?.channelConfigured);
     if(missing)return toast(`請先指定${routes[missing.reminderKey]==="committee"?"會員委員會群":"交流群"}，再啟用提醒`);
     if(rules.some(item=>item.enabled)&&!state.schedulerReady)return toast("Supabase 排程尚未啟用，請先保持提醒關閉");
     const button=$("#saveRules");button.disabled=true;button.textContent="保存中…";
@@ -98,10 +100,10 @@
   };
   document.querySelectorAll("[data-test]").forEach(button=>button.onclick=async()=>{
     const key=button.dataset.test,label=labels[key],target=targetForRule(key),defaultText=button.textContent;
-    if(!target)return toast(`尚未指定${routes[key]==="committee"?"會員委員會群":"交流群"}`);
+    if(!target?.channelConfigured)return toast(`${routes[key]==="committee"?"會員委員秘書Bot":"副主席秘書Bot"}尚未完成群組或憑證設定`);
     if(!confirm(`將目前已保存的「${label}」文案立即測試發送到「${target.displayName}」？\n\n測試訊息會真的 @所有人。若剛修改文案，請先按保存。`))return;
     button.disabled=true;button.textContent="發送中…";
-    try{const result=await api("POST",{action:"test",reminderKey:key});state=result.state;render();toast(result.message)}catch(error){toast(error.message)}finally{button.textContent=defaultText;button.disabled=!targetForRule(key)||!state.configured}
+    try{const result=await api("POST",{action:"test",reminderKey:key});state=result.state;render();toast(result.message)}catch(error){toast(error.message)}finally{button.textContent=defaultText;button.disabled=!targetForRule(key)?.channelConfigured}
   });
   ["weeklyMessage","monthlyMessage","committeeMessage"].forEach(id=>$("#"+id).addEventListener("input",preview));
   $("#workDigestMessage").addEventListener("input",()=>{digestDirty=true;renderWorkDigest()});

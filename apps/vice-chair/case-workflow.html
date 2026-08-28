@@ -11,9 +11,9 @@
   <script src="assets/js/auth.js?v=7"></script>
   <script src="assets/js/supabase-data.js?v=2"></script>
   <script src="core/calendar-domain.js?v=1"></script>
-  <script src="core/case-domain.js?v=5"></script>
+  <script src="core/case-domain.js?v=6"></script>
   <script src="assets/js/task-store.js?v=6"></script>
-  <script src="assets/js/case-state-store.js?v=10"></script>
+  <script src="assets/js/case-state-store.js?v=11"></script>
   <script src="services/case-files.js?v=5"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -67,11 +67,11 @@
             <button id="downloadWord" class="ghost" disabled>下載保存檔</button>
           </div>
           <div class="notice-compose">
-            <div><b>委員回饋通知</b><small>正式 LINE OA 會發送至後台已綁定的會員委員會群，並真正 @所有人。</small></div>
+            <div><b>委員回饋通知</b><small>會員委員秘書Bot會發送至後台已綁定的會員委員會群，並真正 @所有人。</small></div>
             <button id="copyFeedbackNotice" class="ghost">複製文案</button>
-            <button id="sendFeedbackNotice" class="primary vp-control">通知委員（正式 LINE OA）</button>
+            <button id="sendFeedbackNotice" class="primary vp-control">通知委員（會員委員秘書Bot）</button>
           </div>
-          <div class="vote-line-state" id="feedbackLineState">將使用正式 LINE OA 發送至後台已綁定的會員委員會群，並真正 @所有人。</div>
+          <div class="vote-line-state" id="feedbackLineState">將使用會員委員秘書Bot發送至後台已綁定的會員委員會群，並真正 @所有人。</div>
           <pre id="feedbackNoticePreview" class="message-preview"></pre>
         </section>
 
@@ -91,18 +91,18 @@
         </section>
 
         <section class="card vote-card" id="voteSection">
-          <div class="section-title"><span>04</span><div><h2>系統投票</h2><p>先判斷超過半數參與，再以贊成、反對票多數形成決議</p></div></div>
+          <div class="section-title"><span>04</span><div><h2>系統投票</h2><p>副主席複製通知人工貼送，或由會員委員秘書Bot送達後，委員即可投票</p></div></div>
           <div class="vote-locked" id="voteLocked"><b>投票尚未開啟</b><span>需先完成回饋門檻，再由副主席開啟。</span></div>
           <div id="voteWorkspace" hidden>
             <div class="vote-topline">
               <span id="voteSnapshot">投票資格快照 7 人</span>
               <span id="deadlineLabel">截止時間尚未設定</span>
               <div class="vote-notice-actions">
-                <button id="copyVoteNotice" class="ghost vp-control">複製投票通知</button>
-                <button id="sendVoteNotice" class="primary vp-control">通知委員（正式 LINE OA）</button>
+                <button id="copyVoteNotice" class="ghost vp-control">複製投票通知並開放</button>
+                <button id="sendVoteNotice" class="primary vp-control">通知委員（會員委員秘書Bot）</button>
               </div>
             </div>
-            <div class="vote-line-state" id="voteLineState">將使用正式 LINE OA 發送至後台指定的會員委員會群，並真正 @所有人。</div>
+            <div class="vote-line-state" id="voteLineState">複製通知並人工貼送，或由會員委員秘書Bot發送至正式群，任一種都可開放系統投票。</div>
             <pre id="voteNoticePreview" class="message-preview vote-notice-preview"></pre>
             <div class="vote-grid">
               <div class="my-vote">
@@ -110,7 +110,7 @@
                 <label><input type="radio" name="vote" value="approve"><span id="approveLabel">同意續約</span></label>
                 <label><input type="radio" name="vote" value="reject"><span id="rejectLabel">不同意續約</span></label>
                 <button id="submitVote" class="primary">確認送出票</button>
-                <small id="voteActionHint" class="vote-action-hint">請先完成投票通知。</small>
+                <small id="voteActionHint" class="vote-action-hint">請先複製投票通知，或由會員委員秘書Bot通知。</small>
                 <small>每位有資格者一票；初版可覆蓋自己的示範票，正式版將鎖定並保留更正紀錄。</small>
               </div>
               <div class="vote-result">
@@ -154,7 +154,7 @@
           <div class="side-head"><small>CASE STATUS</small><h2>案件狀態</h2></div>
           <div class="case-stage"><span id="stageNumber">3</span><div><small>目前階段</small><strong id="stageTitle">蒐集委員回饋</strong></div></div>
           <div class="progress"><i><em id="progressBar"></em></i><span id="progressText">30%</span></div>
-          <dl class="case-summary"><div><dt>案件編號</dt><dd id="caseId">未編號</dd></div><div><dt>申請者</dt><dd id="summaryApplicant">未填寫</dd></div><div><dt>有效基數</dt><dd id="summaryBase">7 人</dd></div><div><dt>最低參與</dt><dd id="summaryQuorum">4 人</dd></div><div><dt>LINE Bot</dt><dd>正式 LINE OA</dd></div><div><dt>資料保存</dt><dd>Supabase 正式資料</dd></div></dl>
+          <dl class="case-summary"><div><dt>案件編號</dt><dd id="caseId">未編號</dd></div><div><dt>申請者</dt><dd id="summaryApplicant">未填寫</dd></div><div><dt>有效基數</dt><dd id="summaryBase">7 人</dd></div><div><dt>最低參與</dt><dd id="summaryQuorum">4 人</dd></div><div><dt>LINE Bot</dt><dd>會員委員秘書Bot</dd></div><div><dt>資料保存</dt><dd>Supabase 正式資料</dd></div></dl>
           <div class="permission-note"><b>副主席權限</b><span id="permissionText">目前可操作開票、通知、送三長群與結案。</span></div>
           <button id="resetCase" class="ghost reset-case">清除並重設案件流程</button>
         </section>
@@ -163,7 +163,7 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=21"></script>
+  <script src="assets/js/case-workflow.js?v=23"></script>
   <script src="assets/js/workspace-nav.js?v=7"></script>
 </body>
 </html>
