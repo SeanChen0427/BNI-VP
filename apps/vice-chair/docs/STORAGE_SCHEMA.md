@@ -55,7 +55,8 @@
 - `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、所屬 OA（`vice_chair`／`committee`）、測試／正式環境與四種用途路由，不保存聊天內容。`committee` 只能由會員委員秘書Bot擁有，其餘路由只能由副主席秘書Bot擁有；相同 LINE 群組在 Bot 換接期間依 OA 分開保留歷史目標。
 - `line_reminder_rules`：交流群兩種常態提醒的開關、Asia/Taipei 發送時間、例會星期、提前天數及文案；僅 service role 可讀寫，初始一律關閉。
 - `line_reminder_deliveries`：常態通知的排程／人工測試發送稽核，以 delivery key 與 LINE retry key 防重複；不保存 Channel Access Token。
-- `case_feedback_line_deliveries`：訪談後委員回饋通知的正式會員委員會群發送稽核；每案只允許一筆成功通知，不保存完整文案。
+- `case_feedback_line_deliveries`：2026-08-28 前訪談後委員回饋 Push 通知的歷史發送稽核；保留既有紀錄，但新版案件不再新增此類 Push。
+- `case_feedback_calls`／`case_feedback_call_responders`：新版 LINE 回饋呼喚、指定測試／正式群、當期有效委員快照、Bot Reply 狀態及稽核；只保存原始 Token 與完整文案的 SHA-256，不保存完整群組聊天文字。測試／正式群都連回同一正式案件。
 - `case_vote_line_deliveries`：開票通知的正式會員委員會群發送稽核與防重送紀錄。
 - `case_result_line_deliveries`：新會員、續約與轉換專業別通過後的正式公告群發送稽核；只允許 `approved`，保存送出當下的案件欄位快照與雜湊，瀏覽器角色不可讀取。
 - `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。
@@ -65,7 +66,7 @@
 - `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。投票通知的人工複製通道只在 `workflow` 保存 `voteNoticeCopiedAt`、`voteNoticeCopiedBy` 與對應截止版本，作為開放送票與稽核旗標；不代表 LINE OA 送達。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
 - `cases`＋`tasks.case_id`：工作台決議案件與正式案件主檔的對照。
-- `case_feedback`：每位副主席／委員在每案各自一筆回饋，案件＋回饋者唯一。
+- `case_feedback`：每位副主席／委員在每案各自一筆正式回饋，案件＋回饋者唯一；登入介面與 LINE 免登入頁共用同一資料表，免登入頁可立即讀取該次名單內的全體回饋。
 - `vote_snapshots`／`vote_snapshot_voters`／`votes`：開票當下資格快照、申請者迴避與每人唯一且不可任意改寫的票。
 - `case_events`：回饋保存、開票及投票等後端確認事件。
 

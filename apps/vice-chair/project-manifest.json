@@ -39,6 +39,7 @@
     "lineCommitteeWorkDigest": "supabase/functions/_shared/committee-work-digest.mjs",
     "userFacingReleaseNotes": "assets/js/release-notes.js",
     "lineCaseVoteNotice": "supabase/functions/app-api/line-message.mjs",
+    "lineCaseFeedbackCall": "supabase/functions/_shared/case-feedback-call-domain.mjs",
     "lineCaseResultAnnouncement": "supabase/functions/app-api/line-message.mjs",
     "votingAndRecusal": [
       "core/case-domain.js",
@@ -53,6 +54,7 @@
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",
     "case-board.html": "進行中案件與階段篩選",
     "case-workflow.html": "回饋、投票、董顧確認與結案",
+    "public-feedback.html": "LINE 圖卡開啟的免登入委員回饋與全體回饋檢視",
     "member-care.html": "BNI 分析橋接與會員關懷",
     "attendance.html": "每週點名與出席公告",
     "accountability-emails.html": "副主席當責信待寄提醒、複製與人工寄送留痕",

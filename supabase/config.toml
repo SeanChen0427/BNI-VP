@@ -129,6 +129,9 @@ verify_jwt = false
 [functions.public-vote]
 verify_jwt = false
 
+[functions.public-feedback]
+verify_jwt = false
+
 [functions.line-reminder-cron]
 verify_jwt = false
 

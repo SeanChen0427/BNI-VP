@@ -7,6 +7,13 @@ import {
   normalizeVoteCallText,
   voteCallFingerprintSource,
 } from "../_shared/case-vote-call-domain.mjs";
+import {
+  buildFeedbackCallReplyMessages,
+  extractFeedbackCallToken,
+  extractFeedbackCallUrl,
+  feedbackCallFingerprintSource,
+  normalizeFeedbackCallText,
+} from "../_shared/case-feedback-call-domain.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -86,6 +93,98 @@ async function finishVoteCall(callId: string, patch: Record<string, unknown>) {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify(patch),
+  });
+}
+
+async function finishFeedbackCall(callId: string, patch: Record<string, unknown>) {
+  await db(`case_feedback_calls?id=eq.${callId}&status=eq.replying`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function processFeedbackCallEvent(event: {
+  groupId: string;
+  text: string;
+  replyToken: string;
+  webhookEventId: string;
+  lineMessageId: string;
+}) {
+  if (!committeeAccessToken) return;
+  const token = extractFeedbackCallToken(event.text);
+  const feedbackUrl = extractFeedbackCallUrl(event.text);
+  if (!token || !feedbackUrl) return;
+  const targets = await db(
+    `line_group_targets?oa_channel=eq.committee&line_group_id=eq.${encodeURIComponent(event.groupId)}&status=eq.active&route_key=eq.committee&select=id,purpose&limit=1`,
+  );
+  const target = targets?.[0];
+  if (!target || !["test", "production"].includes(String(target.purpose || ""))) return;
+  const [tokenHash, messageHash] = await Promise.all([
+    sha256Text(token),
+    sha256Text(feedbackCallFingerprintSource(normalizeFeedbackCallText(event.text))),
+  ]);
+  const calls = await db(
+    `case_feedback_calls?token_sha256=eq.${tokenHash}&message_sha256=eq.${messageHash}&group_target_id=eq.${target.id}&environment=eq.${target.purpose}&status=in.(awaiting_reply,reply_failed)&select=*&limit=1`,
+  );
+  const call = calls?.[0];
+  if (!call || call.environment !== target.purpose) return;
+  const claimed = await db(
+    `case_feedback_calls?id=eq.${call.id}&status=in.(awaiting_reply,reply_failed)`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "replying",
+        webhook_event_id: event.webhookEventId || null,
+        line_message_id: event.lineMessageId || null,
+        failed_at: null,
+        error_message: null,
+      }),
+    },
+  );
+  if (!claimed?.[0]) return;
+  const messages = buildFeedbackCallReplyMessages({
+    caseType: call.case_type,
+    applicant: call.applicant_snapshot,
+    profession: call.profession_snapshot,
+    feedbackUrl,
+  });
+  let response: Response;
+  try {
+    response = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${committeeAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ replyToken: event.replyToken, messages }),
+    });
+  } catch (error) {
+    await finishFeedbackCall(call.id, {
+      status: "reply_failed",
+      failed_at: new Date().toISOString(),
+      error_message: String((error as Error)?.message || error).slice(0, 1000),
+    });
+    return;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    await finishFeedbackCall(call.id, {
+      status: "reply_failed",
+      failed_at: new Date().toISOString(),
+      line_request_id: response.headers.get("x-line-request-id") || null,
+      error_message: String(payload?.message || `LINE HTTP ${response.status}`).slice(0, 1000),
+    });
+    return;
+  }
+  await finishFeedbackCall(call.id, {
+    status: "replied",
+    replied_at: new Date().toISOString(),
+    failed_at: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || null,
+    line_message_id: payload?.sentMessages?.[1]?.id || payload?.sentMessages?.[0]?.id || event.lineMessageId || null,
   });
 }
 
@@ -196,10 +295,14 @@ Deno.serve(async (request) => {
   try { payload = JSON.parse(rawBody); }
   catch { return json(400, { message: "Invalid JSON" }); }
   try {
-    // 普通聊天內容不落地；只有包含一次性 Token 且完整雜湊相符的投票呼喚會觸發 Reply。
+    // 普通聊天內容不落地；只有包含一次性 Token 且完整雜湊相符的回饋／投票呼喚會觸發 Reply。
     await Promise.all(collectGroupEvents(payload).map(event => recordGroupEvent(event, oaChannel)));
     if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
-      await Promise.all(collectVoteCallEvents(payload).map(event => processVoteCallEvent(event)));
+      const callEvents = collectVoteCallEvents(payload);
+      await Promise.all(callEvents.flatMap(event => [
+        processFeedbackCallEvent(event),
+        processVoteCallEvent(event),
+      ]));
     }
     return json(200, { ok: true });
   } catch (error) {

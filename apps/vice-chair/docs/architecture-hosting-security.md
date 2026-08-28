@@ -45,7 +45,7 @@ BNI 分析工具
 | 身分證或本人佐證 | 原則上只現場核對、不留檔 | 若制度要求保存，另行確認最小欄位、遮罩與期限 |
 | 訪談 Word、申請書、佐證附件 | 私人 bucket：`case-files` | 副主席及受指派案件人員 |
 | 訪談確認截圖 | 私人 bucket：`case-confirmations` | 副主席及受指派案件人員 |
-| 委員回饋 | PostgreSQL：`case_feedback` | 當期有效委員，結案後鎖定 |
+| 委員回饋 | PostgreSQL：`case_feedback`；LINE 呼喚與名單快照：`case_feedback_calls`、`case_feedback_call_responders` | 當期有效委員；持有效一次性連結者免登入選名填寫並可查看該案全體回饋，結案後鎖定；原始 Token 不落庫 |
 | 投票資格、票向及時間 | PostgreSQL：`vote_snapshots`、`votes` | 依投票制度與查閱規則限制 |
 | 董事顧問確認 | PostgreSQL：`advisor_confirmations`＋必要附件 | 副主席、Admin；其他角色依案件顯示結果 |
 | 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可保存草稿，副主席／Admin 最終確認；正式與待 PALMS 會員均用內部 ID 記錄，只作 LINE 公告暫時增量 |
@@ -54,7 +54,7 @@ BNI 分析工具
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |
 | LINE 群組目標與點名公告發送紀錄 | PostgreSQL：`line_group_targets`、`attendance_line_deliveries` | 只由 Edge Function/service role 讀寫；前端只取得去識別狀態與群組顯示名稱 |
 | 每週委員工作進度發送稽核 | PostgreSQL：`committee_work_digest_deliveries` | 只由 Edge Function/service role 讀寫；不保存完整文案，只保存來源／文案雜湊與發送結果 |
-| 案件委員回饋通知發送稽核 | PostgreSQL：`case_feedback_line_deliveries` | 只由 Edge Function/service role 讀寫；正式委員會群、每案一次、只保存文案雜湊與送達結果 |
+| 案件委員回饋通知稽核 | PostgreSQL：`case_feedback_calls`、`case_feedback_call_responders`；舊 Push 歷史：`case_feedback_line_deliveries` | 只由 Edge Function/service role 讀寫；綁定該次測試／正式群，只保存 Token／文案雜湊、名單快照與 Reply 結果，不保存群聊全文 |
 | 個人 AI API Key | 後端加密欄位／Vault（按使用者隔離） | 前端只讀取綁定狀態與末四碼；完整 Key 不可讀回 |
 | 富聯共用系統 Secret（若未來需要） | Supabase Edge Function Secrets | 前端與資料庫一般角色不可讀取 |
 | 正式帳號與密碼 | Supabase Auth | 系統不得保存明碼密碼 |

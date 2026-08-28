@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#9f171c">
+  <meta name="referrer" content="no-referrer">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://fahrblkukuhgveiptufn.supabase.co; img-src 'self' data:; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">
+  <title>會員委員回饋｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="stylesheet" href="assets/css/public-feedback.css?v=1">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+</head>
+<body>
+  <main class="feedback-shell">
+    <header class="feedback-brand">
+      <img src="assets/images/fulian-favicon.png" alt="富聯分會">
+      <div><strong>富聯分會</strong><span>會員委員會回饋</span></div>
+    </header>
+
+    <section class="case-card" aria-live="polite">
+      <span class="eyebrow" id="caseLabel">正在讀取案件資料</span>
+      <h1 id="applicant">請稍候…</h1>
+      <p class="profession" id="profession"></p>
+      <div class="case-meta">
+        <span id="interviewDate">訪談日期 —</span>
+        <span id="interviewers">主訪／陪訪 —</span>
+      </div>
+      <div class="feedback-status" id="feedbackStatus">正在確認這份回饋連結…</div>
+    </section>
+
+    <section class="responses-card" id="responsesCard" hidden>
+      <div class="section-head">
+        <div><span>目前回饋</span><h2><b id="feedbackCount">0</b> 份</h2></div>
+        <button type="button" id="refreshFeedback" class="text-button">重新整理</button>
+      </div>
+      <p class="visibility-note">此頁會直接顯示目前所有委員的回饋，不必先送出自己的內容。</p>
+      <div class="responses-list" id="feedbackList"></div>
+    </section>
+
+    <section class="compose-card" id="composeCard" hidden>
+      <div class="section-head"><div><span>填寫回饋</span><h2>直接同步正式案件</h2></div></div>
+      <form id="feedbackForm">
+        <label class="identity-field">第一步：選擇你是誰
+          <select id="responder" required><option value="">請選擇姓名</option></select>
+          <small>和原本 Google 表單相同，由委員自行選擇姓名；同一姓名只能透過此頁送出一次。</small>
+        </label>
+        <label class="feedback-field">第二步：填寫你的回饋
+          <textarea id="feedback" rows="8" maxlength="5000" placeholder="請引用訪談內容、數據或具體觀察，並提出建議與期待。" required></textarea>
+          <small><span id="characterCount">0</span>／5,000 字</small>
+        </label>
+        <button type="submit" id="submitFeedback" disabled>確認送出並同步系統</button>
+      </form>
+    </section>
+
+    <section class="share-card" id="shareCard" hidden>
+      <span class="done-mark">✓</span>
+      <h2>回饋已同步系統</h2>
+      <p>你可以把這段回饋分享回會員委員會群，讓群組繼續保留大家的討論。</p>
+      <a id="shareLine" class="line-share" href="#" rel="noreferrer">分享回 LINE 群組</a>
+      <button id="copyFeedback" class="copy-button" type="button">複製這段回饋</button>
+      <small id="copyState"></small>
+    </section>
+
+    <p class="privacy-note">此頁不需要登入，也不會取得你的 LINE 帳號。回饋連結請只留在會員委員會群組內。</p>
+  </main>
+  <script src="assets/js/public-feedback.js?v=1"></script>
+</body>
+</html>

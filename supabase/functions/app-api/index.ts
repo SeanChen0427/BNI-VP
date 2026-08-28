@@ -30,6 +30,10 @@ import {
   buildVoteCallText,
   voteCallFingerprintSource,
 } from "../_shared/case-vote-call-domain.mjs";
+import {
+  buildFeedbackCallText,
+  feedbackCallFingerprintSource,
+} from "../_shared/case-feedback-call-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -371,7 +375,7 @@ async function sha256Text(value: string) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
-function randomVoteToken() {
+function randomPublicToken() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -385,6 +389,15 @@ function publicVoteUrl(token: string) {
     throw Object.assign(new Error("公開投票頁網址設定不正確"), { status: 503 });
   }
   return `${base}?t=${encodeURIComponent(token)}`;
+}
+
+function publicFeedbackUrl(token: string) {
+  const configured = String(Deno.env.get("PUBLIC_FEEDBACK_BASE_URL") || "").trim();
+  const base = configured || "https://seanchen0427.github.io/BNI-VP/public-feedback.html";
+  if (!/^https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\/public-feedback\.html$/.test(base)) {
+    throw Object.assign(new Error("公開回饋頁網址設定不正確"), { status: 503 });
+  }
+  return `${base}?f=${encodeURIComponent(token)}`;
 }
 
 function lineTargetChannel(row: any, routeKey = row?.route_key) {
@@ -3238,11 +3251,12 @@ async function caseParticipationForCases(caseIds: string[]) {
   const result = new Map<string, any>();
   if (!ids.length) return result;
   const filter = `in.(${ids.join(",")})`;
-  const [people, feedback, snapshots, voteCalls] = await Promise.all([
+  const [people, feedback, snapshots, voteCalls, feedbackCalls] = await Promise.all([
     db("people?select=id,display_name"),
     db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,submitted_by_person_id,body,submitted_at,updated_at`),
     db(`vote_snapshots?case_id=${filter}&select=id,case_id,status,opened_at,deadline_at,closed_at,original_base,eligible_base,majority_threshold,result,approve_count,reject_count`),
     db(`case_vote_calls?case_id=${filter}&is_test=eq.false&select=id,case_id,status,environment,created_at,copied_at,replied_at,failed_at,deadline_at,error_message&order=created_at.desc`),
+    db(`case_feedback_calls?case_id=${filter}&select=id,case_id,status,environment,created_at,copied_at,replied_at,failed_at,error_message&order=created_at.desc`),
   ]);
   const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
   const snapshotIds = (snapshots || []).map((snapshot: any) => snapshot.id);
@@ -3257,6 +3271,10 @@ async function caseParticipationForCases(caseIds: string[]) {
   const voteCallByCase = new Map<string, any>();
   for (const call of voteCalls || []) {
     if (!voteCallByCase.has(call.case_id)) voteCallByCase.set(call.case_id, call);
+  }
+  const feedbackCallByCase = new Map<string, any>();
+  for (const call of feedbackCalls || []) {
+    if (!feedbackCallByCase.has(call.case_id)) feedbackCallByCase.set(call.case_id, call);
   }
   for (const caseId of ids) {
     const snapshot: any = snapshotByCase.get(caseId) || null;
@@ -3298,6 +3316,7 @@ async function caseParticipationForCases(caseIds: string[]) {
         .filter(([name]: any) => Boolean(name))),
       snapshot,
       voteCall: voteCallByCase.get(caseId) || null,
+      feedbackCall: feedbackCallByCase.get(caseId) || null,
     });
   }
   return result;
@@ -3349,6 +3368,16 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
         voteCallError: participation.voteCall.error_message || "",
         voteCallDeadline: participation.voteCall.deadline_at || "",
         voteCallEnvironment: participation.voteCall.environment || "production",
+      } : {}),
+      ...(participation?.feedbackCall ? {
+        feedbackCallId: participation.feedbackCall.id,
+        feedbackCallStatus: participation.feedbackCall.status,
+        feedbackCallCreatedAt: participation.feedbackCall.copied_at || participation.feedbackCall.created_at || "",
+        feedbackCallRepliedAt: participation.feedbackCall.replied_at || "",
+        feedbackCallFailedAt: participation.feedbackCall.failed_at || "",
+        feedbackCallError: participation.feedbackCall.error_message || "",
+        feedbackCallEnvironment: participation.feedbackCall.environment || "production",
+        feedbackNotified: Boolean(fullWorkflow.feedbackNotified || participation.feedbackCall.status === "replied"),
       } : {}),
       feedback: recusedApplicant
         ? {}
@@ -3445,6 +3474,100 @@ async function markCaseFeedbackNoticeSent(access: any, delivery: any, target: an
   });
   const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
   return caseStateResponse(access, latestRows?.[0], context);
+}
+
+async function prepareCaseFeedbackCall(access: any, existing: any, context: Context, expectedRevision: number, requestedEnvironment: unknown) {
+  leadership(context);
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員回饋呼喚"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (expectedRevision !== Number(existing?.revision || 0)) {
+    throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再啟動回饋流程"), { status: 409 });
+  }
+  if (!existing || !workflow.wordSaved || workflow.closed) {
+    throw Object.assign(new Error("請先保存訪談 Word，且案件必須尚未結案"), { status: 409 });
+  }
+  await ensureTaskCase(access, context);
+  const feedbackEnvironment = String(requestedEnvironment || "production").trim();
+  if (!["test", "production"].includes(feedbackEnvironment)) {
+    throw Object.assign(new Error("回饋圖卡發布群組只能選擇測試群或正式群"), { status: 400 });
+  }
+  const environmentLabel = feedbackEnvironment === "test" ? "測試群" : "正式群";
+  const [targetRows, roster] = await Promise.all([
+    db(`line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.${feedbackEnvironment}&select=*&limit=1`),
+    activeVotingRoster(),
+  ]);
+  const target = targetRows?.[0];
+  if (!target) throw Object.assign(new Error(`尚未在設定頁指定會員委員會${environmentLabel}`), { status: 409 });
+  if (!lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)) {
+    throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
+  }
+  const applicant = String(access.task.title || "").trim();
+  const eligibleMembers = (roster || [])
+    .filter((item: any) => ["vp", "committee"].includes(String(item.role || "")))
+    .map((item: any) => String(item.people?.display_name || "").trim())
+    .filter((name: string) => name && name !== applicant);
+  const taskMeta = parseTaskJson(access.task.result_summary);
+  const profession = String(taskMeta.profession || workflow.form?.profession || "").trim();
+  const interviewDate = String(workflow.form?.interviewDate || "").trim();
+  const leadInterviewer = String(workflow.form?.leadInterviewer || "").trim();
+  const companionInterviewer = String(workflow.form?.companionInterviewer || "").trim() || "無";
+  const token = randomPublicToken();
+  const feedbackUrl = publicFeedbackUrl(token);
+  const callText = buildFeedbackCallText({
+    caseType: access.task.category,
+    applicant,
+    profession,
+    interviewDate,
+    leadInterviewer,
+    companionInterviewer,
+    eligibleMembers,
+    feedbackUrl,
+  });
+  const [tokenHash, messageHash] = await Promise.all([
+    sha256Text(token),
+    sha256Text(feedbackCallFingerprintSource(callText)),
+  ]);
+  const callId = crypto.randomUUID();
+  const copiedAt = new Date().toISOString();
+  try {
+    await db("rpc/edge_prepare_case_feedback_call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_call_id: callId,
+        p_task_id: access.task.id,
+        p_actor: context.personId,
+        p_actor_auth_user_id: context.userId,
+        p_expected_revision: expectedRevision,
+        p_group_target_id: target.id,
+        p_token_sha256: tokenHash,
+        p_message_sha256: messageHash,
+        p_applicant: applicant,
+        p_profession: profession,
+        p_interview_date: interviewDate,
+        p_lead_interviewer: leadInterviewer,
+        p_companion_interviewer: companionInterviewer,
+        p_copied_at: copiedAt,
+      }),
+    });
+  } catch (error) {
+    if (String((error as any)?.message).includes("CASE_CONFLICT")) {
+      throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再啟動回饋流程"), { status: 409 });
+    }
+    throw error;
+  }
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  const state = await caseStateResponse(access, latestRows?.[0], context);
+  return {
+    ...state,
+    callText,
+    feedbackUrl,
+    message: `回饋呼喚已建立；請將完整文案貼到「${target.display_name}」，Bot 才會回覆免登入回饋圖卡`,
+    lineTarget: publicLineTarget(target),
+    feedbackEnvironment,
+  };
 }
 
 async function sendCaseFeedbackNotice(access: any, existing: any, context: Context) {
@@ -3692,7 +3815,7 @@ async function prepareCaseVoteCall(access: any, existing: any, context: Context,
   const taskMeta = parseTaskJson(access.task.result_summary);
   const profession = String(taskMeta.profession || workflow.form?.profession || "").trim();
   if (!profession) throw Object.assign(new Error("案件專業別尚未填寫"), { status: 409 });
-  const token = randomVoteToken();
+  const token = randomPublicToken();
   const ballotUrl = publicVoteUrl(token);
   const callText = buildVoteCallText({
     caseType: access.task.category,
@@ -4063,12 +4186,16 @@ async function caseStatesApi(request: Request, context: Context) {
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
 
-  if (["feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+  if (["feedback-call-prepare", "feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
   }
 
   if (body.kind === "feedback-notice") {
     return sendCaseFeedbackNotice(access, existing, context);
+  }
+
+  if (body.kind === "feedback-call-prepare") {
+    return prepareCaseFeedbackCall(access, existing, context, expectedRevision, body.feedbackEnvironment);
   }
 
   if (body.kind === "vote-call-prepare") {

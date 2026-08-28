@@ -1,82 +1,133 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
+import { buildCaseFeedbackNoticeText } from "../../../supabase/functions/app-api/line-message.mjs";
 import {
-  buildCaseFeedbackNoticeMessage,
-  buildCaseFeedbackNoticeText,
-  caseFeedbackNoticeFingerprintSource,
-} from "../../../supabase/functions/app-api/line-message.mjs";
+  buildFeedbackCallReplyMessages,
+  buildFeedbackCallText,
+  extractFeedbackCallToken,
+  extractFeedbackCallUrl,
+  feedbackCallFingerprintSource,
+  normalizeFeedbackCallText,
+} from "../../../supabase/functions/_shared/case-feedback-call-domain.mjs";
 
 const root = new URL("../../../", import.meta.url);
 const read = path => readFileSync(new URL(path, root), "utf8");
-
+const token = "F".repeat(43);
+const feedbackUrl = `https://seanchen0427.github.io/BNI-VP/public-feedback.html?f=${token}`;
 const input = {
   caseType: "new",
   applicant: "測試會員",
   profession: "測試專業",
-  interviewDate: "2026-08-18",
+  interviewDate: "2026-08-28",
   leadInterviewer: "主訪甲",
   companionInterviewer: "陪訪乙",
   eligibleMembers: ["副主席", "委員甲", "委員甲", "委員乙"],
 };
 
-test("委員回饋通知由正式案件欄位與當期委員名單產生", () => {
-  assert.equal(
-    buildCaseFeedbackNoticeText(input),
-    "【 新申請商訪表述&回饋 】\n請主、陪訪回饋與表述,並請委員們參照相簿中「訪談表」及「相關資料」回饋表述。各位為分會重要的守門員,請儘量給予回饋建議!\n------------------\n2026/08/18\n地點: ZOOM\n申請者: 測試會員\n專業別: 測試專業\n主訪：主訪甲 陪訪：陪訪乙\n------------------\n■ 副主席 -\n■ 委員甲 -\n■ 委員乙 -",
-  );
-  assert.match(buildCaseFeedbackNoticeText({ ...input, caseType: "renewal" }), /^【 續約商訪表述&回饋 】/);
-  assert.match(buildCaseFeedbackNoticeText({ ...input, caseType: "industry" }), /^【 轉換行業別商訪表述&回饋 】/);
-  assert.throws(() => buildCaseFeedbackNoticeText({ ...input, interviewDate: "" }), /訪談日期/);
-  assert.throws(() => buildCaseFeedbackNoticeText({ ...input, eligibleMembers: [] }), /沒有可通知/);
+test("回饋呼喚保留既有公版並加入可精準比對的一次性網址", () => {
+  const legacy = buildCaseFeedbackNoticeText(input);
+  const text = buildFeedbackCallText({ ...input, feedbackUrl });
+  assert.ok(text.startsWith(legacy));
+  assert.match(text, /請點以下連結填寫委員回饋/);
+  assert.equal(extractFeedbackCallToken(text), token);
+  assert.equal(extractFeedbackCallUrl(text), feedbackUrl);
+  assert.equal(normalizeFeedbackCallText(`\r\n${text.replaceAll("\n", "\r\n")}\r\n`), text);
+  assert.match(feedbackCallFingerprintSource(text), /^case-feedback-reply-card-v1\n/);
 });
 
-test("正式回饋通知使用 LINE textV2 真正全群 mention", () => {
-  const message = buildCaseFeedbackNoticeMessage({ ...input, profession: "測試{專業}" });
-  assert.equal(message.type, "textV2");
-  assert.equal(message.substitution.all.mentionee.type, "all");
-  assert.match(message.text, /^\{all\}\n【 新申請商訪表述&回饋 】/);
-  assert.match(message.text, /測試\{\{專業\}\}/);
-  assert.match(caseFeedbackNoticeFingerprintSource("內容"), /^case-feedback-text-v2-mention-all-v1\n/);
+test("Bot 以一次 Reply 真正 @所有人並附免登入回饋圖卡", () => {
+  const messages = buildFeedbackCallReplyMessages({
+    caseType: "renewal",
+    applicant: "測試會員",
+    profession: "測試專業",
+    feedbackUrl,
+  });
+  assert.equal(messages.length, 2);
+  assert.equal(messages[0].type, "textV2");
+  assert.equal(messages[0].substitution.all.mentionee.type, "all");
+  assert.equal(messages[1].type, "flex");
+  assert.equal(messages[1].contents.footer.contents[0].action.uri, feedbackUrl);
+  assert.match(messages[1].contents.body.contents.at(-1).text, /所有委員回饋/);
 });
 
-test("後端只在 LINE 送達後標記回饋通知，且同案防止重送", () => {
+test("案件頁可選測試／正式群建立回饋呼喚，流程本身不使用 Push 額度", () => {
   const edge = read("supabase/functions/app-api/index.ts");
-  const migration = read("supabase/migrations/20260818090000_case_feedback_line_delivery.sql");
   const store = read("apps/vice-chair/assets/js/case-state-store.js");
   const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
   const html = read("apps/vice-chair/case-workflow.html");
+  const prepareStart = edge.indexOf("async function prepareCaseFeedbackCall");
+  const prepareEnd = edge.indexOf("\nasync function sendCaseFeedbackNotice", prepareStart);
+  const prepareSection = edge.slice(prepareStart, prepareEnd);
 
-  assert.match(edge, /body\.kind === "feedback-notice"/);
-  assert.match(edge, /sendCaseFeedbackNotice\(access, existing, context\)/);
-  assert.match(edge, /route_key=eq\.committee/);
-  assert.match(edge, /target\.purpose !== "production"/);
-  assert.match(edge, /await ensureTaskCase\(access, context\)/);
-  assert.match(edge, /activeVotingRoster\(\)/);
-  assert.match(edge, /workflow\.feedbackNotified && prior\?\.status !== "sent"/);
-  assert.match(edge, /X-Line-Retry-Key/);
-  const start = edge.indexOf("async function sendCaseFeedbackNotice");
-  const section = edge.slice(start, edge.indexOf("\nasync function openVoteSnapshot", start));
-  assert.match(
-    section,
-    /await finishCaseFeedbackLineDelivery\(delivery\.id,\s*\{\s*status: "sent"[\s\S]*?state = await markCaseFeedbackNoticeSent/,
-    "必須先確認 LINE 送達，再推進案件狀態",
-  );
+  assert.match(edge, /body\.kind === "feedback-call-prepare"/);
+  assert.match(edge, /prepareCaseFeedbackCall\(access, existing, context, expectedRevision, body\.feedbackEnvironment\)/);
+  assert.match(prepareSection, /\["test", "production"\]\.includes\(feedbackEnvironment\)/);
+  assert.match(prepareSection, /purpose=eq\.\$\{feedbackEnvironment\}/);
+  assert.match(prepareSection, /rpc\/edge_prepare_case_feedback_call/);
+  assert.match(prepareSection, /sha256Text\(token\)/);
+  assert.match(prepareSection, /sha256Text\(feedbackCallFingerprintSource\(callText\)\)/);
+  assert.doesNotMatch(prepareSection, /message\/push/);
 
-  assert.match(migration, /create table public\.case_feedback_line_deliveries/);
-  assert.match(migration, /unique \(task_id, notification_type\)/);
-  assert.match(migration, /revoke all on table public\.case_feedback_line_deliveries from public, anon, authenticated/);
-  assert.match(migration, /edge_mark_task_feedback_notice_sent/);
-  assert.match(migration, /target_group\.route_key <> 'committee'/);
-  assert.match(migration, /target_group\.purpose <> 'production'/);
-  assert.match(migration, /target_delivery\.status <> 'sent'/);
+  assert.match(store, /prepareFeedbackCall: \(taskId, feedbackEnvironment = "production"\) => postAction/);
+  assert.match(workflow, /result\.callText/);
+  assert.match(workflow, /navigator\.clipboard\.writeText\(activeFeedbackCallText\)/);
+  assert.match(workflow, /這只改變回饋圖卡的發布位置/);
+  assert.doesNotMatch(html, /id="sendFeedbackNotice"/);
+  assert.match(html, /啟動回饋流程並複製文案/);
+  assert.match(html, /id="feedbackCallEnvironment"/);
+  assert.match(html, /測試群（仍寫入正式案件）/);
+  assert.match(html, /case-state-store\.js\?v=14/);
+  assert.match(html, /case-workflow\.js\?v=27/);
+});
 
-  assert.match(store, /sendFeedbackNotice: taskId => postAction\(taskId, "feedback-notice", \{\}\)/);
-  const handler = workflow.match(/\$\("#sendFeedbackNotice"\)\.addEventListener\("click",async\(\)=>\{[\s\S]*?\n  \}\);/)?.[0] || "";
-  assert.match(handler, /FulianCaseStateStore\.sendFeedbackNotice\(CASE_ID\)/);
-  assert.match(handler, /confirm\(/);
-  assert.doesNotMatch(handler, /state\.feedbackNotified=true/);
-  assert.doesNotMatch(workflow, /已模擬發送委員回饋通知/);
-  assert.match(html, /id="feedbackLineState"/);
-  assert.match(html, /通知委員（會員委員秘書Bot）/);
+test("Webhook 只接受指定委員群的 Token 與完整文案雜湊，並使用 Reply API", () => {
+  const webhook = read("supabase/functions/line-webhook/index.ts");
+  const start = webhook.indexOf("async function processFeedbackCallEvent");
+  const end = webhook.indexOf("\nasync function processVoteCallEvent", start);
+  const handler = webhook.slice(start, end);
+
+  assert.match(handler, /extractFeedbackCallToken\(event\.text\)/);
+  assert.match(handler, /feedbackCallFingerprintSource\(normalizeFeedbackCallText\(event\.text\)\)/);
+  assert.match(handler, /environment=eq\.\$\{target\.purpose\}/);
+  assert.match(handler, /group_target_id=eq\.\$\{target\.id\}/);
+  assert.match(handler, /status=in\.\(awaiting_reply,reply_failed\)/);
+  assert.match(handler, /status: "replying"/);
+  assert.match(handler, /https:\/\/api\.line\.me\/v2\/bot\/message\/reply/);
+  assert.match(handler, /replyToken: event\.replyToken/);
+  assert.match(handler, /status: "replied"/);
+  assert.doesNotMatch(handler, /message\/push/);
+  assert.match(webhook, /回饋／投票呼喚/);
+});
+
+test("免登入回饋頁直接顯示全體內容，送出寫回既有 case_feedback", () => {
+  const config = read("supabase/config.toml");
+  const endpoint = read("supabase/functions/public-feedback/index.ts");
+  const migration = read("supabase/migrations/20260828223000_public_case_feedback_calls.sql");
+  const html = read("apps/vice-chair/public-feedback.html");
+  const script = read("apps/vice-chair/assets/js/public-feedback.js");
+
+  assert.match(config, /\[functions\.public-feedback\]\s+verify_jwt = false/);
+  assert.match(endpoint, /sha256\(token\)/);
+  assert.match(endpoint, /sha256\(`\$\{token\}:\$\{personId\}`\)/);
+  assert.match(endpoint, /case_feedback\?case_id=eq\.\$\{call\.case_id\}/);
+  assert.match(endpoint, /rpc\/edge_save_public_case_feedback/);
+  assert.doesNotMatch(endpoint, /auth\/v1\/user/);
+  assert.match(migration, /insert into public\.case_feedback/);
+  assert.match(migration, /這個姓名已完成回饋/);
+  assert.match(html, /不必先送出自己的內容/);
+  assert.match(html, /此頁不需要登入/);
+  assert.match(script, /https:\/\/line\.me\/R\/share\?text=/);
+  assert.doesNotMatch(script, /feedbackCount.*submitted/);
+});
+
+test("公開回饋資料表與 RPC 只開放 service role，並保留正式案件稽核", () => {
+  const migration = read("supabase/migrations/20260828223000_public_case_feedback_calls.sql");
+  assert.match(migration, /create table public\.case_feedback_calls/);
+  assert.match(migration, /create table public\.case_feedback_call_responders/);
+  assert.match(migration, /revoke all on table public\.case_feedback_calls, public\.case_feedback_call_responders\s+from public, anon, authenticated/);
+  assert.match(migration, /grant execute on function public\.edge_save_public_case_feedback\(uuid, uuid, text\)\s+to service_role/);
+  assert.match(migration, /'source', 'line_public'/);
+  assert.match(migration, /feedback_call\.created/);
+  assert.match(migration, /案件已重設或結案/);
 });

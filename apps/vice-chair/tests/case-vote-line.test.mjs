@@ -81,8 +81,8 @@ test("正式案件可選發布群組，但只建立呼喚且不使用 Push 額�
   assert.match(html, /測試群（仍列入正式票）/);
   assert.match(workflow, /這只改變投票圖卡的發布位置/);
   assert.match(workflow, /仍會直接寫入/);
-  assert.match(html, /case-state-store\.js\?v=13/);
-  assert.match(html, /case-workflow\.js\?v=26/);
+  assert.match(html, /case-state-store\.js\?v=14/);
+  assert.match(html, /case-workflow\.js\?v=27/);
 });
 
 test("Webhook 只接受本次指定委員會群的 Token 與完整文案雜湊，並呼叫 Reply API", () => {

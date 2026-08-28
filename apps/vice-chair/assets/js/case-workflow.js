@@ -26,6 +26,14 @@ const initialState = {
   feedbackNoticeSentAt:"",
   feedbackNoticeTargetName:"",
   feedbackNoticeDeliveryId:"",
+  feedbackCallId:"",
+  feedbackCallStatus:"",
+  feedbackCallCreatedAt:"",
+  feedbackCallRepliedAt:"",
+  feedbackCallFailedAt:"",
+  feedbackCallError:"",
+  feedbackCallTargetName:"",
+  feedbackCallEnvironment:"production",
   feedback:{},
   feedbackMeta:{},
   votingOpen:false,
@@ -67,6 +75,9 @@ let lastPersist=Promise.resolve();
 let feedbackDirty=false;
 let feedbackEditorTarget=currentUser();
 let announcementMembers=[];
+let activeFeedbackCallText="";
+let selectedFeedbackEnvironment=["test","production"].includes(state.feedbackCallEnvironment)?state.feedbackCallEnvironment:"production";
+let feedbackEnvironmentTouched=false;
 let activeVoteCallText="";
 let selectedVoteEnvironment=["test","production"].includes(state.voteCallEnvironment)?state.voteCallEnvironment:"production";
 let voteEnvironmentTouched=false;
@@ -188,8 +199,7 @@ function populateResultReferrers(){
 function configureIdentity(){const role=authSession.role==="vp"?"vp":authSession.role==="committee"?"committee":"admin";$("#loginUser").innerHTML=`<option value="${authSession.name}" data-role="${role}">${authSession.name}（${role==="vp"?"副主席":role==="committee"?"會員委員":"系統開發人員 Admin"}）</option>`;$("#loginUser").disabled=true;}
 
 function feedbackNotice(){
-  const blankMembers=eligibleMembers().map(name=>`■ ${name} -`).join("\n");
-  return `@All 【 ${config().label}商訪表述&回饋 】\n請主、陪訪回饋與表述,並請委員們參照相簿中「訪談表」及「相關資料」回饋表述。各位為分會重要的守門員,請儘量給予回饋建議!\n------------------\n${$("#interviewDate").value.replaceAll("-","/")}\n地點: ZOOM\n申請者: ${$("#applicant").value}\n專業別: ${$("#profession").value}\n主訪：${$("#leadInterviewer").value} 陪訪：${$("#companionInterviewer").value}\n------------------\n${blankMembers}`;
+  return activeFeedbackCallText||"按下「啟動回饋流程並複製文案」後，系統會在這裡產生含一次性回饋網址的完整 LINE 呼喚。請勿自行修改文字，Bot 只會回覆完全相符的文案。";
 }
 
 function voteNotice(){
@@ -197,6 +207,7 @@ function voteNotice(){
 }
 
 function voteEnvironmentLabel(environment=selectedVoteEnvironment){return environment==="test"?"測試群":"正式群";}
+function feedbackEnvironmentLabel(environment=selectedFeedbackEnvironment){return environment==="test"?"測試群":"正式群";}
 
 function leadersMessage(){
   const decision=voteDecision();
@@ -419,19 +430,42 @@ function renderSummary(){
   $("#caseType").disabled=true;
   $("#applicant").readOnly=true;
   $("#profession").readOnly=true;
+  const feedbackCallStatus=state.feedbackCallStatus||"";
+  if(!feedbackEnvironmentTouched&&state.feedbackCallId&&["test","production"].includes(state.feedbackCallEnvironment))selectedFeedbackEnvironment=state.feedbackCallEnvironment;
+  const feedbackCallEnvironment=["test","production"].includes(state.feedbackCallEnvironment)?state.feedbackCallEnvironment:selectedFeedbackEnvironment;
+  const selectedFeedbackGroupLabel=feedbackEnvironmentLabel(selectedFeedbackEnvironment);
+  const feedbackCallGroupLabel=feedbackEnvironmentLabel(feedbackCallEnvironment);
+  const feedbackEnvironmentSelect=$("#feedbackCallEnvironment"),feedbackEnvironmentHint=$("#feedbackCallEnvironmentHint");
+  feedbackEnvironmentSelect.value=selectedFeedbackEnvironment;
+  feedbackEnvironmentSelect.disabled=!isVp()||Boolean(activeFeedbackCallText)||["replying","replied"].includes(feedbackCallStatus);
+  feedbackEnvironmentHint.textContent=selectedFeedbackEnvironment==="test"
+    ?"測試群只改變圖卡發布位置；所有回饋仍直接寫入本案正式紀錄。"
+    :"預設發布到正式群；所有回饋都直接寫入本案正式紀錄。";
+  feedbackEnvironmentHint.classList.toggle("warning",selectedFeedbackEnvironment==="test");
   $("#feedbackNoticePreview").textContent=feedbackNotice();
-  $("#sendFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.feedbackNotified&&!state.closed);
-  const feedbackFormallySent=Boolean(state.feedbackNoticeDeliveryId);
-  $("#sendFeedbackNotice").textContent=state.feedbackNotified
-    ? feedbackFormallySent?"已發送回饋通知":"已通知（歷史紀錄）"
-    : "通知委員（會員委員秘書Bot）";
+  $("#copyFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.closed&&feedbackCallStatus!=="replied");
+  $("#copyFeedbackNotice").textContent=feedbackCallStatus==="replied"
+    ?"Bot 已回覆回饋圖卡"
+    :activeFeedbackCallText
+      ?"再次複製完整回饋文案"
+      :state.feedbackCallId
+        ?"重新產生並複製回饋文案"
+        :"啟動回饋流程並複製文案";
   const feedbackLineState=$("#feedbackLineState");
-  feedbackLineState.classList.toggle("sent",Boolean(state.feedbackNotified));
-  feedbackLineState.textContent=state.feedbackNotified
-    ? feedbackFormallySent
-      ? `已於 ${dateLabel(state.feedbackNoticeSentAt)} 發送至「${state.feedbackNoticeTargetName||"會員委員會正式群"}」，系統已鎖定避免重複發送。`
-      : "本案已有先前的人工／模擬通知紀錄；為避免正式群收到重複訊息，系統不會自動補送。"
-    : "將使用會員委員秘書Bot發送至後台已綁定的會員委員會群，並真正 @所有人。";
+  feedbackLineState.classList.toggle("sent",feedbackCallStatus==="replied"||(!state.feedbackCallId&&Boolean(state.feedbackNoticeDeliveryId)));
+  feedbackLineState.textContent=feedbackCallStatus==="replied"
+    ?`會員委員秘書Bot 已於 ${dateLabel(state.feedbackCallRepliedAt)} 在「${state.feedbackCallTargetName||feedbackCallGroupLabel}」回覆免登入回饋圖卡；委員打開即可查看目前所有回饋。`
+    :feedbackCallStatus==="replying"
+      ?"Bot 已收到完整呼喚，正在回覆回饋圖卡…"
+      :feedbackCallStatus==="reply_failed"
+        ?`Bot 上次回覆失敗${state.feedbackCallError?`：${state.feedbackCallError}`:""}。請將相同完整文案再貼一次；若已重新整理，請重新產生文案。`
+        :feedbackCallStatus==="awaiting_reply"
+          ?`完整文案已建立，等待貼到「${state.feedbackCallTargetName||feedbackCallGroupLabel}」。Bot 只會在本次指定的${feedbackCallGroupLabel}回覆完全相符的內容。`
+          :feedbackCallStatus==="revoked"
+            ?"先前回饋連結已失效，請重新產生完整文案。"
+            :state.feedbackNotified
+              ?"本案已有舊版 LINE 回饋通知紀錄；仍可建立免登入回饋圖卡，貼文前請確認群組不會重複收到相同通知。"
+              :`按下後會建立一次性回饋網址；請將完整文案原樣貼到${selectedFeedbackGroupLabel}，等待 Bot 回覆圖卡。`;
   $("#resetCase").hidden=state.closed||state.resultAnnouncementSent;
   $("#activityLog").innerHTML=state.log.map(item=>`<li class="${item.done?"done":""}"><b>${escapeHtml(item.text)}</b><span>${escapeHtml(item.time)}</span></li>`).join("");
 }
@@ -506,6 +540,11 @@ async function getWord(){return window.FulianCaseFiles.getCaseFile({caseId:CASE_
 
 function bindEvents(){
   $$('[data-save]').forEach(node=>{node.addEventListener("change",scheduleSave);node.addEventListener("input",scheduleSave);});
+  $("#feedbackCallEnvironment").addEventListener("change",event=>{
+    selectedFeedbackEnvironment=event.target.value==="test"?"test":"production";
+    feedbackEnvironmentTouched=true;
+    renderSummary();
+  });
   $("#voteCallEnvironment").addEventListener("change",event=>{
     selectedVoteEnvironment=event.target.value==="test"?"test":"production";
     voteEnvironmentTouched=true;
@@ -549,28 +588,33 @@ function bindEvents(){
   });
   $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
-  $("#copyFeedbackNotice").addEventListener("click",async()=>{await navigator.clipboard.writeText(feedbackNotice());toast("回饋通知已複製");});
-  $("#sendFeedbackNotice").addEventListener("click",async()=>{
-    if(!isVp()||!state.wordSaved||state.feedbackNotified)return;
-    if(!confirm(`即將透過會員委員秘書Bot發送到後台已綁定的會員委員會正式群，並 @所有人。\n成功送出後，同一案件不能重複發送。\n\n${feedbackNotice()}\n\n確定立即發送？`))return;
-    const button=$("#sendFeedbackNotice");button.disabled=true;button.textContent="正式 LINE 發送中…";
+  $("#copyFeedbackNotice").addEventListener("click",async()=>{
+    if(!isVp()||!state.wordSaved||state.closed)return;
+    const feedbackEnvironment=selectedFeedbackEnvironment==="test"?"test":"production";
+    const groupLabel=feedbackEnvironmentLabel(feedbackEnvironment);
+    if(activeFeedbackCallText){
+      try{await navigator.clipboard.writeText(activeFeedbackCallText);$("#saveState").textContent=`完整回饋文案已再次複製；等待貼到${groupLabel}`;return toast(`請將完整文案原樣貼到委員會${groupLabel}`)}
+      catch{$("#feedbackNoticePreview").focus();return toast("請手動全選下方完整文案後複製")}
+    }
+    if(feedbackEnvironment==="test"&&!confirm(`你選擇的是「測試群」。\n\n這只改變回饋圖卡的發布位置；委員送出的內容仍會直接寫入「${$("#applicant").value.trim()||"本案申請者"}」這筆正式案件，並列入回饋門檻。\n\n確定用測試群啟動這筆正式回饋？`))return;
+    const button=$("#copyFeedbackNotice");button.disabled=true;button.textContent="正在建立回饋連結…";
     clearTimeout(saveTimer);
     state.form=collectForm();
     localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
-    $("#saveState").textContent="正在確認案件欄位與 LINE 正式群…";
+    $("#saveState").textContent="正在確認案件欄位與 LINE 群組…";
     try{await window.FulianCaseStateStore.flush()}catch(error){state=loadState();render();$("#saveState").textContent="案件欄位尚未同步";return toast(error.message||"請先完成案件資料同步");}
-    button.disabled=true;button.textContent="正式 LINE 發送中…";
-    $("#saveState").textContent="正在等待 LINE 確認送達…";
-    lastPersist=window.FulianCaseStateStore.sendFeedbackNotice(CASE_ID);
+    button.disabled=true;button.textContent="正在建立回饋連結…";
+    $("#saveState").textContent="正在建立一次性回饋連結…";
+    lastPersist=window.FulianCaseStateStore.prepareFeedbackCall(CASE_ID,feedbackEnvironment);
     try{
       const result=await lastPersist;
-      state=loadState();render();
-      $("#saveState").textContent="委員回饋通知已送達並保存至 Supabase";
-      toast(result.message||"委員回饋通知已由會員委員秘書Bot發送");
+      activeFeedbackCallText=result.callText||"";selectedFeedbackEnvironment=result.feedbackEnvironment==="test"?"test":"production";feedbackEnvironmentTouched=false;state=loadState();render();
+      try{await navigator.clipboard.writeText(activeFeedbackCallText);$("#saveState").textContent=`完整回饋文案已複製；等待貼到${groupLabel}`;toast(result.message||`請將完整文案貼到委員會${groupLabel}`)}
+      catch{$("#feedbackNoticePreview").focus();$("#saveState").textContent="回饋文案已建立，請手動全選下方內容複製";toast("瀏覽器未允許自動複製，請手動複製完整文案")}
     }catch(error){
       state=loadState();render();
-      $("#saveState").textContent="LINE 委員回饋通知尚未完成";
-      toast(error.message||"委員回饋通知發送失敗");
+      $("#saveState").textContent="回饋流程尚未啟動";
+      toast(error.message||"回饋呼喚建立失敗");
     }
   });
   $("#saveFeedback").addEventListener("click",async()=>{const text=$("#myFeedback").value.trim(),user=currentUser(),target=selectedFeedbackAuthor(),proxy=isVp()&&target!==user;if(!text)return toast("請先填寫回饋內容");if(!user)return toast("登入身份載入失敗，請重新登入後再試");if(!eligibleMembers().includes(target))return toast(`${target||user}是本案申請者，依規則須迴避回饋與投票`);if(target!==user&&!isVp())return toast("只有副主席可以代填會員委員回饋");$("#saveState").textContent=proxy?`正在代填 ${target} 的回饋…`:"正在保存你的回饋…";lastPersist=window.FulianCaseStateStore.saveFeedback(CASE_ID,text,target);try{await lastPersist;feedbackDirty=false;state=loadState();render();$("#saveState").textContent=proxy?`${target} 的代填回饋已保存至 Supabase`:"你的回饋已保存至 Supabase";toast(proxy?`已代填 ${target} 的回饋`:"回饋已儲存")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"回饋保存失敗")}});

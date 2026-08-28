@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.13",
+      publishedAt: "2026-08-28",
+      title: "LINE 免登入委員回饋",
+      level: "important",
+      changes: Object.freeze([
+        "案件保存訪談 Word 後，可按「啟動回饋流程並複製文案」，再把完整文字貼到會員委員會測試群或正式群；Bot會免費回覆 @所有人與回饋圖卡。",
+        "委員從圖卡開啟後不必登入或綁定 LINE，選擇自己的姓名並送出，內容會直接同步本案正式回饋。",
+        "回饋頁一打開就能看見目前所有委員內容，不需要先送出自己的回饋；頁面也會自動更新。",
+        "送出後可直接分享或複製回 LINE 群組，保留大家接續閱讀與討論的習慣。"
+      ]),
+      impact: "測試群只改變圖卡發布位置，仍寫入同一正式案件；既有回饋、投票、具名票向、結果圖、Word 與結案紀錄均不修改。"
+    }),
+    Object.freeze({
       version: "1.0.12",
       publishedAt: "2026-08-28",
       title: "正式投票可選測試群發布",
