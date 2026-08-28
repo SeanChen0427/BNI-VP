@@ -30,6 +30,7 @@ test("首頁通知中心同步待寄任務並連到副主席專用頁", async ()
   assert.match(notification, /\/api\/accountability-emails/);
   assert.match(notification, /accountability-emails\.html\?task=/);
   assert.match(index, /href="accountability-emails\.html"/);
+  assert.match(index, /data-nav-key="common-resources"[\s\S]*href="accountability-emails\.html"[\s\S]*<\/details>/);
   assert.match(navigation, /"當責信待寄",\s*"accountability-emails\.html",\s*"vp"/);
   assert.match(login, /"accountability-emails\.html"/);
 });

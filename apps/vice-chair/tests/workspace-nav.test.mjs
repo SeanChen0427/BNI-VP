@@ -42,4 +42,15 @@ assert.ok(navScript.includes("常用資源"));
 assert.ok(navScript.includes("文稿範本"));
 assert.ok(navScript.includes("common-resources"));
 
+const dailyWork = navScript.slice(
+  navScript.indexOf('label: "日常工作"'),
+  navScript.indexOf('label: "訪談與輔導"')
+);
+const commonResources = navScript.slice(
+  navScript.indexOf('key: "common-resources"'),
+  navScript.indexOf('["學", "副主席交接課程"')
+);
+assert.doesNotMatch(dailyWork, /accountability-emails\.html/);
+assert.match(commonResources, /"當責信待寄",\s*"accountability-emails\.html",\s*"vp"/);
+
 console.log("workspace-nav tests passed");
