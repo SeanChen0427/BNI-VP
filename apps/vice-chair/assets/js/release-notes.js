@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.12",
+      publishedAt: "2026-08-28",
+      title: "正式投票可選測試群發布",
+      level: "important",
+      changes: Object.freeze([
+        "正式案件按「啟動投票流程並複製文案」前，可選擇將圖卡發布到會員委員會測試群或正式群；預設仍是正式群。",
+        "選擇測試群時會再次警告：群組只代表圖卡發布位置，委員送出的票仍會直接寫入該正式案件並影響決議與結案。",
+        "Bot 只會在本次選定的群組回覆完整相符的文案；把同一文案貼到另一個群組不會產生圖卡。",
+        "LINE Bot 與群組管理改為每個用途只顯示一列，以測試群／正式群下拉選單切換查看。"
+      ]),
+      impact: "獨立 LINE 投票測試器仍維持退場；不建立測試票、不改寫既有正式案件、票數、回饋、Word 或結案紀錄。"
+    }),
+    Object.freeze({
       version: "1.0.11",
       publishedAt: "2026-08-28",
       title: "LINE 投票測試器已退場",

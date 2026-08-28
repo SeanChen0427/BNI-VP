@@ -15,7 +15,7 @@ test("登入帳密、設定紀錄與測試資料重置只提供 Admin", () => {
   assert.match(page, /id="credentialsCard" hidden/);
   assert.match(page, /id="auditCard" hidden/);
   assert.match(page, /id="testDataResetCard" hidden/);
-  assert.match(page, /assets\/js\/settings\.js\?v=16/);
+  assert.match(page, /assets\/js\/settings\.js\?v=17/);
   assert.match(settings, /#credentialsCard"\)\.hidden=!admin/);
   assert.match(settings, /#auditCard"\)\.hidden=!admin/);
   assert.match(settings, /canResetTestData=session\.role==="admin"/);

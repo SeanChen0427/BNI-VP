@@ -3242,7 +3242,7 @@ async function caseParticipationForCases(caseIds: string[]) {
     db("people?select=id,display_name"),
     db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,submitted_by_person_id,body,submitted_at,updated_at`),
     db(`vote_snapshots?case_id=${filter}&select=id,case_id,status,opened_at,deadline_at,closed_at,original_base,eligible_base,majority_threshold,result,approve_count,reject_count`),
-    db(`case_vote_calls?case_id=${filter}&is_test=eq.false&select=id,case_id,status,created_at,copied_at,replied_at,failed_at,deadline_at,error_message&order=created_at.desc`),
+    db(`case_vote_calls?case_id=${filter}&is_test=eq.false&select=id,case_id,status,environment,created_at,copied_at,replied_at,failed_at,deadline_at,error_message&order=created_at.desc`),
   ]);
   const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
   const snapshotIds = (snapshots || []).map((snapshot: any) => snapshot.id);
@@ -3348,6 +3348,7 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
         voteCallFailedAt: participation.voteCall.failed_at || "",
         voteCallError: participation.voteCall.error_message || "",
         voteCallDeadline: participation.voteCall.deadline_at || "",
+        voteCallEnvironment: participation.voteCall.environment || "production",
       } : {}),
       feedback: recusedApplicant
         ? {}
@@ -3657,7 +3658,7 @@ async function markCaseVoteNoticeCopied(access: any, existing: any, context: Con
   };
 }
 
-async function prepareCaseVoteCall(access: any, existing: any, context: Context, expectedRevision: number) {
+async function prepareCaseVoteCall(access: any, existing: any, context: Context, expectedRevision: number, requestedEnvironment: unknown) {
   leadership(context);
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
     throw Object.assign(new Error("此案件類型不適用委員投票呼喚"), { status: 409 });
@@ -3669,9 +3670,14 @@ async function prepareCaseVoteCall(access: any, existing: any, context: Context,
   if (!workflow.votingOpen || workflow.closed || !access.task.case_id) {
     throw Object.assign(new Error("投票尚未開啟、案件已結案，或正式投票快照尚未建立"), { status: 409 });
   }
+  const voteEnvironment = String(requestedEnvironment || "production").trim();
+  if (!["test", "production"].includes(voteEnvironment)) {
+    throw Object.assign(new Error("投票圖卡發布群組只能選擇測試群或正式群"), { status: 400 });
+  }
+  const environmentLabel = voteEnvironment === "test" ? "測試群" : "正式群";
   const [snapshotRows, targetRows] = await Promise.all([
     db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.production&select=*&limit=1"),
+    db(`line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.${voteEnvironment}&select=*&limit=1`),
   ]);
   const snapshot = snapshotRows?.[0];
   const target = targetRows?.[0];
@@ -3679,7 +3685,7 @@ async function prepareCaseVoteCall(access: any, existing: any, context: Context,
   if (!snapshot.deadline_at || new Date(snapshot.deadline_at).getTime() <= Date.now()) {
     throw Object.assign(new Error("投票期限已截止，請先更新截止時間"), { status: 409 });
   }
-  if (!target) throw Object.assign(new Error("尚未在設定頁指定會員委員會正式群"), { status: 409 });
+  if (!target) throw Object.assign(new Error(`尚未在設定頁指定會員委員會${environmentLabel}`), { status: 409 });
   if (!lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)) {
     throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
   }
@@ -3735,6 +3741,7 @@ async function prepareCaseVoteCall(access: any, existing: any, context: Context,
     ballotUrl,
     message: `投票呼喚已建立；請將完整文案貼到「${target.display_name}」，Bot 才會回覆投票圖卡`,
     lineTarget: publicLineTarget(target),
+    voteEnvironment,
   };
 }
 
@@ -4065,7 +4072,7 @@ async function caseStatesApi(request: Request, context: Context) {
   }
 
   if (body.kind === "vote-call-prepare") {
-    return prepareCaseVoteCall(access, existing, context, expectedRevision);
+    return prepareCaseVoteCall(access, existing, context, expectedRevision, body.voteEnvironment);
   }
 
   if (body.kind === "vote-notice" || body.kind === "vote-notice-copy") {
@@ -4172,6 +4179,7 @@ async function caseStatesApi(request: Request, context: Context) {
     delete proposed.voteCallError;
     delete proposed.voteCallDeadline;
     delete proposed.voteCallTargetName;
+    delete proposed.voteCallEnvironment;
     await openVoteSnapshot(access, existing, proposed, context);
     const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
     return caseStateResponse(access, latestRows?.[0], context);
@@ -4252,6 +4260,7 @@ async function caseStatesApi(request: Request, context: Context) {
         delete workflow.voteCallError;
         delete workflow.voteCallDeadline;
         delete workflow.voteCallTargetName;
+        delete workflow.voteCallEnvironment;
       } else {
         workflow.voteCallId = currentWorkflow.voteCallId;
         workflow.voteCallStatus = currentWorkflow.voteCallStatus || "awaiting_reply";
@@ -4261,6 +4270,7 @@ async function caseStatesApi(request: Request, context: Context) {
         workflow.voteCallError = currentWorkflow.voteCallError || "";
         workflow.voteCallDeadline = currentWorkflow.voteCallDeadline || "";
         workflow.voteCallTargetName = currentWorkflow.voteCallTargetName || "";
+        workflow.voteCallEnvironment = currentWorkflow.voteCallEnvironment || "production";
       }
       if (currentWorkflow.resultAnnouncementSent) {
         workflow.resultAnnouncementSent = true;
@@ -4285,7 +4295,7 @@ async function caseStatesApi(request: Request, context: Context) {
           "votingOpen", "voteNoticeSent", "voteNoticeCopiedAt", "voteNoticeCopiedBy",
           "voteNoticeCopiedDeadline", "voteCallId", "voteCallStatus",
           "voteCallCreatedAt", "voteCallRepliedAt", "voteCallFailedAt",
-          "voteCallError", "voteCallDeadline", "voteCallTargetName",
+          "voteCallError", "voteCallDeadline", "voteCallTargetName", "voteCallEnvironment",
           "voterSnapshot", "leadersSent",
           "advisorStatus", "advisorNote", "resultAnnouncementSent",
           "resultAnnouncementSentAt", "resultAnnouncementTargetName",

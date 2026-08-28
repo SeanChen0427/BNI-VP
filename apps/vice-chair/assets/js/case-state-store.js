@@ -341,7 +341,12 @@
     saveVote: (taskId, value) => postAction(taskId, "vote", value),
     openVote: (taskId, workflow) => postAction(taskId, "open-vote", workflow),
     sendFeedbackNotice: taskId => postAction(taskId, "feedback-notice", {}),
-    prepareVoteCall: taskId => postAction(taskId, "vote-call-prepare", {}),
+    prepareVoteCall: (taskId, voteEnvironment = "production") => postAction(
+      taskId,
+      "vote-call-prepare",
+      {},
+      { voteEnvironment },
+    ),
     sendResultAnnouncement: taskId => postAction(taskId, "result-announcement", {}),
     saveWorkflow: (taskId, workflow) => postAction(taskId, "workflow", workflow),
     reset: (taskId) => postAction(taskId, "reset", {}),

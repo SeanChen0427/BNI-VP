@@ -23,11 +23,13 @@ test("所有排程頁面都載入最新版 Supabase task 與 case state store", 
   for (const page of pages) {
     assert.match(read(page), /assets\/js\/task-store\.js\?v=7/, `${page} 未載入 task-store v7`);
   }
-  for (const page of pages.filter(page => ![
+  const caseStatePages = pages.filter(page => ![
     "apps/vice-chair/member-care.html",
     "apps/vice-chair/monthly-meeting.html",
-  ].includes(page))) {
-    assert.match(read(page), /assets\/js\/case-state-store\.js\?v=12/, `${page} 未載入 case-state-store v12`);
+  ].includes(page));
+  for (const page of caseStatePages) {
+    const expectedVersion = page === "apps/vice-chair/case-workflow.html" ? 13 : 12;
+    assert.match(read(page), new RegExp(`assets/js/case-state-store\\.js\\?v=${expectedVersion}`), `${page} 未載入對應的 case-state-store 快取版本`);
   }
 });
 
