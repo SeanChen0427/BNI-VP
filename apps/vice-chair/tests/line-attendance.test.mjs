@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { collectGroupEvents, verifyLineSignature } from "../../../supabase/functions/line-webhook/domain.mjs";
+import { collectGroupEvents, collectVoteCallEvents, verifyLineSignature } from "../../../supabase/functions/line-webhook/domain.mjs";
 import { buildLineAttendanceMessage, lineAttendanceFingerprintSource } from "../../../supabase/functions/app-api/line-message.mjs";
 
 const read = path => readFileSync(new URL(`../../../${path}`, import.meta.url), "utf8");
@@ -43,8 +43,9 @@ assert.throws(() => buildLineAttendanceMessage("字".repeat(5000)), /@所有人�
 assert.match(webhook, /x-line-signature/);
 assert.match(webhook, /resolveLineWebhookChannel\(rawBody/);
 assert.match(webhook, /LINE_COMMITTEE_CHANNEL_SECRET/);
-assert.match(webhook, /User message content is ignored/);
-assert.doesNotMatch(webhook, /message\.text/);
+assert.deepEqual(collectVoteCallEvents(JSON.parse(body)), []);
+assert.match(webhook, /普通聊天內容不落地/);
+assert.match(webhook, /完整雜湊相符/);
 assert.match(migration, /revoke all on table public\.line_group_targets, public\.attendance_line_deliveries/);
 assert.match(migration, /unique \(attendance_session_id, group_target_id, announcement_sha256\)/);
 assert.match(routingMigration, /'attendance', 'committee', 'leadership'/);
@@ -69,6 +70,6 @@ assert.match(settingsScript, /action:"assign"/);
 assert.match(settingsScript, /item\.availableForAssignment&&item\.status!=="active"/);
 assert.match(settingsScript, /已停用，可直接重新指定/);
 assert.match(settingsHtml, /已停用群組可直接重新啟用/);
-assert.match(settingsHtml, /assets\/js\/settings\.js\?v=14/);
+assert.match(settingsHtml, /assets\/js\/settings\.js\?v=15/);
 
 console.log("LINE attendance delivery tests passed");

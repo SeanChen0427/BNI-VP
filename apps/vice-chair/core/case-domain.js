@@ -120,7 +120,11 @@
   }
 
   function voteAccessReady(state) {
-    return Boolean(state?.voteNoticeSent || state?.voteNoticeCopiedAt);
+    return Boolean(
+      state?.voteCallStatus === "replied"
+      || state?.voteNoticeSent
+      || state?.voteNoticeCopiedAt
+    );
   }
 
   function assignedMembers(task) {

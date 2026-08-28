@@ -26,6 +26,10 @@ import {
   lineChannelLabel,
   normalizeLineChannel,
 } from "../_shared/line-channel-domain.mjs";
+import {
+  buildVoteCallText,
+  voteCallFingerprintSource,
+} from "../_shared/case-vote-call-domain.mjs";
 
 const ALLOWED_ORIGINS = new Set([
   "https://seanchen0427.github.io",
@@ -367,6 +371,22 @@ async function sha256Text(value: string) {
   return [...new Uint8Array(digest)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
+function randomVoteToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
+}
+
+function publicVoteUrl(token: string) {
+  const configured = String(Deno.env.get("PUBLIC_VOTE_BASE_URL") || "").trim();
+  const base = configured || "https://seanchen0427.github.io/BNI-VP/public-vote.html";
+  if (!/^https:\/\/[A-Za-z0-9.-]+(?:\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*)?\/public-vote\.html$/.test(base)) {
+    throw Object.assign(new Error("公開投票頁網址設定不正確"), { status: 503 });
+  }
+  return `${base}?t=${encodeURIComponent(token)}`;
+}
+
 function lineTargetChannel(row: any, routeKey = row?.route_key) {
   const channel = normalizeLineChannel(row?.oa_channel);
   if (!channel) throw Object.assign(new Error("LINE 群組缺少所屬 Bot 設定，請重新綁定群組"), { status: 409 });
@@ -432,7 +452,7 @@ async function lineAttendanceState(currentSession: any, context: Context) {
   if (!["admin", "vp"].includes(context.role)) return { visible: false };
   const targetRows = await db("line_group_targets?status=in.(discovered,active)&select=*&order=last_event_at.desc");
   const targets = await Promise.all((targetRows || []).map(refreshLineGroupName));
-  const activeTarget = targets.find((target: any) => target.status === "active" && target.route_key === "attendance") || null;
+  const activeTarget = targets.find((target: any) => target.status === "active" && target.route_key === "attendance" && target.purpose === "production") || null;
   let delivery = null;
   if (currentSession?.id && currentSession?.announcement_snapshot && activeTarget) {
     const announcementHash = await sha256Text(lineAttendanceFingerprintSource(currentSession.announcement_snapshot));
@@ -481,7 +501,7 @@ async function assignLineTarget(targetId: string, routeKey: string, environment:
     throw Object.assign(new Error("LINE Bot 目前無法確認此群組，請確認 Bot 仍在測試群中"), { status: 502 });
   }
   const now = new Date().toISOString();
-  await db(`line_group_targets?status=eq.active&route_key=eq.${routeKey}&id=neq.${target.id}`, {
+  await db(`line_group_targets?status=eq.active&route_key=eq.${routeKey}&purpose=eq.${environment}&id=neq.${target.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
     body: JSON.stringify({ status: "disabled", purpose: null, route_key: null, verified_by: null, verified_at: null }),
@@ -630,7 +650,7 @@ async function committeeWorkDigestState(target: any) {
 async function lineRemindersState() {
   const [rules, targets, deliveries] = await Promise.all([
     db("line_reminder_rules?select=*&order=reminder_key.asc"),
-    db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
+    db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
     db("line_reminder_deliveries?select=reminder_key,trigger_source,local_due_date,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
   ]);
   const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, publicLineTarget(target)]));
@@ -733,7 +753,7 @@ async function sendCommitteeWorkDigest(contentInput: unknown, sourceFingerprintI
   if (!content || [...content].length > 4500) throw new Error("工作進度文案必須為 1 至 4,500 字");
   const sourceFingerprint = String(sourceFingerprintInput || "");
   if (!/^[0-9a-f]{64}$/.test(sourceFingerprint)) throw new Error("工作進度預覽版本不正確，請重新產生");
-  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1");
+  const targets = await db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.production&select=*&limit=1");
   const target = targets?.[0];
   if (!target) throw Object.assign(new Error("尚未將會員委員秘書Bot綁定至會員委員會群"), { status: 409 });
   const oaChannel = lineTargetChannel(target, "committee");
@@ -998,7 +1018,7 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
   const routeKey = reminderRouteKey(reminderKey);
   const [rules, targets] = await Promise.all([
     db(`line_reminder_rules?reminder_key=eq.${encodeURIComponent(reminderKey)}&select=*&limit=1`),
-    db(`line_group_targets?status=eq.active&route_key=eq.${encodeURIComponent(routeKey)}&select=*&limit=1`),
+    db(`line_group_targets?status=eq.active&route_key=eq.${encodeURIComponent(routeKey)}&purpose=eq.production&select=*&limit=1`),
   ]);
   const rule = rules?.[0];
   const target = targets?.[0];
@@ -1071,7 +1091,7 @@ async function lineRemindersApi(request: Request, context: Context) {
   if (updates.some((rule: any) => rule.enabled)) {
     if (!Deno.env.get("LINE_REMINDER_CRON_SECRET")) throw Object.assign(new Error("Supabase 排程尚未啟用，請先保持提醒關閉"), { status: 409 });
     const requiredRoutes = new Set(updates.filter((rule: any) => rule.enabled).map((rule: any) => reminderRouteKey(rule.reminder_key)));
-    const targets = await db("line_group_targets?status=eq.active&route_key=in.(exchange,committee)&select=route_key,oa_channel");
+    const targets = await db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=route_key,oa_channel");
     const activeRoutes = new Set((targets || [])
       .filter((target: any) => lineChannelForRoute(target.route_key) === normalizeLineChannel(target.oa_channel)
         && Boolean(lineAccessToken(target.oa_channel)))
@@ -1156,7 +1176,7 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
   const [sessionRows, targetRows] = await Promise.all([
     db(`attendance_sessions?meeting_date=eq.${meetingDate}&status=eq.confirmed&select=id,meeting_date,status,announcement_snapshot&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.attendance&oa_channel=eq.vice_chair&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.attendance&oa_channel=eq.vice_chair&purpose=eq.production&select=*&limit=1"),
   ]);
   const session = sessionRows?.[0];
   const target = targetRows?.[0];
@@ -3053,6 +3073,72 @@ async function completeRecordOnlyTask(sourceReference: string, context: Context)
   throw Object.assign(new Error("案件剛由其他裝置更新，請重新操作完成訪談"), { status: 409 });
 }
 
+function storageObjectDeletePath(bucketId: string, objectPath: string) {
+  const bucket = encodeURIComponent(String(bucketId || ""));
+  const path = String(objectPath || "").split("/").map(segment => encodeURIComponent(segment)).join("/");
+  return `/storage/v1/object/${bucket}/${path}`;
+}
+
+async function queueStorageDeletionJobs(sourceReference: string, deletedTaskId: string, files: any[]) {
+  if (!files?.length) return [];
+  return db("storage_deletion_jobs?on_conflict=bucket_id,object_path", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(files.map((file: any) => ({
+      source_reference: sourceReference,
+      deleted_task_id: deletedTaskId,
+      bucket_id: file.bucket_id || "case-files",
+      object_path: file.object_path,
+      status: "pending",
+      last_error: null,
+      deleted_at: null,
+    }))),
+  });
+}
+
+async function performStorageDeletionJobs(jobs: any[]) {
+  const outcomes = [];
+  for (const job of jobs || []) {
+    const attemptedAt = new Date().toISOString();
+    try {
+      const response = await fetch(`${supabaseUrl}${storageObjectDeletePath(job.bucket_id, job.object_path)}`, {
+        method: "DELETE",
+        headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+      });
+      if (!response.ok && response.status !== 404) {
+        const payload = await response.json().catch(() => ({}));
+        throw new Error(payload.message || payload.error || `Storage HTTP ${response.status}`);
+      }
+      await db(`storage_deletion_jobs?id=eq.${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          status: "deleted",
+          attempt_count: Number(job.attempt_count || 0) + 1,
+          attempted_at: attemptedAt,
+          deleted_at: attemptedAt,
+          last_error: null,
+        }),
+      });
+      outcomes.push({ objectPath: job.object_path, status: "deleted" });
+    } catch (error) {
+      const message = String((error as Error)?.message || error).slice(0, 1000);
+      await db(`storage_deletion_jobs?id=eq.${job.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({
+          status: "failed",
+          attempt_count: Number(job.attempt_count || 0) + 1,
+          attempted_at: attemptedAt,
+          last_error: message,
+        }),
+      });
+      outcomes.push({ objectPath: job.object_path, status: "failed", error: message });
+    }
+  }
+  return outcomes;
+}
+
 async function tasksApi(request: Request, context: Context) {
   if (request.method === "GET") return taskResponse(context);
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
@@ -3069,7 +3155,10 @@ async function tasksApi(request: Request, context: Context) {
     const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,case_id,revision&limit=1`);
     const row = rows?.[0];
     const files = row
-      ? await db(`task_case_files?task_id=eq.${row.id}&select=object_path`)
+      ? await db(`task_case_files?task_id=eq.${row.id}&select=bucket_id,object_path`)
+      : [];
+    const deletionJobs = row
+      ? await queueStorageDeletionJobs(id, row.id, files || [])
       : [];
     try {
       await db("rpc/edge_delete_task", {
@@ -3081,15 +3170,17 @@ async function tasksApi(request: Request, context: Context) {
         }),
       });
     } catch (error) {
+      const queuedIds = (deletionJobs || []).map((job: any) => job.id).filter(Boolean);
+      if (queuedIds.length) {
+        await db(`storage_deletion_jobs?id=in.(${queuedIds.join(",")})`, { method: "DELETE" }).catch(() => undefined);
+      }
       if (String((error as any)?.message).includes("TASK_CONFLICT")) {
         throw Object.assign(new Error("這項工作已在其他裝置更新，已重新載入最新資料，請確認後再刪除"), { status: 409 });
       }
       throw error;
     }
-    for (const file of files || []) {
-      await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
-    }
-    return taskResponse(context);
+    const cleanup = await performStorageDeletionJobs(deletionJobs || []);
+    return { ...(await taskResponse(context)), cleanup };
   }
   const tasks = Array.isArray(body.tasks) ? body.tasks : [];
   if (tasks.length > 250) throw Object.assign(new Error("單次排程同步不可超過 250 筆"), { status: 413 });
@@ -3147,10 +3238,11 @@ async function caseParticipationForCases(caseIds: string[]) {
   const result = new Map<string, any>();
   if (!ids.length) return result;
   const filter = `in.(${ids.join(",")})`;
-  const [people, feedback, snapshots] = await Promise.all([
+  const [people, feedback, snapshots, voteCalls] = await Promise.all([
     db("people?select=id,display_name"),
     db(`case_feedback?case_id=${filter}&select=case_id,author_person_id,submitted_by_person_id,body,submitted_at,updated_at`),
     db(`vote_snapshots?case_id=${filter}&select=id,case_id,status,opened_at,deadline_at,closed_at,original_base,eligible_base,majority_threshold,result,approve_count,reject_count`),
+    db(`case_vote_calls?case_id=${filter}&is_test=eq.false&select=id,case_id,status,created_at,copied_at,replied_at,failed_at,deadline_at,error_message&order=created_at.desc`),
   ]);
   const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
   const snapshotIds = (snapshots || []).map((snapshot: any) => snapshot.id);
@@ -3162,6 +3254,10 @@ async function caseParticipationForCases(caseIds: string[]) {
     ])
     : [[], []];
   const snapshotByCase = new Map((snapshots || []).map((snapshot: any) => [snapshot.case_id, snapshot]));
+  const voteCallByCase = new Map<string, any>();
+  for (const call of voteCalls || []) {
+    if (!voteCallByCase.has(call.case_id)) voteCallByCase.set(call.case_id, call);
+  }
   for (const caseId of ids) {
     const snapshot: any = snapshotByCase.get(caseId) || null;
     const snapshotVoters = snapshot
@@ -3195,6 +3291,7 @@ async function caseParticipationForCases(caseIds: string[]) {
         .map((vote: any) => [names.get(vote.voter_person_id), vote.choice])
         .filter(([name]: any) => Boolean(name))),
       snapshot,
+      voteCall: voteCallByCase.get(caseId) || null,
     });
   }
   return result;
@@ -3217,6 +3314,15 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
   const participationWorkflow = decisionCase
     ? {
       ...fullWorkflow,
+      ...(participation?.voteCall ? {
+        voteCallId: participation.voteCall.id,
+        voteCallStatus: participation.voteCall.status,
+        voteCallCreatedAt: participation.voteCall.copied_at || participation.voteCall.created_at || "",
+        voteCallRepliedAt: participation.voteCall.replied_at || "",
+        voteCallFailedAt: participation.voteCall.failed_at || "",
+        voteCallError: participation.voteCall.error_message || "",
+        voteCallDeadline: participation.voteCall.deadline_at || "",
+      } : {}),
       feedback: recusedApplicant
         ? {}
         : { ...(fullWorkflow.feedback || {}), ...(participation?.feedback || {}) },
@@ -3322,7 +3428,7 @@ async function sendCaseFeedbackNotice(access: any, existing: any, context: Conte
   }
   await ensureTaskCase(access, context);
   const [targetRows, roster] = await Promise.all([
-    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.production&select=*&limit=1"),
     activeVotingRoster(),
   ]);
   const target = targetRows?.[0];
@@ -3522,6 +3628,88 @@ async function markCaseVoteNoticeCopied(access: any, existing: any, context: Con
   };
 }
 
+async function prepareCaseVoteCall(access: any, existing: any, context: Context, expectedRevision: number) {
+  leadership(context);
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用委員投票呼喚"), { status: 409 });
+  }
+  const workflow = existing?.workflow || {};
+  if (expectedRevision !== Number(existing?.revision || 0)) {
+    throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再啟動投票流程"), { status: 409 });
+  }
+  if (!workflow.votingOpen || workflow.closed || !access.task.case_id) {
+    throw Object.assign(new Error("投票尚未開啟、案件已結案，或正式投票快照尚未建立"), { status: 409 });
+  }
+  const [snapshotRows, targetRows] = await Promise.all([
+    db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.production&select=*&limit=1"),
+  ]);
+  const snapshot = snapshotRows?.[0];
+  const target = targetRows?.[0];
+  if (!snapshot) throw Object.assign(new Error("本案沒有進行中的正式投票快照"), { status: 409 });
+  if (!snapshot.deadline_at || new Date(snapshot.deadline_at).getTime() <= Date.now()) {
+    throw Object.assign(new Error("投票期限已截止，請先更新截止時間"), { status: 409 });
+  }
+  if (!target) throw Object.assign(new Error("尚未在設定頁指定會員委員會正式群"), { status: 409 });
+  if (!lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)) {
+    throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
+  }
+  const taskMeta = parseTaskJson(access.task.result_summary);
+  const profession = String(taskMeta.profession || workflow.form?.profession || "").trim();
+  if (!profession) throw Object.assign(new Error("案件專業別尚未填寫"), { status: 409 });
+  const token = randomVoteToken();
+  const ballotUrl = publicVoteUrl(token);
+  const callText = buildVoteCallText({
+    caseType: access.task.category,
+    applicant: access.task.title,
+    profession,
+    deadlineAt: snapshot.deadline_at,
+    ballotUrl,
+    isTest: false,
+  });
+  const [tokenHash, messageHash] = await Promise.all([
+    sha256Text(token),
+    sha256Text(voteCallFingerprintSource(callText)),
+  ]);
+  const callId = crypto.randomUUID();
+  const copiedAt = new Date().toISOString();
+  try {
+    await db("rpc/edge_prepare_case_vote_call", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_call_id: callId,
+        p_task_id: access.task.id,
+        p_actor: context.personId,
+        p_actor_auth_user_id: context.userId,
+        p_expected_revision: expectedRevision,
+        p_snapshot_id: snapshot.id,
+        p_group_target_id: target.id,
+        p_token_sha256: tokenHash,
+        p_message_sha256: messageHash,
+        p_deadline: snapshot.deadline_at,
+        p_applicant: access.task.title,
+        p_profession: profession,
+        p_copied_at: copiedAt,
+      }),
+    });
+  } catch (error) {
+    if (String((error as any)?.message).includes("CASE_CONFLICT")) {
+      throw Object.assign(new Error("案件已在其他裝置更新，請重新整理後再啟動投票流程"), { status: 409 });
+    }
+    throw error;
+  }
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  const state = await caseStateResponse(access, latestRows?.[0], context);
+  return {
+    ...state,
+    callText,
+    ballotUrl,
+    message: `投票呼喚已建立；請將完整文案貼到「${target.display_name}」，Bot 才會回覆投票圖卡`,
+    lineTarget: publicLineTarget(target),
+  };
+}
+
 async function sendCaseVoteNotice(access: any, existing: any, context: Context) {
   leadership(context);
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
@@ -3534,7 +3722,7 @@ async function sendCaseVoteNotice(access: any, existing: any, context: Context) 
   if (!access.task.case_id) throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
   const [snapshotRows, targetRows] = await Promise.all([
     db(`vote_snapshots?case_id=eq.${access.task.case_id}&status=eq.open&select=*&limit=1`),
-    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&select=*&limit=1"),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.production&select=*&limit=1"),
   ]);
   const snapshot = snapshotRows?.[0];
   const target = targetRows?.[0];
@@ -3840,7 +4028,7 @@ async function caseStatesApi(request: Request, context: Context) {
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
 
-  if (["feedback-notice", "vote-notice", "vote-notice-copy", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+  if (["feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
   }
 
@@ -3848,12 +4036,12 @@ async function caseStatesApi(request: Request, context: Context) {
     return sendCaseFeedbackNotice(access, existing, context);
   }
 
-  if (body.kind === "vote-notice") {
-    return sendCaseVoteNotice(access, existing, context);
+  if (body.kind === "vote-call-prepare") {
+    return prepareCaseVoteCall(access, existing, context, expectedRevision);
   }
 
-  if (body.kind === "vote-notice-copy") {
-    return markCaseVoteNoticeCopied(access, existing, context, expectedRevision);
+  if (body.kind === "vote-notice" || body.kind === "vote-notice-copy") {
+    throw Object.assign(new Error("舊版投票通知已停用；請重新整理後使用「啟動投票流程並複製文案」"), { status: 410 });
   }
 
   if (body.kind === "result-announcement") {
@@ -3901,7 +4089,10 @@ async function caseStatesApi(request: Request, context: Context) {
   if (body.kind === "vote") {
     if (!["vp", "committee"].includes(context.role)) throw Object.assign(new Error("此身份不能參與投票"), { status: 403 });
     if (currentWorkflow.closed) throw Object.assign(new Error("案件已結案，無法投票"), { status: 409 });
-    if (!currentWorkflow.votingOpen || !(currentWorkflow.voteNoticeSent || currentWorkflow.voteNoticeCopiedAt)) {
+    const repliedCalls = access.task.case_id
+      ? await db(`case_vote_calls?case_id=eq.${access.task.case_id}&is_test=eq.false&status=eq.replied&select=id&limit=1`)
+      : [];
+    if (!currentWorkflow.votingOpen || !(currentWorkflow.voteNoticeSent || currentWorkflow.voteNoticeCopiedAt || repliedCalls?.[0])) {
       throw Object.assign(new Error("投票尚未開放或尚未通知"), { status: 409 });
     }
     const choice = String(body.value || "");
@@ -3945,6 +4136,14 @@ async function caseStatesApi(request: Request, context: Context) {
     delete proposed.voteNoticeCopiedAt;
     delete proposed.voteNoticeCopiedBy;
     delete proposed.voteNoticeCopiedDeadline;
+    delete proposed.voteCallId;
+    delete proposed.voteCallStatus;
+    delete proposed.voteCallCreatedAt;
+    delete proposed.voteCallRepliedAt;
+    delete proposed.voteCallFailedAt;
+    delete proposed.voteCallError;
+    delete proposed.voteCallDeadline;
+    delete proposed.voteCallTargetName;
     await openVoteSnapshot(access, existing, proposed, context);
     const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
     return caseStateResponse(access, latestRows?.[0], context);
@@ -4016,6 +4215,25 @@ async function caseStatesApi(request: Request, context: Context) {
         workflow.voteNoticeCopiedBy = currentWorkflow.voteNoticeCopiedBy || "";
         workflow.voteNoticeCopiedDeadline = currentWorkflow.voteNoticeCopiedDeadline || "";
       }
+      if (!currentWorkflow.voteCallId || deadlineChanged) {
+        delete workflow.voteCallId;
+        delete workflow.voteCallStatus;
+        delete workflow.voteCallCreatedAt;
+        delete workflow.voteCallRepliedAt;
+        delete workflow.voteCallFailedAt;
+        delete workflow.voteCallError;
+        delete workflow.voteCallDeadline;
+        delete workflow.voteCallTargetName;
+      } else {
+        workflow.voteCallId = currentWorkflow.voteCallId;
+        workflow.voteCallStatus = currentWorkflow.voteCallStatus || "awaiting_reply";
+        workflow.voteCallCreatedAt = currentWorkflow.voteCallCreatedAt || "";
+        workflow.voteCallRepliedAt = currentWorkflow.voteCallRepliedAt || "";
+        workflow.voteCallFailedAt = currentWorkflow.voteCallFailedAt || "";
+        workflow.voteCallError = currentWorkflow.voteCallError || "";
+        workflow.voteCallDeadline = currentWorkflow.voteCallDeadline || "";
+        workflow.voteCallTargetName = currentWorkflow.voteCallTargetName || "";
+      }
       if (currentWorkflow.resultAnnouncementSent) {
         workflow.resultAnnouncementSent = true;
         workflow.resultAnnouncementSentAt = currentWorkflow.resultAnnouncementSentAt || "";
@@ -4037,7 +4255,10 @@ async function caseStatesApi(request: Request, context: Context) {
       if (access.assigned) {
         const protectedKeys = new Set([
           "votingOpen", "voteNoticeSent", "voteNoticeCopiedAt", "voteNoticeCopiedBy",
-          "voteNoticeCopiedDeadline", "voterSnapshot", "leadersSent",
+          "voteNoticeCopiedDeadline", "voteCallId", "voteCallStatus",
+          "voteCallCreatedAt", "voteCallRepliedAt", "voteCallFailedAt",
+          "voteCallError", "voteCallDeadline", "voteCallTargetName",
+          "voterSnapshot", "leadersSent",
           "advisorStatus", "advisorNote", "resultAnnouncementSent",
           "resultAnnouncementSentAt", "resultAnnouncementTargetName",
           "resultAnnouncementDeliveryId", "closed",
@@ -4190,7 +4411,7 @@ async function testResetApi(request: Request, context: Context) {
   const [meetings, tasks, files, protectedRegistrations] = await Promise.all([
     db("committee_meetings?select=id"),
     db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,revision`),
-    db("task_case_files?select=task_id,object_path"),
+    db("task_case_files?select=task_id,bucket_id,object_path"),
     db("provisional_members?status=in.(pending_palms,promoted)&select=source_task_id"),
   ]);
   const protectedTaskIds = new Set((protectedRegistrations || []).map((row: any) => row.source_task_id));
@@ -4207,25 +4428,38 @@ async function testResetApi(request: Request, context: Context) {
   const body = await requestBody(request);
   if (body.confirmation !== "RESET_FULIAN_TEST_DATA") throw new Error("缺少測試資料清除確認");
   await db("committee_meetings?id=not.is.null", { method: "DELETE" });
+  await db("case_vote_calls?is_test=eq.true", { method: "DELETE" });
+  const deletionJobs = [];
   for (const task of resettableTasks) {
-    await db("rpc/edge_delete_task", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        p_source_reference: task.source_reference,
-        p_expected_revision: Number(task.revision),
-      }),
-    });
+    const taskFiles = resettableFiles.filter((file: any) => file.task_id === task.id);
+    const queued = await queueStorageDeletionJobs(task.source_reference, task.id, taskFiles);
+    try {
+      await db("rpc/edge_delete_task", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_source_reference: task.source_reference,
+          p_expected_revision: Number(task.revision),
+        }),
+      });
+      deletionJobs.push(...(queued || []));
+    } catch (error) {
+      const queuedIds = (queued || []).map((job: any) => job.id).filter(Boolean);
+      if (queuedIds.length) await db(`storage_deletion_jobs?id=in.(${queuedIds.join(",")})`, { method: "DELETE" }).catch(() => undefined);
+      throw error;
+    }
   }
-  for (const file of resettableFiles) {
-    await serviceFetch(`/storage/v1/object/case-files/${file.object_path}`, { method: "DELETE" }).catch(console.error);
-  }
+  const cleanup = await performStorageDeletionJobs(deletionJobs);
+  const failedCleanup = cleanup.filter((item: any) => item.status === "failed").length;
   return {
     meetings: meetings.length,
     tasks: resettableTasks.length,
     files: resettableFiles.length,
     protectedNewMemberCases: protectedTaskIds.size,
-    message: "Supabase 月會、案件、草稿與附件測試資料已清除",
+    cleanup,
+    message: failedCleanup
+      ? `測試資料已清除；另有 ${failedCleanup} 個附件清理失敗，系統已留下待處理紀錄`
+      : "Supabase 月會、案件、草稿與附件測試資料已清除",
   };
 }
 
@@ -4620,6 +4854,143 @@ async function committeeBoardApi(request: Request, context: Context) {
   throw new Error("不支援的留言板操作");
 }
 
+async function voteTestState(context: Context) {
+  leadership(context);
+  const [memberRows, targetRows] = await Promise.all([
+    db("members?status=eq.active&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&order=created_at.asc"),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.test&select=*&limit=1"),
+  ]);
+  const target = targetRows?.[0] || null;
+  const calls = target
+    ? await db(`case_vote_calls?is_test=eq.true&group_target_id=eq.${target.id}&select=id,status,applicant_snapshot,profession_snapshot,deadline_at,created_at,replied_at,failed_at,error_message&order=created_at.desc&limit=1`)
+    : [];
+  const latest = calls?.[0] || null;
+  const votes = latest
+    ? await db(`case_vote_test_votes?call_id=eq.${latest.id}&select=id`)
+    : [];
+  return {
+    configured: Boolean(lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)),
+    target: target ? publicLineTarget(target) : null,
+    subjects: (memberRows || []).map((member: any) => ({
+      id: member.id,
+      name: member.people?.display_name || "",
+      profession: member.profession || "",
+    })).filter((member: any) => member.name),
+    latest: latest ? {
+      id: latest.id,
+      status: latest.status,
+      applicant: latest.applicant_snapshot,
+      profession: latest.profession_snapshot,
+      deadlineAt: latest.deadline_at,
+      createdAt: latest.created_at,
+      repliedAt: latest.replied_at,
+      failedAt: latest.failed_at,
+      error: latest.error_message || "",
+      voteCount: (votes || []).length,
+    } : null,
+  };
+}
+
+async function voteTestApi(request: Request, context: Context) {
+  leadership(context);
+  if (request.method === "GET") return voteTestState(context);
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "delete") {
+    const callId = String(body.callId || "");
+    if (!UUID_REFERENCE.test(callId)) throw new Error("測試投票識別碼格式不正確");
+    await db(`case_vote_calls?id=eq.${callId}&is_test=eq.true`, {
+      method: "DELETE",
+      headers: { Prefer: "return=minimal" },
+    });
+    return { ...(await voteTestState(context)), message: "測試投票與測試票數已清除" };
+  }
+  if (body.action !== "prepare") throw new Error("不支援的測試投票操作");
+  const subjectId = String(body.subjectId || "");
+  if (!UUID_REFERENCE.test(subjectId)) throw new Error("請選擇一位現任會員作為畫面測試對象");
+  const [subjects, targets, roster] = await Promise.all([
+    db(`members?id=eq.${subjectId}&status=eq.active&people.status=eq.active&select=id,profession,people!inner(id,display_name,status)&limit=1`),
+    db("line_group_targets?status=eq.active&route_key=eq.committee&oa_channel=eq.committee&purpose=eq.test&select=*&limit=1"),
+    activeVotingRoster(),
+  ]);
+  const subject = subjects?.[0];
+  const target = targets?.[0];
+  if (!subject) throw Object.assign(new Error("這位會員已不在現任會員名單，請重新選擇"), { status: 409 });
+  if (!target) throw Object.assign(new Error("請先在 LINE 群組管理指定會員委員會測試群"), { status: 409 });
+  if (!lineAccessToken(LINE_OA_CHANNELS.COMMITTEE)) {
+    throw Object.assign(new Error("會員委員秘書Bot Channel Access Token 尚未設定"), { status: 503 });
+  }
+  const applicant = String(subject.people?.display_name || "").trim();
+  const profession = String(subject.profession || "").trim();
+  if (!applicant || !profession) throw Object.assign(new Error("測試會員缺少姓名或專業別"), { status: 409 });
+  const voters = (roster || []).filter((item: any) => ["vp", "committee"].includes(String(item.role || "")));
+  if (!voters.length) throw Object.assign(new Error("目前沒有在任投票委員可供測試"), { status: 409 });
+  const token = randomVoteToken();
+  const ballotUrl = publicVoteUrl(token);
+  const createdAt = new Date();
+  const deadlineAt = new Date(createdAt.getTime() + 45 * 60 * 1000).toISOString();
+  const callText = buildVoteCallText({
+    caseType: "renewal",
+    applicant,
+    profession,
+    deadlineAt,
+    ballotUrl,
+    isTest: true,
+  });
+  const [tokenHash, messageHash] = await Promise.all([
+    sha256Text(token),
+    sha256Text(voteCallFingerprintSource(callText)),
+  ]);
+  await db(`case_vote_calls?is_test=eq.true&group_target_id=eq.${target.id}&status=in.(preparing,awaiting_reply,replying,replied,reply_failed)`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({ status: "revoked", error_message: "由設定頁重新建立測試投票" }),
+  });
+  const callId = crypto.randomUUID();
+  try {
+    await db("case_vote_calls", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        id: callId,
+        group_target_id: target.id,
+        environment: "test",
+        is_test: true,
+        case_type: "renewal",
+        applicant_snapshot: applicant,
+        profession_snapshot: profession,
+        deadline_at: deadlineAt,
+        token_sha256: tokenHash,
+        message_sha256: messageHash,
+        status: "awaiting_reply",
+        created_by: context.personId,
+        created_by_auth_user_id: context.userId,
+        copied_at: createdAt.toISOString(),
+      }),
+    });
+    await db("case_vote_call_voters", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(voters.map((item: any) => ({
+        call_id: callId,
+        person_id: item.person_id,
+        display_name_snapshot: String(item.people?.display_name || "").trim(),
+        role: item.role,
+        is_recused: item.person_id === subject.people?.id,
+      }))),
+    });
+  } catch (error) {
+    await db(`case_vote_calls?id=eq.${callId}&is_test=eq.true`, { method: "DELETE" }).catch(() => undefined);
+    throw error;
+  }
+  return {
+    ...(await voteTestState(context)),
+    callText,
+    ballotUrl,
+    message: `測試呼喚已建立；請將完整文案貼到「${target.display_name}」`,
+  };
+}
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors(request) });
   if (!supabaseUrl || !anonKey || !serviceKey) return respond(request, 500, { message: "Supabase Edge API 環境設定不完整" });
@@ -4647,6 +5018,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);
+    else if (path === "/api/vote-test") result = await voteTestApi(request, context);
     else if (path === "/api/line-reminders") result = await lineRemindersApi(request, context);
     else if (path === "/api/attendance") result = await attendanceApi(request, url, context);
     else if (path === "/api/accountability-emails") result = await accountabilityEmailsApi(request, context);

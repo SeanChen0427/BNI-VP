@@ -68,6 +68,14 @@
       throw error;
     }
     replaceCache(data.tasks);
+    const failedCleanup = Array.isArray(data.cleanup)
+      ? data.cleanup.filter(item => item?.status === "failed")
+      : [];
+    if (failedCleanup.length) {
+      window.dispatchEvent(new CustomEvent("fulian:storage-cleanup-warning", {
+        detail: { count: failedCleanup.length },
+      }));
+    }
     return data.tasks;
   }
 

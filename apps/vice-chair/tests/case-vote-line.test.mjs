@@ -2,139 +2,148 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import {
-  buildCaseVoteNoticeMessage,
-  buildCaseVoteNoticeText,
-  caseVoteNoticeFingerprintSource,
-  formatCaseVoteDeadline,
-} from "../../../supabase/functions/app-api/line-message.mjs";
+  buildVoteCallReplyMessages,
+  buildVoteCallText,
+  extractVoteCallToken,
+  extractVoteCallUrl,
+  normalizeVoteCallText,
+  voteCallFingerprintSource,
+} from "../../../supabase/functions/_shared/case-vote-call-domain.mjs";
 
 const root = new URL("../../../", import.meta.url);
 const read = path => readFileSync(new URL(path, root), "utf8");
+const token = "A".repeat(43);
+const ballotUrl = `https://seanchen0427.github.io/BNI-VP/public-vote.html?t=${token}`;
 
-test("投票通知文案依案件類型與台北截止時間產生", () => {
-  const now = new Date("2026-08-08T04:00:00Z");
-  const deadline = "2026-08-09T10:00:00Z";
-  assert.equal(formatCaseVoteDeadline(deadline, now), "明天晚上6點");
-  const text = buildCaseVoteNoticeText({
+test("投票呼喚包含一次性網址、截止時間與可精準比對的完整格式", () => {
+  const text = buildVoteCallText({
+    caseType: "renewal",
+    applicant: "測試會員",
+    profession: "測試專業",
+    deadlineAt: "2026-08-29T10:00:00Z",
+    ballotUrl,
+  });
+  assert.match(text, /^@All 【續約投票】/);
+  assert.match(text, /申請者：測試會員/);
+  assert.match(text, /專業別：測試專業/);
+  assert.match(text, new RegExp(token));
+  assert.match(text, /投票截止：2026\/8\/29 18:00/);
+  assert.equal(extractVoteCallToken(text), token);
+  assert.equal(extractVoteCallUrl(text), ballotUrl);
+  assert.equal(normalizeVoteCallText(`\r\n${text.replaceAll("\n", "\r\n")}\r\n`), text);
+  assert.match(voteCallFingerprintSource(text), /^case-vote-reply-card-v1\n/);
+
+  const testText = buildVoteCallText({
+    caseType: "renewal",
+    applicant: "測試會員",
+    profession: "測試專業",
+    deadlineAt: "2026-08-29T10:00:00Z",
+    ballotUrl,
+    isTest: true,
+  });
+  assert.match(testText, /測試續約投票｜不列入正式紀錄/);
+  assert.match(testText, /不建立正式案件、不列入正式票數/);
+});
+
+test("Bot 以一次 Reply 同時真正 @所有人並回覆 Flex 投票圖卡", () => {
+  const messages = buildVoteCallReplyMessages({
     caseType: "new",
     applicant: "測試會員",
     profession: "測試專業",
-    deadlineAt: deadline,
-    now,
+    deadlineAt: "2026-08-29T10:00:00Z",
+    ballotUrl,
   });
-  assert.equal(text, "【新申請投票】\n申請者：測試會員\n專業別：測試專業\n\n請各位委員針對表述回饋及相關文件，開始進行投票！\n截止至明天晚上6點前\n會員委員及副主席擁有各一票投票權，董事顧問有最終裁量權。\n攸關團隊品質，請委員們參閱回饋務必投下這一票！\n***完成投票請 tag 回覆「已投」");
-  assert.match(buildCaseVoteNoticeText({ caseType: "renewal", applicant: "甲", profession: "乙", deadlineAt: deadline, now }), /^【續約投票】/);
-  assert.match(buildCaseVoteNoticeText({ caseType: "industry", applicant: "甲", profession: "乙", deadlineAt: deadline, now }), /^【轉換行業別投票】/);
-  assert.equal(formatCaseVoteDeadline("2026-08-12T06:10:00Z", now), "2026/8/12 下午2:10");
-  assert.throws(() => buildCaseVoteNoticeText({ caseType: "new", applicant: "甲", profession: "", deadlineAt: deadline, now }), /專業別尚未填寫/);
+  assert.equal(messages.length, 2);
+  assert.equal(messages[0].type, "textV2");
+  assert.equal(messages[0].substitution.all.mentionee.type, "all");
+  assert.equal(messages[1].type, "flex");
+  assert.equal(messages[1].contents.footer.contents[0].action.uri, ballotUrl);
 });
 
-test("正式 LINE 訊息使用真正全群 mention 並納入格式指紋", () => {
-  const message = buildCaseVoteNoticeMessage({
-    caseType: "new",
-    applicant: "測試會員",
-    profession: "測試{專業}",
-    deadlineAt: "2026-08-09T10:00:00Z",
-    now: new Date("2026-08-08T04:00:00Z"),
-  });
-  assert.equal(message.type, "textV2");
-  assert.equal(message.substitution.all.mentionee.type, "all");
-  assert.match(message.text, /^\{all\}\n【新申請投票】/);
-  assert.match(message.text, /測試\{\{專業\}\}/);
-  assert.match(caseVoteNoticeFingerprintSource("內容"), /^case-vote-text-v2-mention-all-v1\n/);
-});
-
-test("年度培訓與來賓欄位只在續約案件顯示", () => {
-  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
-  const html = read("apps/vice-chair/case-workflow.html");
-  const css = read("apps/vice-chair/assets/css/case-workflow-extra.css");
-
-  assert.match(html, /id="renewalExtra" hidden/);
-  assert.match(html, /case-workflow-extra\.css\?v=4/);
-  assert.match(workflow, /\$\("#renewalExtra"\)\.hidden=\$\("#caseType"\)\.value!=="renewal"/);
-  assert.match(workflow, /catch\{if\(\$\("#caseType"\)\.value==="renewal"\)/);
-  assert.match(css, /\.renewal-extra\[hidden\],[\s\S]*?\.annual-data-source\[hidden\][\s\S]*?display: none !important/);
-});
-
-test("後端只以正式案件、正式委員會群與投票快照發送", () => {
+test("正式案件只建立呼喚，不再由投票按鈕使用 Push 額度", () => {
   const edge = read("supabase/functions/app-api/index.ts");
-  const migration = read("supabase/migrations/20260808211500_case_vote_line_delivery.sql");
   const store = read("apps/vice-chair/assets/js/case-state-store.js");
   const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
   const html = read("apps/vice-chair/case-workflow.html");
+  const prepareStart = edge.indexOf("async function prepareCaseVoteCall");
+  const prepareEnd = edge.indexOf("\nasync function sendCaseVoteNotice", prepareStart);
+  const prepareSection = edge.slice(prepareStart, prepareEnd);
 
-  assert.match(edge, /body\.kind === "vote-notice"/);
-  assert.match(edge, /route_key=eq\.committee/);
-  assert.match(edge, /target\.purpose !== "production"/);
-  assert.match(edge, /vote_snapshots\?case_id=eq\.\$\{access\.task\.case_id\}&status=eq\.open/);
-  assert.match(edge, /applicant: access\.task\.title/);
-  assert.match(edge, /profession: taskMeta\.profession \|\| workflow\.form\?\.profession/);
-  assert.match(edge, /X-Line-Retry-Key/);
-  assert.match(edge, /messages: \[lineMessage\]/);
-  assert.match(edge, /workflow\.voteNoticeSent && prior\?\.status !== "sent"/);
-  const sendStart = edge.indexOf("async function sendCaseVoteNotice");
-  const sendSection = edge.slice(sendStart, edge.indexOf("\nasync function caseStatesApi", sendStart));
-  assert.match(
-    sendSection,
-    /await finishCaseVoteLineDelivery\(delivery\.id,\s*\{\s*status: "sent"[\s\S]*?state = await markCaseVoteNoticeSent/,
-    "必須先確認 LINE 送達，再推進案件狀態",
-  );
-  assert.match(edge, /proposed\.voteNoticeSent = false/);
+  assert.match(edge, /body\.kind === "vote-call-prepare"/);
+  assert.match(edge, /return prepareCaseVoteCall\(access, existing, context, expectedRevision\)/);
+  assert.match(edge, /body\.kind === "vote-notice" \|\| body\.kind === "vote-notice-copy"/);
+  assert.match(edge, /舊版投票通知已停用/);
+  assert.match(prepareSection, /purpose=eq\.production/);
+  assert.match(prepareSection, /rpc\/edge_prepare_case_vote_call/);
+  assert.match(prepareSection, /sha256Text\(token\)/);
+  assert.match(prepareSection, /sha256Text\(voteCallFingerprintSource\(callText\)\)/);
+  assert.doesNotMatch(prepareSection, /message\/push/);
 
-  assert.match(migration, /create table public\.case_vote_line_deliveries/);
-  assert.match(migration, /unique \(task_id, snapshot_id, group_target_id, notification_type, deadline_at, message_sha256\)/);
-  assert.match(migration, /revoke all on table public\.case_vote_line_deliveries from public, anon, authenticated/);
-  assert.match(migration, /edge_mark_task_vote_notice_sent/);
-  assert.match(migration, /target_snapshot\.deadline_at <> p_deadline/);
-  assert.match(migration, /target_delivery\.status <> 'sent'/);
-
-  assert.match(store, /sendVoteNotice: taskId => postAction\(taskId, "vote-notice", \{\}\)/);
-  const handler = workflow.match(/\$\("#sendVoteNotice"\)\.addEventListener\("click",async\(\)=>\{.*?\}\);/)?.[0] || "";
-  assert.match(handler, /FulianCaseStateStore\.sendVoteNotice\(CASE_ID\)/);
-  assert.match(handler, /confirm\(/);
-  assert.doesNotMatch(handler, /state\.voteNoticeSent=true/);
-  assert.match(workflow, /FulianCaseStateStore\.sendVoteNotice/);
-  assert.doesNotMatch(workflow, /已模擬 LINE Bot 通知委員投票/);
-  assert.match(html, /id="copyVoteNotice"/);
-  assert.match(html, /通知委員（會員委員秘書Bot）/);
-  assert.match(html, /id="voteNoticePreview"/);
-  assert.match(html, /case-state-store\.js\?v=11/);
-  assert.match(html, /case-workflow\.js\?v=23/);
+  assert.match(store, /prepareVoteCall: taskId => postAction\(taskId, "vote-call-prepare", \{\}\)/);
+  assert.doesNotMatch(store, /sendVoteNotice:/);
+  assert.match(workflow, /result\.callText/);
+  assert.match(workflow, /navigator\.clipboard\.writeText\(activeVoteCallText\)/);
+  assert.doesNotMatch(html, /id="sendVoteNotice"/);
+  assert.match(html, /啟動投票流程並複製文案/);
+  assert.match(html, /case-state-store\.js\?v=12/);
+  assert.match(html, /case-workflow\.js\?v=24/);
 });
 
-test("複製投票通知可留存人工貼送紀錄並開放送票", () => {
+test("Webhook 只接受委員會群的 Token 與完整文案雜湊，並呼叫 Reply API", () => {
+  const webhook = read("supabase/functions/line-webhook/index.ts");
+  const domain = read("supabase/functions/line-webhook/domain.mjs");
+  const handlerStart = webhook.indexOf("async function processVoteCallEvent");
+  const handlerEnd = webhook.indexOf("\nDeno.serve", handlerStart);
+  const handler = webhook.slice(handlerStart, handlerEnd);
+
+  assert.match(domain, /collectVoteCallEvents/);
+  assert.match(handler, /extractVoteCallToken\(event\.text\)/);
+  assert.match(handler, /voteCallFingerprintSource\(normalizeVoteCallText\(event\.text\)\)/);
+  assert.match(handler, /group_target_id=eq\.\$\{target\.id\}/);
+  assert.match(handler, /status=in\.\(awaiting_reply,reply_failed\)/);
+  assert.match(handler, /status: "replying"/);
+  assert.match(handler, /https:\/\/api\.line\.me\/v2\/bot\/message\/reply/);
+  assert.match(handler, /replyToken: event\.replyToken/);
+  assert.match(handler, /status: "replied"/);
+  assert.doesNotMatch(handler, /message\/push/);
+  assert.match(webhook, /普通聊天內容不落地/);
+});
+
+test("免登入頁以雜湊 Token 與別名選人，正式票仍寫入同一份 votes", () => {
+  const config = read("supabase/config.toml");
+  const publicVote = read("supabase/functions/public-vote/index.ts");
+  const migration = read("supabase/migrations/20260828160000_case_vote_reply_calls.sql");
+  const initialSchema = read("supabase/migrations/20260720070454_initial_schema.sql");
+  const html = read("apps/vice-chair/public-vote.html");
+  const script = read("apps/vice-chair/assets/js/public-vote.js");
+
+  assert.match(config, /\[functions\.public-vote\]\s+verify_jwt = false/);
+  assert.match(publicVote, /sha256\(token\)/);
+  assert.match(publicVote, /sha256\(`\$\{token\}:\$\{personId\}`\)/);
+  assert.match(publicVote, /rpc\/edge_cast_public_case_vote/);
+  assert.doesNotMatch(publicVote, /auth\/v1\/user/);
+  assert.match(migration, /alter column actor_auth_user_id drop not null/);
+  assert.match(migration, /cast_source = 'line_public'/);
+  assert.match(migration, /insert into public\.votes/);
+  assert.match(initialSchema, /unique \(snapshot_id, voter_person_id\)/);
+  assert.match(html, /此頁不需要登入/);
+  assert.match(script, /請確認：你選擇/);
+});
+
+test("設定頁測試器與正式票完全分離，測試群可和正式群並存", () => {
+  const migration = read("supabase/migrations/20260828160000_case_vote_reply_calls.sql");
   const edge = read("supabase/functions/app-api/index.ts");
-  const migration = read("supabase/migrations/20260828090000_vote_notice_copy_unlock.sql");
-  const store = read("apps/vice-chair/assets/js/case-state-store.js");
-  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
-  const html = read("apps/vice-chair/case-workflow.html");
+  const settings = read("apps/vice-chair/assets/js/settings.js");
+  const html = read("apps/vice-chair/settings.html");
 
-  assert.match(edge, /body\.kind === "vote-notice-copy"/);
-  assert.match(edge, /rpc\/edge_mark_task_vote_notice_copied/);
-  assert.match(edge, /p_expected_revision: expectedRevision/);
-  assert.match(edge, /currentWorkflow\.voteNoticeSent \|\| currentWorkflow\.voteNoticeCopiedAt/);
-  assert.match(edge, /delete proposed\.voteNoticeCopiedAt/);
-  assert.match(edge, /voteNoticeCopiedDeadline", "voterSnapshot"/);
-
-  assert.match(migration, /create or replace function public\.edge_mark_task_vote_notice_copied/);
-  assert.match(migration, /p_expected_revision <> target_state\.revision/);
-  assert.match(migration, /target_snapshot\.deadline_at <> p_deadline/);
-  assert.match(migration, /voteNoticeCopiedAt/);
-  assert.match(migration, /voteNoticeCopiedDeadline'[\s\S]*?snapshot\.deadline_at/);
-  assert.match(migration, /vote_notice_copied/);
-  assert.match(
-    migration,
-    /voteNoticeSent'[\s\S]*?<> 'true'[\s\S]*?and nullif\(btrim\(coalesce\(target_state\.workflow->>'voteNoticeCopiedAt'/,
-  );
-  assert.match(migration, /to service_role/);
-
-  assert.match(store, /markVoteNoticeCopied: taskId => postAction\(taskId, "vote-notice-copy", \{\}\)/);
-  const copyStart = workflow.indexOf('$("#copyVoteNotice").addEventListener');
-  const copyEnd = workflow.indexOf('$("#sendVoteNotice").addEventListener', copyStart);
-  const copyHandler = workflow.slice(copyStart, copyEnd);
-  assert.match(copyHandler, /navigator\.clipboard\.writeText\(voteNotice\(\)\)/);
-  assert.match(copyHandler, /FulianCaseStateStore\.markVoteNoticeCopied\(CASE_ID\)/);
-  assert.match(copyHandler, /state=loadState\(\);render\(\)/);
-  assert.match(workflow, /caseDomain\.voteAccessReady\(state\)/);
-  assert.match(html, /複製投票通知並開放/);
+  assert.match(migration, /line_group_targets_one_active_route_environment/);
+  assert.match(migration, /\(route_key, purpose\)/);
+  assert.match(migration, /create table public\.case_vote_test_votes/);
+  assert.match(migration, /is_test and environment = 'test' and task_id is null/);
+  assert.match(edge, /path === "\/api\/vote-test"/);
+  assert.match(edge, /purpose=eq\.test/);
+  assert.match(edge, /case_vote_test_votes/);
+  assert.match(settings, /voteTestApi/);
+  assert.match(settings, /測試群與正式群可同時保留/);
+  assert.match(html, /不建立續約案件、不產生 Word、不寫入正式 votes/);
 });
