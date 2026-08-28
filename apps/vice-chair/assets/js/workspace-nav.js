@@ -27,7 +27,6 @@
         ["析", "月度分析審閱", "analysis-review.html", "vp"],
         ["會", "會員委員會月會", "monthly-meeting.html"],
         ["勤", "點名與出席", "attendance.html"],
-        ["信", "當責信待寄", "accountability-emails.html", "vp"],
         ["提", "常態通知", "routine-reminders.html", "vp"],
       ],
     },
@@ -49,6 +48,7 @@
           icon: "常",
           label: "常用資源",
           children: [
+            ["信", "當責信待寄", "accountability-emails.html", "vp"],
             ["文", "文稿範本", "message-templates.html", "vp"],
             ["鏈", "常用連結", "useful-links.html"],
           ],
