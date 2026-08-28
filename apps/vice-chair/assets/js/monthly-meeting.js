@@ -24,7 +24,7 @@
   function inMonth(value,month){return String(value||"").slice(0,7)===month}
   function caseContext(month){
     const tasks=loadTasks(),applications=tasks.filter(task=>task.type==="new"&&inMonth(task.createdAt,month)),departures=tasks.filter(task=>task.type==="departure"&&isClosedTask(task)&&inMonth(task.completedAt,month));
-    const newCases=tasks.filter(task=>task.type==="new"),approved=newCases.filter(task=>{const state=workflow(task),votes=Object.values(state.votes||{});return isClosedTask(task)&&inMonth(task.completedAt,month)&&votes.filter(v=>v==="approve").length>votes.filter(v=>v==="reject").length});
+    const newCases=tasks.filter(task=>task.type==="new"),approved=newCases.filter(task=>{const state=workflow(task),result=FulianCaseDomain.voteSummary(state);return isClosedTask(task)&&inMonth(task.completedAt,month)&&result.status==="pass"});
     const pending=newCases.filter(task=>!isClosedTask(task));
     const care=tasks.filter(task=>!isClosedTask(task)&&["renewal","midterm","special"].includes(task.type)).map(task=>({id:task.id,member:task.member,taskType:task.type,type:task.type==="renewal"?"續約／終期輔導":task.type==="midterm"?"期中輔導":"特定關懷",stage:task.stage||"待處理",lead:task.lead||"",companion:task.companions?.[0]||"",scheduledAt:task.scheduledAt||"",notes:task.notes||"",source:task.source||""}));
     return{lostCount:departures.length,applicationCount:applications.length,growthCount:approved.length-departures.length,approvedCount:approved.length,conditionalCount:0,pendingReviewCount:pending.length,taskCareMembers:care,taskIds:tasks.map(task=>task.id),completedTaskIds:tasks.filter(isClosedTask).map(task=>task.id)};

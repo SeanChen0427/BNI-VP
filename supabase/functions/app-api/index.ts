@@ -3287,6 +3287,12 @@ async function caseParticipationForCases(caseIds: string[]) {
         .filter((voter: any) => !voter.is_recused)
         .map((voter: any) => names.get(voter.person_id))
         .filter(Boolean),
+      voterRoster: snapshotVoters
+        .map((voter: any) => ({
+          name: names.get(voter.person_id),
+          isRecused: Boolean(voter.is_recused),
+        }))
+        .filter((voter: any) => Boolean(voter.name)),
       votes: Object.fromEntries(snapshotVotes
         .map((vote: any) => [names.get(vote.voter_person_id), vote.choice])
         .filter(([name]: any) => Boolean(name))),
@@ -3311,6 +3317,26 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
       applicant: task.title,
     },
   };
+  const voterSnapshot = participation?.snapshot
+    ? participation.voterSnapshot
+    : (Array.isArray(fullWorkflow.voterSnapshot) ? fullWorkflow.voterSnapshot : []);
+  const voterRoster = participation?.snapshot
+    ? participation.voterRoster
+    : (Array.isArray(fullWorkflow.voterRoster) ? fullWorkflow.voterRoster : voterSnapshot.map((name: string) => ({ name, isRecused: false })));
+  const eligibleVoters = new Set(voterSnapshot);
+  const fullVotes = Object.fromEntries(Object.entries({
+    ...(fullWorkflow.votes || {}),
+    ...(participation?.votes || {}),
+  }).filter(([name, choice]) => eligibleVoters.has(name) && ["approve", "reject"].includes(String(choice))));
+  const votedVoters = Object.keys(fullVotes);
+  const approveCount = Object.values(fullVotes).filter(choice => choice === "approve").length;
+  const rejectCount = Object.values(fullVotes).filter(choice => choice === "reject").length;
+  const viewerVote = fullVotes[String(viewerName || "").trim()];
+  const visibleVotes = leadershipRole
+    ? fullVotes
+    : viewerVote
+      ? { [String(viewerName || "").trim()]: viewerVote }
+      : {};
   const participationWorkflow = decisionCase
     ? {
       ...fullWorkflow,
@@ -3329,12 +3355,15 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
       feedbackMeta: recusedApplicant
         ? {}
         : { ...(fullWorkflow.feedbackMeta || {}), ...(participation?.feedbackMeta || {}) },
-      voterSnapshot: participation?.snapshot
-        ? participation.voterSnapshot
-        : (Array.isArray(fullWorkflow.voterSnapshot) ? fullWorkflow.voterSnapshot : []),
+      voterSnapshot,
+      voterRoster,
       votes: recusedApplicant
         ? {}
-        : { ...(fullWorkflow.votes || {}), ...(participation?.votes || {}) },
+        : visibleVotes,
+      votedVoters: recusedApplicant ? [] : votedVoters,
+      voteTally: recusedApplicant
+        ? { total: 0, approve: 0, reject: 0 }
+        : { total: approveCount + rejectCount, approve: approveCount, reject: rejectCount },
     }
     : fullWorkflow;
   const workflow = leadershipRole || assigned || decisionCase

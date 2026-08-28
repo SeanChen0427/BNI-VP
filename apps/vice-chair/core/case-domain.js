@@ -116,7 +116,52 @@
   }
 
   function voteCount(state) {
-    return Object.keys(state?.votes || {}).length;
+    const tallyTotal = Number(state?.voteTally?.total);
+    return Number.isInteger(tallyTotal) && tallyTotal >= 0
+      ? tallyTotal
+      : Object.keys(state?.votes || {}).length;
+  }
+
+  function voteSummary(state, baseFallback = 0) {
+    const snapshot = Array.isArray(state?.voterSnapshot)
+      ? state.voterSnapshot
+      : [];
+    const snapshotSet = new Set(snapshot);
+    const entries = Object.entries(state?.votes || {}).filter(([name]) =>
+      !snapshot.length || snapshotSet.has(name)
+    );
+    const tally = state?.voteTally;
+    const tallyApprove = Number(tally?.approve);
+    const tallyReject = Number(tally?.reject);
+    const approve = Number.isInteger(tallyApprove) && tallyApprove >= 0
+      ? tallyApprove
+      : entries.filter(([, choice]) => choice === "approve").length;
+    const reject = Number.isInteger(tallyReject) && tallyReject >= 0
+      ? tallyReject
+      : entries.filter(([, choice]) => choice === "reject").length;
+    const countedTotal = approve + reject;
+    const tallyTotal = Number(tally?.total);
+    const total = Number.isInteger(tallyTotal) && tallyTotal >= countedTotal
+      ? tallyTotal
+      : countedTotal;
+    const base = snapshot.length || Math.max(Number(baseFallback) || 0, total);
+    const quorum = majorityThreshold(base);
+    const status = total < quorum
+      ? "waiting"
+      : approve === reject
+        ? "tie"
+        : approve > reject
+          ? "pass"
+          : "reject";
+    return {
+      status,
+      base,
+      quorum,
+      total,
+      approve,
+      reject,
+      unvoted: Math.max(base - total, 0),
+    };
   }
 
   function voteAccessReady(state) {
@@ -338,6 +383,7 @@
     hasFeedback,
     feedbackCount,
     voteCount,
+    voteSummary,
     voteAccessReady,
     assignedMembers,
     sameTaskIdentity,

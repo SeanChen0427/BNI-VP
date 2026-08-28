@@ -108,6 +108,115 @@
   background: #e4f2e9;
 }
 
+.vote-result-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  margin-top: 12px;
+  padding: 13px;
+  border: 1px solid #ded5ca;
+  border-radius: 12px;
+  background: #faf8f5;
+}
+
+.vote-result-tools[hidden] {
+  display: none;
+}
+
+.vote-result-tools > div {
+  display: grid;
+  gap: 3px;
+}
+
+.vote-result-tools small {
+  color: #756c65;
+  line-height: 1.5;
+}
+
+.named-vote-details {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e2cda9;
+  border-radius: 14px;
+  background: #fffaf0;
+}
+
+.named-vote-details[hidden] {
+  display: none;
+}
+
+.named-vote-details > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.named-vote-details > div:first-child small {
+  color: #806a47;
+}
+
+.named-vote-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.named-vote-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 11px 12px;
+  border: 1px solid #e7e1da;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.named-vote-row b {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.named-vote-row b small {
+  color: #8b8279;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.named-vote-row em {
+  flex: 0 0 auto;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #efedea;
+  color: #706961;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.named-vote-row.approve em {
+  background: #e4f2e9;
+  color: #24734f;
+}
+
+.named-vote-row.reject em {
+  background: #f7e7e8;
+  color: #a52d36;
+}
+
+.named-vote-row.recused em {
+  background: #f1ece5;
+  color: #766b60;
+}
+
+.named-vote-empty {
+  color: #806a47;
+}
+
 .vote-notice-preview {
   max-height: none;
   margin-bottom: 14px;
@@ -184,6 +293,15 @@
   .vote-notice-actions button {
     flex: 1 1 0;
     min-height: 44px;
+  }
+
+  .vote-result-tools,
+  .named-vote-list {
+    grid-template-columns: 1fr;
+  }
+
+  .vote-result-tools button {
+    width: 100%;
   }
 
   .result-announcement-box .action-row {

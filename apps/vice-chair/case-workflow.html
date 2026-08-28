@@ -11,7 +11,7 @@
   <script src="assets/js/auth.js?v=7"></script>
   <script src="assets/js/supabase-data.js?v=2"></script>
   <script src="core/calendar-domain.js?v=1"></script>
-  <script src="core/case-domain.js?v=7"></script>
+  <script src="core/case-domain.js?v=8"></script>
   <script src="assets/js/task-store.js?v=7"></script>
   <script src="assets/js/case-state-store.js?v=12"></script>
   <script src="services/case-files.js?v=5"></script>
@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/case-workflow.css?v=2">
-  <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=4">
+  <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=5">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
   <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
 </head>
@@ -115,9 +115,17 @@
               <div class="vote-result">
                 <div class="result-numbers"><div><small>已投票</small><strong id="voteCount">0</strong></div><div><small>最低參與</small><strong id="quorum">4</strong></div><div><small>同意</small><strong id="approveCount">0</strong></div><div><small>不同意</small><strong id="rejectCount">0</strong></div></div>
                 <div class="decision-box" id="decisionBox"><small>目前判定</small><strong>等待投票</strong><span>尚未達到最低參與人數</span></div>
+                <div class="vote-result-tools" id="voteResultTools" hidden>
+                  <div><b>給董顧的投票結果圖</b><small id="voteResultImageHint">形成決議後可下載 PNG；圖面只含票數統計，不含具名票向。</small></div>
+                  <button id="downloadVoteResult" class="ghost" type="button" disabled>下載投票結果圖（PNG）</button>
+                </div>
               </div>
             </div>
             <div class="voter-status" id="voterStatus"></div>
+            <section class="named-vote-details" id="namedVoteDetails" hidden>
+              <div><b>副主席具名票向</b><small>僅副主席與系統開發人員 Admin 可查閱；一般委員不會收到其他人的投票選項。</small></div>
+              <div class="named-vote-list" id="namedVoteList"></div>
+            </section>
           </div>
         </section>
 
@@ -162,7 +170,8 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/case-workflow.js?v=24"></script>
+  <script src="assets/js/vote-result-image.js?v=1"></script>
+  <script src="assets/js/case-workflow.js?v=25"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

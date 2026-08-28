@@ -73,7 +73,7 @@
       priority = 3;
     } else if (stage === domain.STAGES.VOTE) {
       kind = "vote";
-      title = `投票進行中・已投 ${Object.keys(state.votes || {}).length} 票`;
+      title = `投票進行中・已投 ${domain.voteCount(state)} 票`;
       link = `case-workflow.html?case=${encodeURIComponent(task.id)}`;
       icon = "票";
       priority = 2;
