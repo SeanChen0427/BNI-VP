@@ -46,12 +46,9 @@
 
   function decisionOf(state) {
     const snapshot = Array.isArray(state.voterSnapshot) ? state.voterSnapshot : [];
-    const votes = Object.entries(state.votes || {}).filter(([name]) => snapshot.includes(name));
-    const approve = votes.filter(([, vote]) => vote === "approve").length;
-    const reject = votes.filter(([, vote]) => vote === "reject").length;
-    const quorum = Math.floor(snapshot.length / 2) + 1;
-    const status = votes.length < quorum ? "未達門檻" : approve === reject ? "同票未形成決議" : approve > reject ? "通過" : "不通過";
-    return { snapshot, votes, approve, reject, quorum, status };
+    const summary = domain.voteSummary(state, snapshot.length);
+    const statusLabel = summary.status === "waiting" ? "未達門檻" : summary.status === "tie" ? "同票未形成決議" : summary.status === "pass" ? "通過" : "不通過";
+    return { snapshot, ...summary, statusLabel };
   }
 
   function renderDecision(task, state) {
@@ -63,8 +60,8 @@
     $("#decisionSection").hidden = false;
     const decision = decisionOf(state);
     $("#decisionSummary").innerHTML = `
-      <article><small>結案決議</small><strong>${esc(decision.status)}</strong></article>
-      <article><small>已投票／門檻</small><strong>${decision.votes.length}／${decision.quorum}</strong></article>
+      <article><small>結案決議</small><strong>${esc(decision.statusLabel)}</strong></article>
+      <article><small>已投票／門檻</small><strong>${decision.total}／${decision.quorum}</strong></article>
       <article><small>同意</small><strong>${decision.approve}</strong></article>
       <article><small>不同意</small><strong>${decision.reject}</strong></article>`;
     const feedback = Object.entries(state.feedback || {}).filter(([, text]) => String(text).trim());
@@ -77,12 +74,37 @@
           return `<span><b>${esc(name)}</b><em class="${vote || "pending"}">${vote === "approve" ? "同意" : vote === "reject" ? "不同意" : "未投票"}</em></span>`;
         }).join("")}`
       : '<div class="empty-record">沒有保存投票資格快照</div>';
+    const downloadButton = $("#downloadVoteResult");
+    downloadButton.disabled = !["pass", "reject"].includes(decision.status);
+    downloadButton.onclick = async () => {
+      if (downloadButton.disabled) return;
+      downloadButton.disabled = true;
+      const original = downloadButton.textContent;
+      downloadButton.textContent = "正在產生 PNG…";
+      try {
+        await window.FulianVoteResultImage.download(window.FulianVoteResultImage.createReport({
+          state,
+          caseType: task.type,
+          applicant: task.member,
+          profession: task.profession || state.form?.profession,
+          deadlineAt: state.form?.voteDeadline,
+          approveLabel: task.type === "new" ? "同意入會" : task.type === "industry" ? "同意轉換" : "同意續約",
+          rejectLabel: task.type === "new" ? "不同意入會" : task.type === "industry" ? "不同意轉換" : "不同意續約",
+        }));
+        toast("投票結果圖已下載");
+      } catch (error) {
+        toast(error.message || "投票結果圖下載失敗");
+      } finally {
+        downloadButton.textContent = original;
+        downloadButton.disabled = !["pass", "reject"].includes(decision.status);
+      }
+    };
     const form = state.form || {};
     const advisorLabel = state.advisorStatus === "confirmed" ? "同意會員委員會決議" : state.advisorStatus === "returned" ? "退回補充資料" : "尚未回覆";
     $("#advisorFacts").innerHTML = [
       fact("三長群發送", state.leadersSent ? "已登記發送" : "未登記"),
       fact("董事顧問確認", advisorLabel),
-      fact("正式公告群", state.resultAnnouncementSent ? `${dateLabel(state.resultAnnouncementSentAt)}・${state.resultAnnouncementTargetName || "正式公告群"}` : decision.status === "不通過" ? "不通過案件不公告" : "未發布"),
+      fact("正式公告群", state.resultAnnouncementSent ? `${dateLabel(state.resultAnnouncementSentAt)}・${state.resultAnnouncementTargetName || "正式公告群"}` : decision.status === "reject" ? "不通過案件不公告" : "未發布"),
       fact("確認備註", state.advisorNote),
       ...(task.type === "renewal" ? [
         fact("過去一年培訓", form.annualTraining),

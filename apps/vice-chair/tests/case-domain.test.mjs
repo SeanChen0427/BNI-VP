@@ -87,6 +87,15 @@ assert.deepEqual(domain.eligibleMembers(committee, "委員乙"), [
 ]);
 assert.equal(domain.majorityThreshold(7), 4);
 assert.equal(domain.majorityThreshold(6), 4);
+assert.equal(domain.voteCount({ votes: { "委員乙": "approve" }, voteTally: { total: 5 } }), 5);
+assert.deepEqual(
+  domain.voteSummary({
+    voterSnapshot: committee,
+    votes: { "委員乙": "reject" },
+    voteTally: { total: 2, approve: 1, reject: 1 },
+  }),
+  { status: "tie", base: 3, quorum: 2, total: 2, approve: 1, reject: 1, unvoted: 1 }
+);
 assert.equal(domain.voteAccessReady({}), false);
 assert.equal(domain.voteAccessReady({ voteNoticeSent: true }), true);
 assert.equal(domain.voteAccessReady({ voteNoticeCopiedAt: "2026-08-28T01:00:00Z" }), true);

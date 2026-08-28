@@ -30,6 +30,9 @@ main { width: min(1120px, 92vw); margin: 30px auto 70px; }
 .section-head h2, .section-head p { margin: 0; }
 .section-head h2 { font-size: 19px; }
 .section-head p { color: var(--muted); font-size: 11px; }
+.archive-vote-head > div { min-width: 0; margin-right: auto; }
+.archive-vote-head > button { flex: 0 0 auto; padding: 9px 13px; border: 1px solid #cfc5bc; border-radius: 10px; color: var(--red); background: #fff; font-weight: 800; cursor: pointer; }
+.archive-vote-head > button:disabled { opacity: .42; cursor: not-allowed; }
 .facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; margin: 0; overflow: hidden; border: 1px solid var(--line); border-radius: 13px; background: var(--line); }
 .facts div { min-width: 0; padding: 13px 15px; background: #fff; }
 .facts dt { color: var(--muted); font-size: 10px; }
@@ -78,4 +81,6 @@ main { width: min(1120px, 92vw); margin: 30px auto 70px; }
   .file-row { grid-template-columns: auto 1fr; }
   .file-row button { grid-column: 1 / 3; }
   .decision-summary { grid-template-columns: 1fr 1fr; }
+  .archive-vote-head { flex-wrap: wrap; }
+  .archive-vote-head > button { width: 100%; }
 }

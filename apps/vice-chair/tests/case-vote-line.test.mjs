@@ -86,7 +86,7 @@ test("正式案件只建立呼喚，不再由投票按鈕使用 Push 額度", ()
   assert.doesNotMatch(html, /id="sendVoteNotice"/);
   assert.match(html, /啟動投票流程並複製文案/);
   assert.match(html, /case-state-store\.js\?v=12/);
-  assert.match(html, /case-workflow\.js\?v=24/);
+  assert.match(html, /case-workflow\.js\?v=25/);
 });
 
 test("Webhook 只接受委員會群的 Token 與完整文案雜湊，並呼叫 Reply API", () => {

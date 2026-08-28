@@ -45,7 +45,10 @@ const initialState = {
   voteCallDeadline:"",
   voteCallTargetName:"",
   voterSnapshot:[],
+  voterRoster:[],
   votes:{},
+  votedVoters:[],
+  voteTally:null,
   leadersSent:false,
   advisorStatus:"pending",
   advisorNote:"",
@@ -72,6 +75,7 @@ function loadState(){
 
 function cloneInitial(){return JSON.parse(JSON.stringify(initialState));}
 function isVp(){return authSession.role==="vp";}
+function canViewNamedVotes(){return ["vp","admin"].includes(authSession.role);}
 function currentUser(){return String(authSession.name||"").trim();}
 function recusedApplicant(){return caseDomain.recusedApplicant(committee,$("#applicant").value);}
 function eligibleMembers(){return caseDomain.eligibleMembers(committee,$("#applicant").value);}
@@ -81,7 +85,6 @@ function selectedFeedbackAuthor(){
   if(!isVp())return currentUser();
   return eligibleMembers().includes(feedbackEditorTarget)?feedbackEditorTarget:currentUser();
 }
-function voteEntries(){return Object.entries(state.votes).filter(([name])=>state.voterSnapshot.includes(name));}
 function nowLabel(){return new Date().toLocaleString("zh-TW",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false});}
 function dateLabel(value){if(!value)return"未設定";const d=new Date(value);return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
 function voteDeadlineLineLabel(value,now=new Date()){
@@ -124,13 +127,23 @@ function feedbackReady(){return feedbackCount()>=threshold();}
 function voteAccessReady(){return caseDomain.voteAccessReady(state);}
 function voteDeadlineStatus(){return caseDomain.voteDeadlineStatus($("#voteDeadline").value);}
 function voteDecision(){
-  const entries=voteEntries();
-  const quorum=Math.floor((state.voterSnapshot.length||eligibleMembers().length)/2)+1;
-  const approve=entries.filter(([,vote])=>vote==="approve").length;
-  const reject=entries.filter(([,vote])=>vote==="reject").length;
-  if(entries.length<quorum)return{status:"waiting",title:"尚未達參與門檻",detail:`還需要 ${quorum-entries.length} 票`,approve,reject,total:entries.length,quorum};
-  if(approve===reject)return{status:"tie",title:"目前票數同票",detail:"需等待下一位有資格委員投票",approve,reject,total:entries.length,quorum};
-  return{status:approve>reject?"pass":"reject",title:approve>reject?"會員委員會表決通過":"會員委員會表決不通過",detail:`同意 ${approve} 票／不同意 ${reject} 票`,approve,reject,total:entries.length,quorum};
+  const summary=caseDomain.voteSummary(state,eligibleMembers().length);
+  if(summary.status==="waiting")return{...summary,title:"尚未達參與門檻",detail:`還需要 ${summary.quorum-summary.total} 票`};
+  if(summary.status==="tie")return{...summary,title:"目前票數同票",detail:"需等待下一位有資格委員投票"};
+  return{...summary,title:summary.status==="pass"?"會員委員會表決通過":"會員委員會表決不通過",detail:`同意 ${summary.approve} 票／不同意 ${summary.reject} 票`};
+}
+
+function voteResultReport(){
+  return window.FulianVoteResultImage.createReport({
+    state,
+    caseType:$("#caseType").value,
+    applicant:$("#applicant").value,
+    profession:$("#profession").value,
+    deadlineAt:$("#voteDeadline").value,
+    approveLabel:config().approve,
+    rejectLabel:config().reject,
+    baseFallback:eligibleMembers().length,
+  });
 }
 
 function currentStage(){
@@ -268,10 +281,31 @@ function renderVote(){
   const box=$("#decisionBox");
   box.className=`decision-box ${decision.status==="pass"?"pass":decision.status==="reject"?"reject":""}`;
   box.innerHTML=`<small>目前判定</small><strong>${decision.title}</strong><span>${decision.detail}</span>`;
+  const votedNames=new Set(Array.isArray(state.votedVoters)?state.votedVoters:Object.keys(state.votes||{}));
   $("#voterStatus").innerHTML=committee.map(name=>{
-    const recused=state.votingOpen&&!state.voterSnapshot.includes(name),voted=Boolean(state.votes[name]);
+    const recused=state.votingOpen&&!state.voterSnapshot.includes(name),voted=votedNames.has(name);
     return `<span class="voter-chip ${recused?"recused":voted?"voted":""}">${name}・${recused?"迴避":voted?"已投":"未投"}</span>`;
   }).join("");
+  const privateVisible=canViewNamedVotes();
+  const privateSection=$("#namedVoteDetails"),privateTools=$("#voteResultTools");
+  privateSection.hidden=!privateVisible;
+  privateTools.hidden=!privateVisible;
+  if(privateVisible){
+    const roster=Array.isArray(state.voterRoster)&&state.voterRoster.length
+      ? state.voterRoster
+      : committee.map(name=>({name,isRecused:state.votingOpen&&!state.voterSnapshot.includes(name)}));
+    $("#namedVoteList").innerHTML=roster.map(item=>{
+      const name=String(item.name||"").trim(),choice=state.votes?.[name];
+      const status=item.isRecused?"recused":choice==="approve"?"approve":choice==="reject"?"reject":"pending";
+      const label=item.isRecused?"迴避":choice==="approve"?config().approve:choice==="reject"?config().reject:"尚未投票";
+      return `<span class="named-vote-row ${status}"><b>${escapeHtml(name)}<small>${escapeHtml(roles[name]||"投票資格者")}</small></b><em>${escapeHtml(label)}</em></span>`;
+    }).join("")||'<span class="named-vote-empty">投票資格快照建立後會顯示逐人票向。</span>';
+    const formed=["pass","reject"].includes(decision.status);
+    $("#downloadVoteResult").disabled=!formed;
+    $("#voteResultImageHint").textContent=formed
+      ?`目前圖面會顯示已投 ${decision.total}／${decision.base} 人及同意、不同意票數；不列具名票向。`
+      :"形成決議後可下載 PNG；圖面只含票數統計，不含具名票向。";
+  }
   const eligible=state.voterSnapshot.includes(currentUser());
   const accessReady=voteAccessReady();
   const canVote=state.votingOpen&&accessReady&&eligible&&!state.closed&&deadline.valid&&!deadline.expired;
@@ -442,7 +476,7 @@ function restoreForm(){
   Object.entries(form).forEach(([id,value])=>{if(id==="recusedMember"||id==="loginUser"||(sourceTask&&taskBoundFields.has(id)))return;const node=$(`#${id}`);if(node&&value!==undefined)node.value=value;});
   if($("#caseType").value==="new")$("#resultReferrerName").value=form.referrerName||caseDraft().referrerName||"";
   $("#recusedMember").value=recusedApplicant()||"無須迴避";
-  if(state.votingOpen&&!Object.keys(state.votes||{}).length){
+  if(state.votingOpen&&!caseDomain.voteCount(state)){
     const corrected=eligibleMembers();
     if(JSON.stringify(state.voterSnapshot)!==JSON.stringify(corrected))state.voterSnapshot=corrected;
   }
@@ -536,6 +570,14 @@ function bindEvents(){
     }catch(error){state=loadState();render();$("#saveState").textContent="投票流程尚未啟動";toast(error.message||"投票呼喚建立失敗")}
   });
   $("#submitVote").addEventListener("click",async()=>{const deadline=voteDeadlineStatus();if(!voteAccessReady())return toast("請等會員委員秘書Bot在正式群回覆投票圖卡");if(!deadline.valid)return toast("請先設定有效的投票截止時間");if(deadline.expired)return toast("投票期限已截止");const selected=$("input[name=vote]:checked");if(!selected)return toast("請選擇投票選項");if(!state.voterSnapshot.includes(currentUser()))return toast("你不在本案投票資格快照中");$("#saveState").textContent="正在送出你的投票…";lastPersist=window.FulianCaseStateStore.saveVote(CASE_ID,selected.value);try{await lastPersist;state=loadState();render();$("#saveState").textContent="你的投票已安全記錄";toast("投票已記錄")}catch(error){$("#saveState").textContent="Supabase 保存失敗";toast(error.message||"投票失敗")}});
+  $("#downloadVoteResult").addEventListener("click",async()=>{
+    if(!canViewNamedVotes()||!["pass","reject"].includes(voteDecision().status))return;
+    const button=$("#downloadVoteResult"),original=button.textContent;
+    button.disabled=true;button.textContent="正在產生 PNG…";
+    try{await window.FulianVoteResultImage.download(voteResultReport());toast("投票結果圖已下載");}
+    catch(error){toast(error.message||"投票結果圖下載失敗");}
+    finally{button.textContent=original;renderVote();}
+  });
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
   $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});
   $("#saveAdvisor").addEventListener("click",()=>{if(!isVp())return;state.advisorStatus=$("#advisorStatus").value;state.advisorNote=$("#advisorNote").value.trim();addLog(state.advisorStatus==="confirmed"?"董事顧問已同意會員委員會決議":state.advisorStatus==="returned"?"董事顧問退回補充資料":"董事顧問確認仍待回覆");persistNow();toast("董顧確認狀態已保存");});

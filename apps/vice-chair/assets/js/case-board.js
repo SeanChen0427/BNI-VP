@@ -78,7 +78,7 @@
       if (state?.advisorStatus === "confirmed") return "董顧已確認・待公告或結案";
       return state?.advisorStatus === "returned" ? "董顧退回補件" : "等待董顧確認";
     }
-    if (stage === "vote") return `投票中・已投 ${Object.keys(state?.votes || {}).length} 票`;
+    if (stage === "vote") return `投票中・已投 ${domain.voteCount(state)} 票`;
     if (stage === "feedback") return `回饋中・已收 ${Object.values(state?.feedback || {}).filter(value => String(value).trim()).length} 份`;
     if (stage === "interview") return "訪談草稿進行中";
     return "尚未開始訪談";

@@ -8,10 +8,12 @@ assert.match(html, /id="caseFacts"/);
 assert.match(html, /id="downloadWord"/);
 assert.match(html, /id="feedbackList"/);
 assert.match(html, /id="voteList"/);
+assert.match(html, /id="downloadVoteResult"/);
 assert.match(html, /id="advisorFacts"/);
 assert.match(html, /id="activityLog"/);
 assert.match(html, /id="departureInsightsSection"/);
-assert.match(html, /case-archive\.js\?v=3/);
+assert.match(html, /vote-result-image\.js\?v=1/);
+assert.match(html, /case-archive\.js\?v=4/);
 assert.match(source, /session\?\.role !== "vp"/, "結案資料只能由副主席查閱");
 assert.match(source, /files\.getCaseFile/, "結案頁必須能讀取保存的 Word");
 assert.match(source, /domain\.requiresDecisionWorkflow\(task\)/, "非投票案件也必須有結案摘要");
@@ -20,5 +22,6 @@ assert.match(source, /#decisionSection"\)\.hidden = true/, "記錄型案件不�
 assert.match(source, /task\.type === "departure"/, "離會訪談須顯示營運改善紀錄");
 assert.match(source, /draft\.committeeSummary/);
 assert.match(source, /draft\.internalNotes/);
+assert.match(source, /FulianVoteResultImage\.download/, "結案頁必須能下載投票結果圖");
 
 console.log("case archive tests passed");
