@@ -1,6 +1,6 @@
 {
   "schema": "fulian.unified-project.v1",
-  "updated": "2026-08-28",
+  "updated": "2026-08-29",
   "product": "富聯分會會員委員會整合系統",
   "runtime": {
     "type": "local multi-page prototype with shared analysis backend",

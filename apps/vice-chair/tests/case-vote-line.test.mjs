@@ -82,7 +82,24 @@ test("正式案件可選發布群組，但只建立呼喚且不使用 Push 額�
   assert.match(workflow, /這只改變投票圖卡的發布位置/);
   assert.match(workflow, /仍會直接寫入/);
   assert.match(html, /case-state-store\.js\?v=14/);
-  assert.match(html, /case-workflow\.js\?v=27/);
+  assert.match(html, /case-workflow\.js\?v=28/);
+});
+
+test("測試群投票圖卡可單向改發正式群，並保留既有正式票", () => {
+  const migration = read("supabase/migrations/20260829023000_promote_test_calls_to_production.sql");
+  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
+
+  assert.match(migration, /promoting_to_production := replied_call\.environment = 'test'\s+and target_group\.purpose = 'production'/);
+  assert.match(migration, /when promoting_to_production then 'vote_call\.promoted'/);
+  assert.match(migration, /if not promoting_to_production\s+and exists \(select 1 from public\.votes/);
+  assert.doesNotMatch(
+    migration,
+    /\b(?:delete from|update)\s+public\.votes(?:\s|$)/i,
+    "改發正式群不得刪除或改寫既有正式票",
+  );
+  assert.match(workflow, /已收到的正式票全部保留/);
+  assert.match(workflow, /尚未投票者可從正式群新圖卡繼續投票/);
+  assert.match(workflow, /voteEnvironment=promotingToProduction\?"production"/);
 });
 
 test("Webhook 只接受本次指定委員會群的 Token 與完整文案雜湊，並呼叫 Reply API", () => {

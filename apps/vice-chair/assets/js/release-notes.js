@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.14",
+      publishedAt: "2026-08-29",
+      title: "測試群圖卡可改發正式群",
+      level: "important",
+      changes: Object.freeze([
+        "回饋或投票圖卡先在測試群確認無誤後，副主席可直接按「改發正式群並複製新文案」。",
+        "改發後請把新文案原樣貼到正式群；Bot 回覆正式圖卡後，流程才會最終鎖定。",
+        "測試群舊連結會失效，避免兩個入口並存；已收到的回饋或票數會完整保留。"
+      ]),
+      impact: "只新增測試群轉正式群的單向發布流程；不刪除或改寫既有正式案件、回饋、票數、Word 與結案紀錄。"
+    }),
+    Object.freeze({
       version: "1.0.13",
       publishedAt: "2026-08-28",
       title: "LINE 免登入委員回饋",

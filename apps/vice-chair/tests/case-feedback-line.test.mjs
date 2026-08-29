@@ -78,7 +78,26 @@ test("案件頁可選測試／正式群建立回饋呼喚，流程本身不使�
   assert.match(html, /id="feedbackCallEnvironment"/);
   assert.match(html, /測試群（仍寫入正式案件）/);
   assert.match(html, /case-state-store\.js\?v=14/);
-  assert.match(html, /case-workflow\.js\?v=27/);
+  assert.match(html, /case-workflow\.js\?v=28/);
+});
+
+test("測試群回饋圖卡可單向改發正式群，並保留既有正式回饋", () => {
+  const migration = read("supabase/migrations/20260829023000_promote_test_calls_to_production.sql");
+  const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
+
+  assert.match(migration, /promoting_to_production := replied_call\.environment = 'test'\s+and target_group\.purpose = 'production'/);
+  assert.match(migration, /when promoting_to_production then 'feedback_call\.promoted'/);
+  assert.match(migration, /測試群驗收完成，已改發正式群/);
+  assert.match(migration, /status in \('awaiting_reply', 'reply_failed', 'replied'\)/);
+  assert.doesNotMatch(
+    migration,
+    /\b(?:delete from|update)\s+public\.case_feedback(?:\s|$)/i,
+    "改發正式群不得刪除或改寫既有正式回饋",
+  );
+  assert.match(workflow, /改發正式群並複製新文案/);
+  assert.match(workflow, /測試群舊連結會失效/);
+  assert.match(workflow, /已收到的正式回饋全部保留/);
+  assert.match(workflow, /feedbackEnvironment=promotingToProduction\?"production"/);
 });
 
 test("Webhook 只接受指定委員群的 Token 與完整文案雜湊，並使用 Reply API", () => {

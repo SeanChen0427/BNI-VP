@@ -325,17 +325,22 @@ function renderVote(){
   const eligible=state.voterSnapshot.includes(currentUser());
   const accessReady=voteAccessReady();
   const callStatus=state.voteCallStatus||"";
-  if(!voteEnvironmentTouched&&state.voteCallId&&["test","production"].includes(state.voteCallEnvironment))selectedVoteEnvironment=state.voteCallEnvironment;
-  const callEnvironment=["test","production"].includes(state.voteCallEnvironment)?state.voteCallEnvironment:selectedVoteEnvironment;
+  const recordedCallEnvironment=["test","production"].includes(state.voteCallEnvironment)?state.voteCallEnvironment:selectedVoteEnvironment;
+  const canPromoteVoteCall=callStatus==="replied"&&recordedCallEnvironment==="test";
+  if(canPromoteVoteCall){selectedVoteEnvironment="production";voteEnvironmentTouched=false;}
+  else if(!voteEnvironmentTouched&&state.voteCallId)selectedVoteEnvironment=recordedCallEnvironment;
+  const callEnvironment=recordedCallEnvironment;
   const selectedGroupLabel=voteEnvironmentLabel(selectedVoteEnvironment);
   const callGroupLabel=voteEnvironmentLabel(callEnvironment);
   const environmentSelect=$("#voteCallEnvironment"),environmentHint=$("#voteCallEnvironmentHint");
   environmentSelect.value=selectedVoteEnvironment;
   environmentSelect.disabled=!isVp()||Boolean(activeVoteCallText)||["replying","replied"].includes(callStatus);
-  environmentHint.textContent=selectedVoteEnvironment==="test"
+  environmentHint.textContent=canPromoteVoteCall
+    ?"測試群圖卡已回覆；現在只可單向改發正式群，既有正式票會完整保留。"
+    :selectedVoteEnvironment==="test"
     ?"測試群只改變圖卡發布位置；所有送票仍列入本案正式紀錄。"
     :"預設發布到正式群；所有送票都列入本案正式紀錄。";
-  environmentHint.classList.toggle("warning",selectedVoteEnvironment==="test");
+  environmentHint.classList.toggle("warning",canPromoteVoteCall||selectedVoteEnvironment==="test");
   const canVote=state.votingOpen&&accessReady&&eligible&&!state.closed&&deadline.valid&&!deadline.expired;
   $("#submitVote").disabled=!canVote;
   $$("input[name=vote]").forEach(input=>input.disabled=!canVote);
@@ -350,8 +355,10 @@ function renderVote(){
   const own=state.votes[currentUser()]||"";
   $$("input[name=vote]").forEach(input=>input.checked=input.value===own);
   $("#voteNoticePreview").textContent=voteNotice();
-  $("#copyVoteNotice").disabled=!(isVp()&&state.votingOpen&&!state.closed&&deadline.valid&&!deadline.expired&&callStatus!=="replied");
-  $("#copyVoteNotice").textContent=callStatus==="replied"
+  $("#copyVoteNotice").disabled=!(isVp()&&state.votingOpen&&!state.closed&&deadline.valid&&!deadline.expired&&(callStatus!=="replied"||canPromoteVoteCall));
+  $("#copyVoteNotice").textContent=canPromoteVoteCall
+    ?"改發正式群並複製新文案"
+    :callStatus==="replied"
     ?"Bot 已回覆投票圖卡"
     :activeVoteCallText
       ?"再次複製完整投票文案"
@@ -361,7 +368,9 @@ function renderVote(){
   const lineState=$("#voteLineState");
   lineState.classList.toggle("sent",callStatus==="replied"||(!state.voteCallId&&accessReady));
   lineState.textContent=callStatus==="replied"
-    ?`會員委員秘書Bot 已於 ${dateLabel(state.voteCallRepliedAt)} 在「${state.voteCallTargetName||callGroupLabel}」回覆投票圖卡；送票會寫入本案正式紀錄。`
+    ?canPromoteVoteCall
+      ?`會員委員秘書Bot 已於 ${dateLabel(state.voteCallRepliedAt)} 在「${state.voteCallTargetName||callGroupLabel}」回覆測試群圖卡。確認圖卡無誤後，可改發正式群；測試連結會失效，既有正式票保留。`
+      :`會員委員秘書Bot 已於 ${dateLabel(state.voteCallRepliedAt)} 在「${state.voteCallTargetName||callGroupLabel}」回覆投票圖卡；送票會寫入本案正式紀錄。`
     :callStatus==="replying"
       ?"Bot 已收到完整呼喚，正在回覆投票圖卡…"
       :callStatus==="reply_failed"
@@ -431,20 +440,27 @@ function renderSummary(){
   $("#applicant").readOnly=true;
   $("#profession").readOnly=true;
   const feedbackCallStatus=state.feedbackCallStatus||"";
-  if(!feedbackEnvironmentTouched&&state.feedbackCallId&&["test","production"].includes(state.feedbackCallEnvironment))selectedFeedbackEnvironment=state.feedbackCallEnvironment;
-  const feedbackCallEnvironment=["test","production"].includes(state.feedbackCallEnvironment)?state.feedbackCallEnvironment:selectedFeedbackEnvironment;
+  const recordedFeedbackEnvironment=["test","production"].includes(state.feedbackCallEnvironment)?state.feedbackCallEnvironment:selectedFeedbackEnvironment;
+  const canPromoteFeedbackCall=feedbackCallStatus==="replied"&&recordedFeedbackEnvironment==="test";
+  if(canPromoteFeedbackCall){selectedFeedbackEnvironment="production";feedbackEnvironmentTouched=false;}
+  else if(!feedbackEnvironmentTouched&&state.feedbackCallId)selectedFeedbackEnvironment=recordedFeedbackEnvironment;
+  const feedbackCallEnvironment=recordedFeedbackEnvironment;
   const selectedFeedbackGroupLabel=feedbackEnvironmentLabel(selectedFeedbackEnvironment);
   const feedbackCallGroupLabel=feedbackEnvironmentLabel(feedbackCallEnvironment);
   const feedbackEnvironmentSelect=$("#feedbackCallEnvironment"),feedbackEnvironmentHint=$("#feedbackCallEnvironmentHint");
   feedbackEnvironmentSelect.value=selectedFeedbackEnvironment;
   feedbackEnvironmentSelect.disabled=!isVp()||Boolean(activeFeedbackCallText)||["replying","replied"].includes(feedbackCallStatus);
-  feedbackEnvironmentHint.textContent=selectedFeedbackEnvironment==="test"
+  feedbackEnvironmentHint.textContent=canPromoteFeedbackCall
+    ?"測試群圖卡已回覆；現在只可單向改發正式群，既有正式回饋會完整保留。"
+    :selectedFeedbackEnvironment==="test"
     ?"測試群只改變圖卡發布位置；所有回饋仍直接寫入本案正式紀錄。"
     :"預設發布到正式群；所有回饋都直接寫入本案正式紀錄。";
-  feedbackEnvironmentHint.classList.toggle("warning",selectedFeedbackEnvironment==="test");
+  feedbackEnvironmentHint.classList.toggle("warning",canPromoteFeedbackCall||selectedFeedbackEnvironment==="test");
   $("#feedbackNoticePreview").textContent=feedbackNotice();
-  $("#copyFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.closed&&feedbackCallStatus!=="replied");
-  $("#copyFeedbackNotice").textContent=feedbackCallStatus==="replied"
+  $("#copyFeedbackNotice").disabled=!(isVp()&&state.wordSaved&&!state.closed&&(feedbackCallStatus!=="replied"||canPromoteFeedbackCall));
+  $("#copyFeedbackNotice").textContent=canPromoteFeedbackCall
+    ?"改發正式群並複製新文案"
+    :feedbackCallStatus==="replied"
     ?"Bot 已回覆回饋圖卡"
     :activeFeedbackCallText
       ?"再次複製完整回饋文案"
@@ -454,7 +470,9 @@ function renderSummary(){
   const feedbackLineState=$("#feedbackLineState");
   feedbackLineState.classList.toggle("sent",feedbackCallStatus==="replied"||(!state.feedbackCallId&&Boolean(state.feedbackNoticeDeliveryId)));
   feedbackLineState.textContent=feedbackCallStatus==="replied"
-    ?`會員委員秘書Bot 已於 ${dateLabel(state.feedbackCallRepliedAt)} 在「${state.feedbackCallTargetName||feedbackCallGroupLabel}」回覆免登入回饋圖卡；委員打開即可查看目前所有回饋。`
+    ?canPromoteFeedbackCall
+      ?`會員委員秘書Bot 已於 ${dateLabel(state.feedbackCallRepliedAt)} 在「${state.feedbackCallTargetName||feedbackCallGroupLabel}」回覆測試群圖卡。確認圖卡無誤後，可改發正式群；測試連結會失效，既有正式回饋保留。`
+      :`會員委員秘書Bot 已於 ${dateLabel(state.feedbackCallRepliedAt)} 在「${state.feedbackCallTargetName||feedbackCallGroupLabel}」回覆免登入回饋圖卡；委員打開即可查看目前所有回饋。`
     :feedbackCallStatus==="replying"
       ?"Bot 已收到完整呼喚，正在回覆回饋圖卡…"
       :feedbackCallStatus==="reply_failed"
@@ -590,13 +608,15 @@ function bindEvents(){
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $("#copyFeedbackNotice").addEventListener("click",async()=>{
     if(!isVp()||!state.wordSaved||state.closed)return;
-    const feedbackEnvironment=selectedFeedbackEnvironment==="test"?"test":"production";
+    const promotingToProduction=state.feedbackCallStatus==="replied"&&state.feedbackCallEnvironment==="test";
+    const feedbackEnvironment=promotingToProduction?"production":selectedFeedbackEnvironment==="test"?"test":"production";
     const groupLabel=feedbackEnvironmentLabel(feedbackEnvironment);
-    if(activeFeedbackCallText){
+    if(activeFeedbackCallText&&!promotingToProduction){
       try{await navigator.clipboard.writeText(activeFeedbackCallText);$("#saveState").textContent=`完整回饋文案已再次複製；等待貼到${groupLabel}`;return toast(`請將完整文案原樣貼到委員會${groupLabel}`)}
       catch{$("#feedbackNoticePreview").focus();return toast("請手動全選下方完整文案後複製")}
     }
-    if(feedbackEnvironment==="test"&&!confirm(`你選擇的是「測試群」。\n\n這只改變回饋圖卡的發布位置；委員送出的內容仍會直接寫入「${$("#applicant").value.trim()||"本案申請者"}」這筆正式案件，並列入回饋門檻。\n\n確定用測試群啟動這筆正式回饋？`))return;
+    if(promotingToProduction&&!confirm(`即將把「${$("#applicant").value.trim()||"本案申請者"}」的回饋圖卡由測試群改發正式群。\n\n改發後：\n・測試群舊連結會失效\n・已收到的正式回饋全部保留\n・系統會建立一份新的正式群文案\n\n確定改發正式群？`))return;
+    if(!promotingToProduction&&feedbackEnvironment==="test"&&!confirm(`你選擇的是「測試群」。\n\n這只改變回饋圖卡的發布位置；委員送出的內容仍會直接寫入「${$("#applicant").value.trim()||"本案申請者"}」這筆正式案件，並列入回饋門檻。\n\n測試群回覆後，仍可單向改發正式群。確定先用測試群啟動這筆正式回饋？`))return;
     const button=$("#copyFeedbackNotice");button.disabled=true;button.textContent="正在建立回饋連結…";
     clearTimeout(saveTimer);
     state.form=collectForm();
@@ -624,13 +644,15 @@ function bindEvents(){
     const deadline=voteDeadlineStatus();
     if(!deadline.valid)return toast("請先設定有效的投票截止時間");
     if(deadline.expired)return toast("投票期限已截止，請先更新截止時間");
-    const voteEnvironment=selectedVoteEnvironment==="test"?"test":"production";
+    const promotingToProduction=state.voteCallStatus==="replied"&&state.voteCallEnvironment==="test";
+    const voteEnvironment=promotingToProduction?"production":selectedVoteEnvironment==="test"?"test":"production";
     const groupLabel=voteEnvironmentLabel(voteEnvironment);
-    if(activeVoteCallText){
+    if(activeVoteCallText&&!promotingToProduction){
       try{await navigator.clipboard.writeText(activeVoteCallText);$("#saveState").textContent=`完整投票文案已再次複製；等待貼到${groupLabel}`;return toast(`請將完整文案原樣貼到委員會${groupLabel}`)}
       catch{$("#voteNoticePreview").focus();return toast("請手動全選下方完整文案後複製")}
     }
-    if(voteEnvironment==="test"&&!confirm(`你選擇的是「測試群」。\n\n這只改變投票圖卡的發布位置；委員送出的票仍會直接寫入「${$("#applicant").value.trim()||"本案申請者"}」這筆正式案件，並影響票數、決議與結案。\n\n確定用測試群啟動這筆正式投票？`))return;
+    if(promotingToProduction&&!confirm(`即將把「${$("#applicant").value.trim()||"本案申請者"}」的投票圖卡由測試群改發正式群。\n\n改發後：\n・測試群舊連結會失效\n・已收到的正式票全部保留\n・尚未投票者可從正式群新圖卡繼續投票\n\n確定改發正式群？`))return;
+    if(!promotingToProduction&&voteEnvironment==="test"&&!confirm(`你選擇的是「測試群」。\n\n這只改變投票圖卡的發布位置；委員送出的票仍會直接寫入「${$("#applicant").value.trim()||"本案申請者"}」這筆正式案件，並影響票數、決議與結案。\n\n測試群回覆後，仍可單向改發正式群。確定先用測試群啟動這筆正式投票？`))return;
     const button=$("#copyVoteNotice");button.disabled=true;button.textContent="正在記錄複製通知…";
     $("#saveState").textContent="正在建立一次性投票連結…";
     lastPersist=window.FulianCaseStateStore.prepareVoteCall(CASE_ID,voteEnvironment);
