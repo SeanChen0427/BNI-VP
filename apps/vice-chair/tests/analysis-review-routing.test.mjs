@@ -2,15 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { reconcile } from "../../bni-analysis/engine/reconcile.mjs";
+import { buildAnalysisFromParsed } from "../../bni-analysis/engine/analyze.mjs";
 
 const html = await readFile(new URL("../analysis-review.html", import.meta.url), "utf8");
 const pageSource = await readFile(new URL("../assets/js/analysis-review.js", import.meta.url), "utf8");
 const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/index.ts", import.meta.url), "utf8");
+const dashboardSource = await readFile(new URL("../../bni-analysis/engine/render-dashboard.mjs", import.meta.url), "utf8");
 
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
   const authIndex = html.indexOf("assets/js/auth.js?v=7");
   const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=2");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=8");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=9");
   assert.ok(authIndex >= 0 && bridgeIndex > authIndex && pageIndex > bridgeIndex);
   assert.match(html, /assets\/css\/analysis-review\.css\?v=6/);
 });
@@ -56,7 +58,7 @@ test("月末可提前驗收當月，其他日期仍以台北時區的上月為�
 test("正式分析載入同會籍週期的未完成期中任務供跨月延續", () => {
   assert.match(edgeSource, /category=eq\.midterm&status=in\.\(pending,in_progress,completed\)/);
   assert.match(edgeSource, /const midtermTasks = \(midtermRows \|\| \[\]\)\.filter/);
-  assert.match(edgeSource, /midtermCompletions,\s*midtermTasks,\s*sources/);
+  assert.match(edgeSource, /midtermCompletions,\s*midtermTasks,\s*officialSyncPending,\s*sources/);
 });
 
 test("正式快照提供續約表單完整年度資料並可安全修復舊快照", () => {
@@ -84,6 +86,67 @@ test("已由副主席確認的離會者不再成為後續對帳差異", () => {
   const after = reconcile({ ...input, departed: [{ name: "測試離會", confirmedAt: "2026-08-04" }] });
   assert.equal(after.ok, true);
   assert.equal(after.issues.some((issue) => issue.member === "測試離會"), false);
+});
+
+test("PALMS 已升格但中心舊報告未收錄時改為待同步而非反覆報錯", () => {
+  const input = {
+    palms: { period: { start: "2026-03-01", end: "2026-08-31" }, members: [{ name: "新會員", present: 3, absent: 0, late: 0, medical: 0, substitute: 0 }] },
+    expiry: { members: [] },
+    tenure: { members: [] },
+    departed: [],
+  };
+  const before = reconcile(input);
+  assert.equal(before.expiredUnrenewed.includes("新會員"), true);
+  assert.equal(before.issues.some((issue) => issue.code === "tenure-missing"), true);
+
+  const after = reconcile({
+    ...input,
+    officialSyncPending: [{ name: "新 會員", promotedAt: "2026-08-31T06:34:03Z", fields: ["expiry", "tenure"] }],
+  });
+  assert.deepEqual(after.expiredUnrenewed, []);
+  assert.deepEqual(after.issues, []);
+  assert.deepEqual(after.pendingOfficialData[0].missing, ["expiry", "tenure"]);
+  assert.equal(after.pendingOfficialData[0].status, "pending-official-sync");
+
+  const explicitExpired = reconcile({
+    ...input,
+    expiry: { members: [{ name: "新會員", section: "expired", status: "逾期", expiryDate: "2026-08-01" }] },
+    officialSyncPending: [{ name: "新會員", fields: ["expiry", "tenure"] }],
+  });
+  assert.equal(explicitExpired.expiredUnrenewed.includes("新會員"), true, "官方明列逾期不得被待同步規則靜音");
+});
+
+test("待同步會員照 PALMS 計分但不猜續約、會齡或期中時點", () => {
+  const engine = buildAnalysisFromParsed({
+    palms: {
+      period: { start: "2026-03-01", end: "2026-08-31" },
+      members: [{
+        name: "新會員", present: 3, absent: 0, late: 0, medical: 0, substitute: 0,
+        refGivenInternal: 0, refGivenExternal: 0, refReceivedInternal: 0, refReceivedExternal: 0,
+        visitors: 0, oneToOne: 0, tyfcb: 0, ceu: 0,
+      }],
+    },
+    expiry: { members: [] },
+    tenure: { members: [] },
+    departed: [],
+    officialSyncPending: [{ name: "新會員", fields: ["expiry", "tenure"] }],
+    asOf: "2026-08-31",
+  });
+  assert.equal(engine.aborted, undefined);
+  assert.equal(engine.members.length, 1, "PALMS 實績仍須正常計分");
+  assert.deepEqual(engine.renewalRadar, [], "不得猜測續約期限");
+  assert.deepEqual(engine.lifecycle.midterm, [], "不得猜測期中關懷時點");
+  assert.deepEqual(engine.lifecycle.newMembers, [], "不得把登錄日充當官方會齡");
+  assert.match(engine.behavior[0].lenientNote, /新會員寬容追蹤/);
+});
+
+test("正式後端只在中心來源早於 PALMS 升格時標記待同步", () => {
+  assert.match(edgeSource, /provisional_members\?status=eq\.promoted&select=display_name,promoted_at/);
+  assert.match(edgeSource, /Date\.parse\(String\(expiry\.imported_at/);
+  assert.match(edgeSource, /Date\.parse\(String\(tenure\.imported_at/);
+  assert.match(edgeSource, /officialSyncPending,/);
+  assert.match(pageSource, /中心資料待同步/);
+  assert.match(dashboardSource, /不列為錯誤、不推算官方會齡或續約期限/);
 });
 
 test("任何 blocking 對帳差異都不能產出、AI 審視或發佈草稿", () => {

@@ -75,3 +75,23 @@ test("published snapshot keeps complete annual PALMS and chapter averages for re
   assert.equal(hasCompletePublishedMemberData(result),true);
   assert.throws(()=>enrichPublishedMemberData({members:[{name:"缺資料"}],halfReport:{members:[]},annualReport:{members:[]},tenureReport:{members:[]}}),/正式續約資料對帳失敗/);
 });
+
+test("published snapshot keeps a PALMS-promoted member while official tenure is pending",()=>{
+  const raw=name=>({
+    name,present:3,absent:0,late:0,medical:0,substitute:0,refGivenInternal:1,refGivenExternal:0,
+    refReceivedInternal:0,refReceivedExternal:0,visitors:0,oneToOne:2,tyfcb:0,ceu:0
+  });
+  const result=enrichPublishedMemberData({
+    members:[{name:"新會員",score:35,profession:"測試業"}],
+    halfReport:{period:{start:"2026-03-01",end:"2026-08-31"},members:[raw("新會員")]},
+    annualReport:{period:{start:"2025-09-01",end:"2026-08-31"},members:[raw("新會員")]},
+    tenureReport:{members:[]},
+    pendingOfficialData:[{name:"新會員",missing:["expiry","tenure"],status:"pending-official-sync"}]
+  });
+  assert.equal(result.members.length,1);
+  assert.equal(result.members[0].activation,"");
+  assert.equal(result.members[0].recentActivation,"");
+  assert.equal(result.members[0].activationStatus,"pending-official-sync");
+  assert.deepEqual(result.members[0].officialDataPending,["expiry","tenure"]);
+  assert.equal(hasCompletePublishedMemberData(result),true);
+});

@@ -55,6 +55,9 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
   const actionMonth = Number(asOf.slice(5, 7));
   const active = engine.reconciliation.counts.active;
   const excluded = engine.reconciliation.excludedDeparted;
+  const pendingOfficialData = Array.isArray(engine.reconciliation.pendingOfficialData)
+    ? engine.reconciliation.pendingOfficialData : [];
+  const pendingOfficialByName = new Map(pendingOfficialData.map((item) => [item.name, item]));
   const d = engine.distribution;
   const greenPct = Math.round((d.green / active) * 100);
 
@@ -97,11 +100,27 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
   const redCards = engine.members.filter((m) => m.light === "red" || m.light === "black").map((m) => {
     const zeroItems = Object.entries(m.scores).filter(([, v]) => v === 0).map(([k]) => `${ITEM_LABEL[k] || "缺席"} 0 分`).join("・");
     const nm = newMemberNames.get(m.name);
-    const chip = nm ? ` <span class="chip">新會員・在會 ${m.weeks} 週</span>` : "";
+    const officialPending = pendingOfficialByName.get(m.name);
+    const chip = officialPending
+      ? ' <span class="chip info">新會員・會齡待中心同步</span>'
+      : nm ? ` <span class="chip">新會員・在會 ${m.weeks} 週</span>` : "";
     const detail = `${zeroItems ? `${zeroItems}｜` : ""}引薦 ${m.metrics.refPerWeek.toFixed(2)}/週・一對一 ${m.metrics.otoPerWeek.toFixed(2)}/週`;
-    const action = nm ? "指派 Mentor，追蹤融入而非究責分數" : "深度關懷面談：了解活躍度下滑原因";
+    const action = officialPending
+      ? "先採新會員寬容追蹤；不以登錄日推算會齡，待官方報告同步後再判定期中時點"
+      : nm ? "指派 Mentor，追蹤融入而非究責分數" : "深度關懷面談：了解活躍度下滑原因";
     return `<div class="card red"><div class="t">${esc(m.name)}｜${m.total} 分 ${m.light === "red" ? "紅燈" : "黑燈"}${chip}</div><div class="d">${detail}</div><div class="action">${action}</div></div>`;
   }).join("\n    ");
+
+  const pendingSyncSection = pendingOfficialData.length ? `<section>
+  <div class="sec-h"><h2>中心資料待同步</h2><span class="badge gray">${pendingOfficialData.length} 位</span></div>
+  <div class="sec-note">已由本期 PALMS 唯一對帳為正式會員，仍正常納入計分；較舊的中心區報告尚未收錄時不列為錯誤、不推算官方會齡或續約期限。</div>
+  <div class="cards">
+    ${pendingOfficialData.map((item) => {
+      const labels = item.missing.map((field) => field === "tenure" ? "會齡" : field === "expiry" ? "到期日" : field).join("、");
+      return `<div class="card"><div class="t">${esc(item.name)} <span class="chip info">${esc(labels)}待中心同步</span></div><div class="d">PALMS 已納入正式計分；官方${esc(labels)}暫不顯示。</div><div class="action">更新中心區報告後自動恢復正式判定，無須手動清除提醒</div></div>`;
+    }).join("\n    ")}
+  </div>
+</section>` : "";
 
   // 黃燈突圍
   const cardsData = {};
@@ -257,6 +276,8 @@ footer{border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font
   <div class="stat${d.red + d.black ? " alert" : ""}"><div class="n">${d.red + d.black}</div><div class="l">紅燈會員</div></div>
   <div class="stat${openAlerts.length ? " alert" : ""}"><div class="n">${openAlerts.length}</div><div class="l">行業別開放警示</div></div>
 </div>
+
+${pendingSyncSection}
 
 <section>
   <div class="sec-h"><h2>續約雷達</h2>${dueNow.length ? `<span class="badge red">${dueNow.length} 筆截止／逾期</span>` : ""}<span class="badge amber">${weakWarn.length} 筆審查預警</span></div>

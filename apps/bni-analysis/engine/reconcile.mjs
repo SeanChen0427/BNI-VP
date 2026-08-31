@@ -3,10 +3,30 @@
 import { normalizeName } from "./parse-reports.mjs";
 
 // palms: parsePalms 結果；expiry: parseExpiry 結果；tenure: parseTenure 結果；
-// departed: parseDeparted 結果；reportEnd: 報表結束日（YYYY-MM-DD）。
-export function reconcile({ palms, expiry, tenure, departed }) {
+// departed: parseDeparted 結果；officialSyncPending: 已由 PALMS 唯一對帳升格、
+// 但較舊的中心區到期／會齡報告尚未收錄的會員。此清單只改變缺檔語意，
+// 不得拿登錄日期代替官方會齡，也不得掩蓋報告已明列的逾期狀態。
+export function reconcile({ palms, expiry, tenure, departed, officialSyncPending = [] }) {
   const issues = [];
   const departedNames = new Set(departed.map((d) => d.name));
+  const pendingByName = new Map(officialSyncPending.map((item) => [
+    normalizeName(item.name),
+    { ...item, fields: new Set(Array.isArray(item.fields) ? item.fields : []) },
+  ]));
+  const pendingOfficialByName = new Map();
+  const markPending = (name, field) => {
+    const pending = pendingByName.get(normalizeName(name));
+    if (!pending?.fields.has(field)) return false;
+    const current = pendingOfficialByName.get(name) || {
+      name,
+      missing: [],
+      promotedAt: pending.promotedAt || null,
+      status: "pending-official-sync",
+    };
+    if (!current.missing.includes(field)) current.missing.push(field);
+    pendingOfficialByName.set(name, current);
+    return true;
+  };
 
   if (!palms.period.start || !palms.period.end) {
     issues.push({ level: "blocking", code: "period-missing", message: "PALMS 報表期間解析失敗，無法確認資料期別" });
@@ -25,6 +45,7 @@ export function reconcile({ palms, expiry, tenure, departed }) {
   for (const m of active) {
     const e = expiryByName.get(m.name);
     if (!e) {
+      if (markPending(m.name, "expiry")) continue;
       expiredUnrenewed.push(m.name);
       issues.push({
         level: "critical",
@@ -59,6 +80,7 @@ export function reconcile({ palms, expiry, tenure, departed }) {
   // 會齡報告缺人：影響會齡顯示與期中關懷判斷，列警告
   for (const m of active) {
     if (!tenureByName.has(m.name)) {
+      if (markPending(m.name, "tenure")) continue;
       issues.push({
         level: "warning",
         code: "tenure-missing",
@@ -82,6 +104,7 @@ export function reconcile({ palms, expiry, tenure, departed }) {
     activeMembers: active,
     excludedDeparted,
     expiredUnrenewed,
+    pendingOfficialData: [...pendingOfficialByName.values()],
     counts: { palms: palms.members.length, expiry: expiry.members.length, tenure: tenure.members.length, active: active.length },
     issues,
   };

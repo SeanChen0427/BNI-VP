@@ -138,24 +138,45 @@ export function averagePalmsMetrics(members=[]){
 export function hasCompletePublishedMemberData(snapshot={}){
   const members=Array.isArray(snapshot.members)?snapshot.members:[],averages=snapshot.memberData?.averages;
   const complete=value=>value&&PUBLISHED_FORM_METRIC_KEYS.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
+  const activationComplete=member=>{
+    const official=/^\d{4}-\d{2}-\d{2}$/.test(String(member.activation||""))&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.recentActivation||""));
+    const pending=member.activationStatus==="pending-official-sync"
+      &&Array.isArray(member.officialDataPending)&&member.officialDataPending.includes("tenure")
+      &&!member.activation&&!member.recentActivation;
+    return official||pending;
+  };
   return members.length>0&&snapshot.memberData?.count===members.length&&complete(averages)
-    &&members.every(member=>member?.name&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.activation||""))&&/^\d{4}-\d{2}-\d{2}$/.test(String(member.recentActivation||""))&&complete(member.annualMetrics));
+    &&members.every(member=>member?.name&&activationComplete(member)&&complete(member.annualMetrics));
 }
-export function enrichPublishedMemberData({members=[],halfReport={},annualReport={},tenureReport={}}={}){
+export function enrichPublishedMemberData({members=[],halfReport={},annualReport={},tenureReport={},pendingOfficialData=[]}={}){
   const byName=(rows=[])=>new Map(rows.map(item=>[normalizeName(item.name),item]));
   const halfByName=byName(halfReport.members),annualByName=byName(annualReport.members),tenureByName=byName(tenureReport.members);
+  const pendingByName=new Map((Array.isArray(pendingOfficialData)?pendingOfficialData:[]).map(item=>[
+    normalizeName(item.name),
+    {...item,missing:Array.isArray(item.missing)?item.missing:[]}
+  ]));
   const missing=[];
   const enriched=members.map(member=>{
     const name=normalizeName(member.name),half=halfByName.get(name),annual=annualByName.get(name),tenure=tenureByName.get(name);
+    const pending=pendingByName.get(name),pendingFields=pending?.missing||[];
     const absent=[];
-    if(!half)absent.push("半年 PALMS");if(!annual)absent.push("一年 PALMS");if(!tenure?.cumulativeStart)absent.push("會齡");
+    if(!half)absent.push("半年 PALMS");if(!annual)absent.push("一年 PALMS");if(!tenure?.cumulativeStart&&!pendingFields.includes("tenure"))absent.push("會齡");
     if(absent.length){missing.push(`${name}（${absent.join("、")}）`);return null}
-    return{...member,name,activation:tenure.cumulativeStart,recentActivation:tenure.recentStart||tenure.cumulativeStart,metrics:normalizedPalmsMetrics(half),annualMetrics:normalizedPalmsMetrics(annual)};
+    const tenurePending=!tenure?.cumulativeStart&&pendingFields.includes("tenure");
+    return{
+      ...member,name,
+      activation:tenurePending?"":tenure.cumulativeStart,
+      recentActivation:tenurePending?"":tenure.recentStart||tenure.cumulativeStart,
+      activationStatus:tenurePending?"pending-official-sync":"official",
+      officialDataPending:pendingFields,
+      metrics:normalizedPalmsMetrics(half),annualMetrics:normalizedPalmsMetrics(annual)
+    };
   });
   if(missing.length)throw new Error(`正式續約資料對帳失敗：${missing.join("；")}`);
   const complete=enriched.filter(Boolean);
   return{
     members:complete,
+    officialDataPending:[...pendingByName.values()],
     memberData:{
       count:complete.length,
       averages:averageMetrics(complete),

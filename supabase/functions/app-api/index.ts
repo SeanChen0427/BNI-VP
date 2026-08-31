@@ -2613,10 +2613,11 @@ async function loadEngineSources() {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
-  const [renewalRows, activeMemberRows, midtermRows] = await Promise.all([
+  const [renewalRows, activeMemberRows, midtermRows, promotedRows] = await Promise.all([
     db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
     db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=in.(pending,in_progress,completed)&select=id,member_id,title,status,created_at,due_at,completed_at,source_reference&order=created_at.desc"),
+    db("provisional_members?status=eq.promoted&select=display_name,promoted_at"),
   ]);
   const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
   const renewalCompletions = (renewalRows || []).map((row: any) => ({
@@ -2641,6 +2642,21 @@ async function loadEngineSources() {
     scheduledAt: row.due_at,
     sourceReference: row.source_reference,
   })).filter((row: any) => row.name && row.createdAt);
+  // 新會員先由本期半年 PALMS 唯一對帳升格；若中心區會籍／會齡來源仍是
+  // 升格前匯入的舊快照，缺名只代表待同步。來源一旦於升格後更新仍缺名，
+  // 引擎就恢復正式警示，避免永久靜音真正的名單異常。
+  const officialSyncPending = (promotedRows || []).map((row: any) => {
+    const promotedAt = Date.parse(String(row.promoted_at || ""));
+    const fields = [
+      Number.isFinite(promotedAt) && Date.parse(String(expiry.imported_at || "")) < promotedAt ? "expiry" : null,
+      Number.isFinite(promotedAt) && Date.parse(String(tenure.imported_at || "")) < promotedAt ? "tenure" : null,
+    ].filter(Boolean);
+    return {
+      name: String(row.display_name || "").replace(/\s+/g, ""),
+      promotedAt: row.promoted_at,
+      fields,
+    };
+  }).filter((row: any) => row.name && row.fields.length);
   const sources = [half, monthlyRow, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   return {
     engine: buildAnalysisFromParsed({
@@ -2654,6 +2670,7 @@ async function loadEngineSources() {
       renewalCompletions,
       midtermCompletions,
       midtermTasks,
+      officialSyncPending,
       sources,
     }),
     formSources: { halfReport, annualReport: annual, tenureReport },
@@ -2666,7 +2683,14 @@ async function analysisSnapshotApi(request: Request, context: Context) {
   if (!published?.snapshot) throw Object.assign(new Error("Supabase 尚無已發佈的 BNI 分析資料"), { status: 503 });
   if (hasCompletePublishedMemberData(published.snapshot)) return published.snapshot;
   const formSources = await loadPublishedFormSources(published.period_start, published.period_end);
-  const enriched = enrichPublishedMemberData({ members: published.snapshot.members || [], ...formSources });
+  const pendingOfficialData = published.snapshot.officialDataPending
+    || published.reconciliation?.pendingOfficialData
+    || [];
+  const enriched = enrichPublishedMemberData({
+    members: published.snapshot.members || [],
+    ...formSources,
+    pendingOfficialData,
+  });
   const repairedAt = new Date().toISOString();
   const snapshot = { ...published.snapshot, ...enriched, memberData: { ...enriched.memberData, repairedAt } };
   if (["admin", "vp"].includes(context.role)) {
@@ -2848,7 +2872,12 @@ async function analysisDraftApi(request: Request, context: Context) {
         light: member.light === "green" ? "綠燈" : member.light === "yellow" ? "黃燈" : member.light === "red" ? "紅燈" : "黑燈",
       };
     });
-    const publishedMemberData = enrichPublishedMemberData({ members: snapshot.members, ...currentSources.formSources });
+    snapshot.officialDataPending = draft.engine.reconciliation.pendingOfficialData || [];
+    const publishedMemberData = enrichPublishedMemberData({
+      members: snapshot.members,
+      ...currentSources.formSources,
+      pendingOfficialData: snapshot.officialDataPending,
+    });
     snapshot.members = publishedMemberData.members;
     snapshot.memberData = publishedMemberData.memberData;
     snapshot.analysisReview = draft.aiReview;

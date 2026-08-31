@@ -63,6 +63,8 @@ assert.match(live, /fetch\("\/api\/analysis-snapshot"/);
 assert.match(live, /正式分析快照缺少完整續約資料，系統已停止顯示 0 值/);
 assert.match(live, /正式分析快照缺少分會平均，系統已停止顯示 0 值/);
 assert.doesNotMatch(live, /annualMetrics\|\|item\.metrics/, "年度 PALMS 缺失時不得靜默退回半年資料");
-assert.match(html, /terminal-form-live\.js\?v=7/);
+assert.match(live, /activationStatus==="pending-official-sync"/);
+assert.match(live, /會齡待中心同步，官方日期更新後即可開啟續約表單/);
+assert.match(html, /terminal-form-live\.js\?v=8/);
 
 console.log("terminal form Word completeness tests passed");

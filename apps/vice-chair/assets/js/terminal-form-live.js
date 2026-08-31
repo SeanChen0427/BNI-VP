@@ -12,10 +12,12 @@
     const metric=value=>Number(value)||0,normalize=(value={})=>({givenIn:metric(value.givenIn),givenOut:metric(value.givenOut),receivedIn:metric(value.receivedIn),receivedOut:metric(value.receivedOut),amount:metric(value.amount),visitors:metric(value.visitors),oneToOne:metric(value.oneToOne),late:metric(value.late),early:0,substitutes:metric(value.substitutes),education:metric(value.education)});
     const requiredMetrics=["givenIn","givenOut","receivedIn","receivedOut","amount","visitors","oneToOne","late","substitutes","education"];
     const complete=value=>value&&requiredMetrics.every(key=>value[key]!==null&&value[key]!==undefined&&value[key]!==""&&Number.isFinite(Number(value[key])));
-    const sourceMembers=Array.isArray(snapshot.members)?snapshot.members:[];
-    if(!sourceMembers.length||sourceMembers.some(item=>!item.name||!Number.isFinite(item.score)||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.activation||""))||!/^\d{4}-\d{2}-\d{2}$/.test(String(item.recentActivation||""))||!complete(item.annualMetrics)))throw new Error("正式分析快照缺少完整續約資料，系統已停止顯示 0 值");
+    const sourceMembers=Array.isArray(snapshot.members)?snapshot.members:[],validDate=value=>/^\d{4}-\d{2}-\d{2}$/.test(String(value||""));
+    const pendingTenure=item=>item.activationStatus==="pending-official-sync"&&Array.isArray(item.officialDataPending)&&item.officialDataPending.includes("tenure")&&!item.activation&&!item.recentActivation;
+    if(!sourceMembers.length||sourceMembers.some(item=>!item.name||!Number.isFinite(item.score)||(!pendingTenure(item)&&(!validDate(item.activation)||!validDate(item.recentActivation)))||!complete(item.annualMetrics)))throw new Error("正式分析快照缺少完整續約資料，系統已停止顯示 0 值");
     if(!complete(snapshot.memberData?.averages))throw new Error("正式分析快照缺少分會平均，系統已停止顯示 0 值");
-    const loaded=sourceMembers.map(item=>({name:item.name,profession:item.profession||"",activation:item.activation,recentActivation:item.recentActivation,score:item.score,metricsReady:false,metrics:normalize(item.annualMetrics)}));
+    if(sourceMembers.some(item=>item.name===currentTask.member&&pendingTenure(item)))throw new Error(`案件會員「${currentTask.member}」會齡待中心同步，官方日期更新後即可開啟續約表單`);
+    const loaded=sourceMembers.filter(item=>validDate(item.activation)&&validDate(item.recentActivation)).map(item=>({name:item.name,profession:item.profession||"",activation:item.activation,recentActivation:item.recentActivation,score:item.score,metricsReady:false,metrics:normalize(item.annualMetrics)}));
     if(!loaded.length)throw new Error("沒有可用的正式會員資料");
     if(!loaded.some(item=>item.name===currentTask.member))throw new Error(`案件會員「${currentTask.member}」不在正式會員資料`);
     const persistedDraft=JSON.parse(localStorage.getItem(window.FulianTerminalFormStoreKey)||"null")||{};

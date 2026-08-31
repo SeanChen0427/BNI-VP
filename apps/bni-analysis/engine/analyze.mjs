@@ -80,11 +80,12 @@ export function buildAnalysisFromParsed({
   renewalCompletions = [],
   midtermCompletions = [],
   midtermTasks = [],
+  officialSyncPending = [],
   asOf = new Date().toISOString().slice(0, 10),
   sources = [],
 } = {}) {
   // 先對帳：blocking 異常存在時直接回傳，不做任何分析。
-  const reconciliation = reconcile({ palms, expiry, tenure, departed });
+  const reconciliation = reconcile({ palms, expiry, tenure, departed, officialSyncPending });
   const meta = {
     version: "fulian.analysis-engine.v1",
     generatedAt: new Date().toISOString(),
@@ -99,6 +100,9 @@ export function buildAnalysisFromParsed({
   const totalWeeks = reportTotalWeeks(palms.members);
   const tenureByName = new Map(tenure.members.map((m) => [m.name, m]));
   const expiryByName = new Map(expiry.members.map((m) => [m.name, m]));
+  const pendingTenureNames = new Set(reconciliation.pendingOfficialData
+    .filter((item) => item.missing.includes("tenure"))
+    .map((item) => item.name));
 
   const activeScored = reconciliation.activeMembers.map((m) => scoreMember(m, totalWeeks));
   activeScored.sort((a, b) => b.total - a.total);
@@ -116,8 +120,17 @@ export function buildAnalysisFromParsed({
   const greenIdles = [];
   for (const s of activeScored) {
     const t = memberTenure(tenureByName.get(s.name), palms.period.end);
-    const diag = behaviorDiagnostics(s, t.months);
-    if (diag.findings.length > 0) behavior.push({ name: s.name, light: s.light, total: s.total, tenureMonths: t.months, lenientNote: diag.lenientNote, findings: diag.findings });
+    const officialTenurePending = pendingTenureNames.has(s.name);
+    const diag = behaviorDiagnostics(s, t.months, { officialTenurePending });
+    if (diag.findings.length > 0) behavior.push({
+      name: s.name,
+      light: s.light,
+      total: s.total,
+      tenureMonths: t.months,
+      tenureStatus: officialTenurePending ? "pending-official-sync" : "official",
+      lenientNote: diag.lenientNote,
+      findings: diag.findings,
+    });
     const idle = greenIdle(s, structuralZeroItems);
     if (idle) greenIdles.push(idle);
   }
@@ -171,6 +184,7 @@ export function buildAnalysisFromParsed({
       counts: reconciliation.counts,
       excludedDeparted: reconciliation.excludedDeparted,
       expiredUnrenewed: reconciliation.expiredUnrenewed,
+      pendingOfficialData: reconciliation.pendingOfficialData,
       issues: reconciliation.issues,
     },
     totalWeeks,

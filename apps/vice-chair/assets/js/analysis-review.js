@@ -204,14 +204,21 @@
     const d = e.distribution;
     const radarTop = e.renewalRadar.slice(0, 6).map((item) => `${radarLabel[item.kind] || item.kind}：${item.name}`).join("；") || "無";
     const auditRed = (e.audit?.observations || []).filter((o) => o.level === "red").map((o) => `${o.name}（${o.families.join("+")}）`).join("、") || "無";
-    $("#draftSummary").innerHTML = [
+    const pendingOfficialData = Array.isArray(e.reconciliation.pendingOfficialData) ? e.reconciliation.pendingOfficialData : [];
+    const summaryItems = [
       ["現任會員", `${e.reconciliation.counts.active} 人`, `排除離會 ${e.reconciliation.excludedDeparted.length} 人`],
       ["燈號分布", `綠 ${d.green}／黃 ${d.yellow}／紅 ${d.red}／黑 ${d.black}`, `週數 ${e.totalWeeks}`],
       ["續約雷達", `${e.renewalRadar.length} 項`, radarTop],
       ["審計紅色觀察", `${(e.audit?.observations || []).filter((o) => o.level === "red").length} 人`, auditRed],
       ["行為診斷", `${e.behavior.length} 人`, `綠燈空轉 ${e.greenIdles.length} 人`],
       ["黃燈突圍", `${e.yellowBreakthroughs.length} 人`, `期中關懷 ${e.lifecycle.midterm.length}／新會員 ${e.lifecycle.newMembers.length}`],
-    ].map(([label, value, note]) => `<article><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
+    ];
+    if (pendingOfficialData.length) summaryItems.splice(1, 0, [
+      "中心資料待同步",
+      `${pendingOfficialData.length} 人`,
+      pendingOfficialData.map((item) => `${item.name}（${item.missing.map((field) => field === "tenure" ? "會齡" : field === "expiry" ? "到期日" : field).join("、")}待同步）`).join("、"),
+    ]);
+    $("#draftSummary").innerHTML = summaryItems.map(([label, value, note]) => `<article><small>${label}</small><strong>${value}</strong><span>${note}</span></article>`).join("");
     renderIssues($("#draftWarnings"), e.reconciliation.issues || []);
     $("#draftJson").textContent = JSON.stringify(e, null, 2);
     renderRenewalResolution(e);

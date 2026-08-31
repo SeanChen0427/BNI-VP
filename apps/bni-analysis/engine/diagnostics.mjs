@@ -37,11 +37,13 @@ export function memberTenure(tenureEntry, reportEnd) {
 }
 
 // 模組二～四：互動三角、引薦含金量、一對一效率。scored 為 score.mjs 輸出。
-export function behaviorDiagnostics(scored, tenureMonths) {
+export function behaviorDiagnostics(scored, tenureMonths, { officialTenurePending = false } = {}) {
   const m = scored.metrics;
   const findings = [];
   const isNewUnder3 = tenureMonths !== null && tenureMonths < 3;
-  const lenient = isNewUnder3 ? "在會未滿 3 個月，數據偏低屬正常（寬容備註，不作一般告警）" : null;
+  const lenient = officialTenurePending
+    ? "已由 PALMS 升格正式會員，官方會齡待中心同步；先採新會員寬容追蹤，不推算會齡或期中關懷時點"
+    : isNewUnder3 ? "在會未滿 3 個月，數據偏低屬正常（寬容備註，不作一般告警）" : null;
 
   // 模組二：互動三角
   const g = m.refPerWeek;
