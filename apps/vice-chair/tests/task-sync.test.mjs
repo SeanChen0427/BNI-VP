@@ -28,7 +28,7 @@ test("所有排程頁面都載入最新版 Supabase task 與 case state store", 
     "apps/vice-chair/monthly-meeting.html",
   ].includes(page));
   for (const page of caseStatePages) {
-    const expectedVersion = page === "apps/vice-chair/case-workflow.html" ? 15 : 12;
+    const expectedVersion = page === "apps/vice-chair/case-workflow.html" ? 16 : 12;
     assert.match(read(page), new RegExp(`assets/js/case-state-store\\.js\\?v=${expectedVersion}`), `${page} 未載入對應的 case-state-store 快取版本`);
   }
 });

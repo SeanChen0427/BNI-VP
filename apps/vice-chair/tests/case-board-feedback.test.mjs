@@ -100,7 +100,7 @@ assert.match(workflowSource, /\$\$\("\.vp-only-section"\)/);
 assert.match(workflowSource, /classList\.toggle\("committee-view",!allowed\)/);
 assert.match(
   workflowSource,
-  /#copyLeaders"\)\.addEventListener\("click",async\(\)=>\{if\(!isVp\(\)\)return;/,
+  /#copyLeaders"\)\.addEventListener\("click",async\(\)=>\{[\s\S]*?if\(!isVp\(\)\|\|/,
   "委員不得由畫面外觸發三長群文案操作"
 );
 assert.match(

@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.17",
+      publishedAt: "2026-08-31",
+      title: "複製文案即可推進案件階段",
+      level: "important",
+      changes: Object.freeze([
+        "複製三長群文案成功後，系統會保存完成紀錄並立即解鎖董事顧問確認。",
+        "董顧同意後，複製正式公告文案可改由副主席人工貼到公告群，不消耗 LINE Push 額度。",
+        "人工複製與 Bot 發送具有相同階段效果；公告完成紀錄保存後即可結案。"
+      ]),
+      impact: "舊版已複製但未保存階段的案件，請在新版重新按一次複製；系統不會自行猜測或改寫既有案件內容。"
+    }),
+    Object.freeze({
       version: "1.0.16",
       publishedAt: "2026-08-31",
       title: "修正董顧確認跳回尚未回覆",

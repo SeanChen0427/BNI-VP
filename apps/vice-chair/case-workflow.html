@@ -13,7 +13,7 @@
   <script src="core/calendar-domain.js?v=1"></script>
   <script src="core/case-domain.js?v=8"></script>
   <script src="assets/js/task-store.js?v=7"></script>
-  <script src="assets/js/case-state-store.js?v=15"></script>
+  <script src="assets/js/case-state-store.js?v=16"></script>
   <script src="services/case-files.js?v=5"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -149,7 +149,7 @@
           <div class="fields two renewal-extra" id="renewalExtra" hidden><label>過去一年培訓數<input id="annualTraining" placeholder="例如：20 分" data-save></label><label>過去一年來賓數<input id="annualVisitors" placeholder="例如：5 位" data-save></label></div>
           <small id="annualDataSource" class="annual-data-source" hidden></small>
           <pre id="leadersPreview" class="message-preview muted-preview"></pre>
-          <div class="action-row"><button id="copyLeaders" class="ghost" disabled>複製三長群文案</button><button id="sendLeaders" class="primary vp-control" disabled>模擬發送三長群</button></div>
+          <div class="action-row"><button id="copyLeaders" class="ghost" disabled>複製三長群文案並完成此步驟</button><button id="sendLeaders" class="primary vp-control" disabled>直接登記三長群已完成</button></div>
           <div class="advisor-box">
             <div><b>董事顧問確認</b><small>請依董顧實際回覆登記，系統不代替董顧作成決定。</small></div>
             <label>確認狀態<select id="advisorStatus" class="vp-control"><option value="pending">尚未回覆</option><option value="confirmed">同意會員委員會決議</option><option value="returned">退回補充資料</option></select></label>
@@ -158,11 +158,11 @@
             <small id="advisorSaveState" class="advisor-save-state" role="status">請依董事顧問實際回覆選擇狀態，再按「保存董顧確認」。</small>
           </div>
           <div class="result-announcement-box" id="resultAnnouncementBox">
-            <div><b>通過結果公告</b><small>董事顧問確認通過後，由副主席人工發送至正式公告群；不會標註 @所有人。</small></div>
+            <div><b>通過結果公告</b><small>董事顧問確認通過後，可複製文案人工貼到正式公告群，或由 Bot 發送；複製成功即登記此步驟完成，不會標註 @所有人。</small></div>
             <label id="resultReferrerRow" hidden>新會員引薦人<select id="resultReferrerName" class="vp-control" data-save><option value="">請選擇正式會員</option></select><small>公告送出時會再次與正式會員主檔核對。</small></label>
             <pre id="resultAnnouncementPreview" class="message-preview result-announcement-preview"></pre>
             <small id="resultAnnouncementState" class="result-announcement-state">等待會員委員會形成決議。</small>
-            <div class="action-row"><button id="copyResultAnnouncement" class="ghost" disabled>複製公告文案</button><button id="sendResultAnnouncement" class="primary vp-control" disabled>發送正式公告群</button></div>
+            <div class="action-row"><button id="copyResultAnnouncement" class="ghost" disabled>複製公告文案並登記人工發布</button><button id="sendResultAnnouncement" class="primary vp-control" disabled>發送正式公告群</button></div>
           </div>
         </section>
 
@@ -187,7 +187,7 @@
   </main>
   <div id="toast"></div>
   <script src="assets/js/vote-result-image.js?v=1"></script>
-  <script src="assets/js/case-workflow.js?v=29"></script>
+  <script src="assets/js/case-workflow.js?v=30"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

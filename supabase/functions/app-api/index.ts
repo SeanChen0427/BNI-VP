@@ -4168,7 +4168,78 @@ function caseWorkflowLogTime() {
   });
 }
 
-async function saveCaseLeadersSent(access: any, existing: any, context: Context) {
+async function saveCaseResultAnnouncementCopy(access: any, existing: any, context: Context) {
+  leadership(context);
+  if (!["renewal", "new", "industry"].includes(access.task.category)) {
+    throw Object.assign(new Error("此案件類型不適用正式結果公告"), { status: 409 });
+  }
+  const currentWorkflow = existing?.workflow || {};
+  if (currentWorkflow.closed) {
+    throw Object.assign(new Error("案件已結案，不能補登正式公告"), { status: 409 });
+  }
+  if (currentWorkflow.resultAnnouncementSent) {
+    return {
+      ...caseStateResponse(access, existing, context),
+      message: "本案正式公告步驟先前已完成，可直接進行結案",
+    };
+  }
+  if (currentWorkflow.advisorStatus !== "confirmed") {
+    throw Object.assign(new Error("董事顧問尚未確認同意，不能登記人工公告"), { status: 409 });
+  }
+  if (!access.task.case_id) {
+    throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
+  }
+  const snapshots = await db(`vote_snapshots?case_id=eq.${access.task.case_id}&select=result&limit=1`);
+  const decision = snapshots?.[0]?.result || "pending";
+  if (decision !== "approved") {
+    throw Object.assign(new Error(decision === "rejected" ? "投票不通過的案件不發布公告群" : "本案尚未形成通過決議"), { status: 409 });
+  }
+
+  const recordedAt = new Date().toISOString();
+  const { input } = await caseResultAnnouncementPayload(access, existing, recordedAt);
+  buildCaseResultAnnouncementMessage(input);
+  const workflow = {
+    ...currentWorkflow,
+    resultAnnouncementSent: true,
+    resultAnnouncementSentAt: recordedAt,
+    resultAnnouncementTargetName: "正式公告群（人工貼上）",
+    resultAnnouncementDeliveryId: "",
+    resultAnnouncementMethod: "manual-copy",
+    resultAnnouncementRecordedBy: context.name,
+    log: [{
+      text: "正式公告文案已複製，依人工貼上流程登記完成",
+      time: caseWorkflowLogTime(),
+      done: true,
+    }, ...(Array.isArray(currentWorkflow.log) ? currentWorkflow.log : [])].slice(0, 20),
+  };
+  try {
+    await db("rpc/edge_save_case_state_as_user", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_task_id: access.task.id,
+        p_actor: context.personId,
+        p_actor_auth_user_id: context.userId,
+        p_workflow: workflow,
+        p_draft: existing?.draft || {},
+        p_expected_revision: Number(existing?.revision || 0),
+        p_vote_deadline: null,
+      }),
+    });
+  } catch (error) {
+    if (String((error as any)?.message).includes("CASE_CONFLICT")) {
+      throw Object.assign(new Error("案件剛由其他裝置更新，公告文案已複製；請重新整理後再按一次複製公告文案"), { status: 409 });
+    }
+    throw error;
+  }
+  const latestRows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  return {
+    ...caseStateResponse(access, latestRows?.[0], context),
+    message: "公告文案已複製並登記由副主席人工貼至正式公告群，可進行結案",
+  };
+}
+
+async function saveCaseLeadersSent(access: any, existing: any, context: Context, value: unknown) {
   leadership(context);
   if (!["renewal", "new", "industry"].includes(access.task.category)) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用三長群確認"), { status: 409 });
@@ -4189,10 +4260,19 @@ async function saveCaseLeadersSent(access: any, existing: any, context: Context)
     throw Object.assign(new Error("本案尚未形成正式投票決議，不能登記三長群步驟"), { status: 409 });
   }
   if (currentWorkflow.leadersSent) return caseStateResponse(access, existing, context);
+  const input = value && typeof value === "object" ? value as Record<string, unknown> : {};
+  const completionMethod = String(input.method || "manual").trim() === "copy" ? "manual-copy" : "manual";
+  const completedAt = new Date().toISOString();
+  const logText = completionMethod === "manual-copy"
+    ? "三長群文案已複製，依人工貼上流程登記完成"
+    : "三長群步驟已由副主席直接登記完成";
   const workflow = {
     ...currentWorkflow,
     leadersSent: true,
-    log: [{ text: "投票結果已模擬發送至三長群", time: caseWorkflowLogTime(), done: true }, ...(Array.isArray(currentWorkflow.log) ? currentWorkflow.log : [])].slice(0, 20),
+    leadersCompletionMethod: completionMethod,
+    leadersCompletedAt: completedAt,
+    leadersCompletedBy: context.name,
+    log: [{ text: logText, time: caseWorkflowLogTime(), done: true }, ...(Array.isArray(currentWorkflow.log) ? currentWorkflow.log : [])].slice(0, 20),
   };
   try {
     await db("rpc/edge_save_case_state_as_user", {
@@ -4231,7 +4311,7 @@ async function saveCaseAdvisorConfirmation(access: any, existing: any, context: 
     throw Object.assign(new Error("正式公告已發布，董事顧問確認已鎖定"), { status: 409 });
   }
   if (!currentWorkflow.leadersSent) {
-    throw Object.assign(new Error("三長群步驟尚未保存，請先完成「模擬發送三長群」"), { status: 409 });
+    throw Object.assign(new Error("三長群步驟尚未保存，請先複製三長群文案或直接登記已完成"), { status: 409 });
   }
   if (!access.task.case_id) {
     throw Object.assign(new Error("本案尚未建立正式投票資格快照"), { status: 409 });
@@ -4318,7 +4398,7 @@ async function caseStatesApi(request: Request, context: Context) {
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
 
-  if (["feedback-call-prepare", "feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "leaders-sent", "advisor-confirmation", "result-announcement", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
+  if (["feedback-call-prepare", "feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "leaders-sent", "advisor-confirmation", "result-announcement", "result-announcement-copy", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
   }
 
@@ -4342,8 +4422,12 @@ async function caseStatesApi(request: Request, context: Context) {
     return sendCaseResultAnnouncement(access, existing, context);
   }
 
+  if (body.kind === "result-announcement-copy") {
+    return saveCaseResultAnnouncementCopy(access, existing, context);
+  }
+
   if (body.kind === "leaders-sent") {
-    return saveCaseLeadersSent(access, existing, context);
+    return saveCaseLeadersSent(access, existing, context, body.value);
   }
 
   if (body.kind === "advisor-confirmation") {
@@ -4554,6 +4638,8 @@ async function caseStatesApi(request: Request, context: Context) {
         workflow.resultAnnouncementSentAt = currentWorkflow.resultAnnouncementSentAt || "";
         workflow.resultAnnouncementTargetName = currentWorkflow.resultAnnouncementTargetName || "";
         workflow.resultAnnouncementDeliveryId = currentWorkflow.resultAnnouncementDeliveryId || "";
+        workflow.resultAnnouncementMethod = currentWorkflow.resultAnnouncementMethod || "line-oa";
+        workflow.resultAnnouncementRecordedBy = currentWorkflow.resultAnnouncementRecordedBy || "";
         workflow.advisorStatus = currentWorkflow.advisorStatus || "confirmed";
         workflow.advisorNote = currentWorkflow.advisorNote || "";
         workflow.form.referrerName = currentWorkflow.form?.referrerName || workflow.form.referrerName || "";
@@ -4562,10 +4648,15 @@ async function caseStatesApi(request: Request, context: Context) {
         delete workflow.resultAnnouncementSentAt;
         delete workflow.resultAnnouncementTargetName;
         delete workflow.resultAnnouncementDeliveryId;
+        delete workflow.resultAnnouncementMethod;
+        delete workflow.resultAnnouncementRecordedBy;
       }
       workflow.advisorStatus = currentWorkflow.advisorStatus || "pending";
       workflow.advisorNote = currentWorkflow.advisorNote || "";
       workflow.leadersSent = Boolean(currentWorkflow.leadersSent);
+      workflow.leadersCompletionMethod = currentWorkflow.leadersCompletionMethod || "";
+      workflow.leadersCompletedAt = currentWorkflow.leadersCompletedAt || "";
+      workflow.leadersCompletedBy = currentWorkflow.leadersCompletedBy || "";
       if (deadlineChanged) {
         voteDeadlineUpdate = normalizedDeadline(proposed.form.voteDeadline);
       }
@@ -4576,10 +4667,12 @@ async function caseStatesApi(request: Request, context: Context) {
           "voteNoticeCopiedDeadline", "voteCallId", "voteCallStatus",
           "voteCallCreatedAt", "voteCallRepliedAt", "voteCallFailedAt",
           "voteCallError", "voteCallDeadline", "voteCallTargetName", "voteCallEnvironment",
-          "voterSnapshot", "leadersSent",
+          "voterSnapshot", "leadersSent", "leadersCompletionMethod",
+          "leadersCompletedAt", "leadersCompletedBy",
           "advisorStatus", "advisorNote", "resultAnnouncementSent",
           "resultAnnouncementSentAt", "resultAnnouncementTargetName",
-          "resultAnnouncementDeliveryId", "closed",
+          "resultAnnouncementDeliveryId", "resultAnnouncementMethod",
+          "resultAnnouncementRecordedBy", "closed",
         ]);
         workflow = { ...workflow };
         for (const [key, value] of Object.entries(proposed)) {

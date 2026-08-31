@@ -45,7 +45,7 @@ test("正式結果公告是純文字且不標註所有人", () => {
   assert.throws(() => buildCaseResultAnnouncementText({ caseType: "industry", applicant: "甲", currentProfession: "乙", newProfession: "乙", announcedAt }), /不可相同/);
 });
 
-test("後端只允許通過、董顧確認與既有正式公告群，且成功送達後才推進案件", () => {
+test("Bot 發送路徑只允許通過、董顧確認與既有正式公告群，且成功送達後才推進案件", () => {
   const edge = read("supabase/functions/app-api/index.ts");
   const migration = read("supabase/migrations/20260810143000_case_result_line_delivery.sql");
   const sendStart = edge.indexOf("async function sendCaseResultAnnouncement");
@@ -75,7 +75,7 @@ test("後端只允許通過、董顧確認與既有正式公告群，且成功�
   assert.match(migration, /workflow->>'advisorStatus', ''\) <> 'confirmed'/);
 });
 
-test("介面只在副主席明確確認後呼叫正式發送，不會載入頁面自動送出", () => {
+test("Bot 發送按鈕只在副主席明確確認後呼叫，不會載入頁面自動送出", () => {
   const html = read("apps/vice-chair/case-workflow.html");
   const workflow = read("apps/vice-chair/assets/js/case-workflow.js");
   const store = read("apps/vice-chair/assets/js/case-state-store.js");

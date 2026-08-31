@@ -63,7 +63,7 @@
 - `departure_interview_preferences`：歷史離會會員的選擇性補訪設定，只記錄「可安排／不安排」及操作者；不得修改 `members.status`、`departed_on` 或 PALMS 對帳結果。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
 - `deleted_task_references`：副主席／Admin 明確刪除案件後的識別碼封存標記；只保存來源、案件編號、原任務 UUID 與刪除時間，阻止舊裝置把 localStorage 殘影再次匯回，不保存會員內容或訪談資料。
-- `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。投票通知的人工複製通道只在 `workflow` 保存 `voteNoticeCopiedAt`、`voteNoticeCopiedBy` 與對應截止版本，作為開放送票與稽核旗標；不代表 LINE OA 送達。
+- `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。投票通知的人工複製通道只在 `workflow` 保存 `voteNoticeCopiedAt`、`voteNoticeCopiedBy` 與對應截止版本，作為開放送票與稽核旗標；不代表 LINE OA 送達。三長群與正式公告另保存 `leadersCompletionMethod`／`leadersCompletedAt`／`leadersCompletedBy` 及 `resultAnnouncementMethod`／`resultAnnouncementRecordedBy`，用來辨識人工複製貼上與 LINE OA 發送；兩者可完成同一階段，但不得把人工路徑顯示成 LINE 已送達。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
 - `cases`＋`tasks.case_id`：工作台決議案件與正式案件主檔的對照。
 - `case_feedback`：每位副主席／委員在每案各自一筆正式回饋，案件＋回饋者唯一；登入介面與 LINE 免登入頁共用同一資料表，免登入頁可立即讀取該次名單內的全體回饋。

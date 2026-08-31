@@ -36,14 +36,15 @@ test("三長群步驟先由後端保存，成功後才解鎖董顧確認", () =>
   const uiHandler = workflow.slice(uiStart, uiEnd);
 
   assert.match(edge, /body\.kind === "leaders-sent"/);
-  assert.match(edge, /saveCaseLeadersSent\(access, existing, context\)/);
+  assert.match(edge, /saveCaseLeadersSent\(access, existing, context, body\.value\)/);
   assert.match(apiHandler, /leadership\(context\)/);
   assert.match(apiHandler, /vote_snapshots\?case_id=.*select=result/);
   assert.match(apiHandler, /leadersSent: true/);
   assert.match(apiHandler, /p_expected_revision: Number\(existing\?\.revision \|\| 0\)/);
-  assert.match(store, /saveLeadersStep: taskId => postAction\(taskId, "leaders-sent", \{\}\)/);
+  assert.match(store, /saveLeadersStep: \(taskId, method = "manual"\) => postAction/);
+  assert.match(store, /"leaders-sent",\s*\{ method \}/);
   assert.match(uiHandler, /async\(\)=>/);
-  assert.match(uiHandler, /saveLeadersStep\(CASE_ID\)/);
+  assert.match(uiHandler, /saveLeadersStep\(CASE_ID,"manual"\)/);
   assert.match(uiHandler, /await lastPersist/);
   assert.match(uiHandler, /state=loadState\(\);render\(\)/);
   assert.doesNotMatch(uiHandler, /state\.leadersSent=true/, "後端成功前不可先解鎖董顧確認");
@@ -80,6 +81,6 @@ test("案件頁等 Supabase 保存成功才套用董顧狀態，失敗時顯示�
   assert.doesNotMatch(handler, /state\.advisorStatus=/, "後端成功前不可先把本機狀態標成董顧同意");
   assert.match(html, /id="advisorSaveState"[^>]*role="status"/);
   assert.match(html, /id="closeCaseHint"/);
-  assert.match(html, /case-state-store\.js\?v=15/);
-  assert.match(html, /case-workflow\.js\?v=29/);
+  assert.match(html, /case-state-store\.js\?v=16/);
+  assert.match(html, /case-workflow\.js\?v=30/);
 });

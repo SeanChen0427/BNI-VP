@@ -357,11 +357,20 @@
       {},
       { voteEnvironment },
     ),
-    saveLeadersStep: taskId => postAction(taskId, "leaders-sent", {}),
+    saveLeadersStep: (taskId, method = "manual") => postAction(
+      taskId,
+      "leaders-sent",
+      { method },
+    ),
     saveAdvisorConfirmation: (taskId, status, note = "") => postAction(
       taskId,
       "advisor-confirmation",
       { status, note },
+    ),
+    recordResultAnnouncementCopy: taskId => postAction(
+      taskId,
+      "result-announcement-copy",
+      {},
     ),
     sendResultAnnouncement: taskId => postAction(taskId, "result-announcement", {}),
     saveWorkflow: (taskId, workflow) => postAction(taskId, "workflow", workflow),
