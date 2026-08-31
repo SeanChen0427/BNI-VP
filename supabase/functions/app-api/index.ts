@@ -2803,6 +2803,25 @@ async function analysisDraftApi(request: Request, context: Context) {
     await db(`analysis_snapshots?id=eq.${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ snapshot: { draft } }) });
     return { draft };
   }
+  if (body.action === "codex-review") {
+    assertAnalysisReconciled(draft.engine);
+    const text = String(body.text || "").trim();
+    const sectionCount = (text.match(/^##\s+/gm) || []).length;
+    if (text.length < 1200 || text.length > 40_000) throw new Error("Codex 細部審視須為 1,200 至 40,000 字元的完整報告");
+    if (sectionCount !== 6) throw new Error("Codex 細部審視須完整包含六個 Markdown 區段");
+    if (!/本報告為草稿[\s\S]*副主席確認/.test(text)) throw new Error("Codex 細部審視結尾須標注本報告為草稿，並由副主席確認後發佈");
+    draft.aiReview = {
+      provider: "codex",
+      model: "BNI 分析 Skill・人工深度審視",
+      text,
+      generatedAt: new Date().toISOString(),
+      promptChars: JSON.stringify(draft.engine).length,
+      feedbackCount: (draft.feedback || []).length,
+      reviewedBy: context.identity,
+    };
+    await db(`analysis_snapshots?id=eq.${row.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ snapshot: { draft } }) });
+    return { draft };
+  }
   if (body.action === "publish") {
     assertAnalysisReconciled(draft.engine);
     if (!draft.aiReview) throw new Error("尚未執行 AI 審視，請先完成審視再發佈");

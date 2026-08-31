@@ -10,9 +10,9 @@ const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/i
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
   const authIndex = html.indexOf("assets/js/auth.js?v=7");
   const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=2");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=7");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=8");
   assert.ok(authIndex >= 0 && bridgeIndex > authIndex && pageIndex > bridgeIndex);
-  assert.match(html, /assets\/css\/analysis-review\.css\?v=5/);
+  assert.match(html, /assets\/css\/analysis-review\.css\?v=6/);
 });
 
 test("月度分析頁不把 HTML 錯誤頁當成 JSON 顯示", () => {
@@ -92,7 +92,19 @@ test("任何 blocking 對帳差異都不能產出、AI 審視或發佈草稿", (
   assert.match(edgeSource, /if \(engine\?\.aborted \|\| blocking\.length\)/);
   assert.match(edgeSource, /if \(body\.action === "generate"\) \{[\s\S]*?assertAnalysisReconciled\(engine\)/);
   assert.match(edgeSource, /if \(body\.action === "ai-review"\) \{\s*assertAnalysisReconciled\(draft\.engine\)/);
+  assert.match(edgeSource, /if \(body\.action === "codex-review"\) \{\s*assertAnalysisReconciled\(draft\.engine\)/);
   assert.match(edgeSource, /if \(body\.action === "publish"\) \{\s*assertAnalysisReconciled\(draft\.engine\)/);
+});
+
+test("Codex 細部審視必須使用六區關懷報告並保留副主席確認門檻", () => {
+  assert.match(html, /id="codexReviewText"/);
+  assert.match(html, /id="codexReviewButton"/);
+  assert.match(pageSource, /post\(\{ action: "codex-review", text \}\)/);
+  assert.match(edgeSource, /const sectionCount = \(text\.match\(\/\^##\\s\+\/gm\) \|\| \[\]\)\.length/);
+  assert.match(edgeSource, /sectionCount !== 6/);
+  assert.match(edgeSource, /provider: "codex"/);
+  assert.match(edgeSource, /BNI 分析 Skill・人工深度審視/);
+  assert.match(edgeSource, /本報告為草稿\[\\s\\S\]\*副主席確認/);
 });
 
 test("成功重跑分析時會清除上一次的阻擋文字", async () => {

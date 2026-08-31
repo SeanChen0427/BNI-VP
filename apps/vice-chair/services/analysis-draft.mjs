@@ -204,6 +204,25 @@ export async function analysisDraftApi(req, url, res, deps) {
       return json(res, 200, { draft });
     }
 
+    if (body.action === "codex-review") {
+      const text = String(body.text || "").trim();
+      const sectionCount = (text.match(/^##\s+/gm) || []).length;
+      if (text.length < 1200 || text.length > 40_000) return json(res, 400, { message: "Codex 細部審視須為 1,200 至 40,000 字元的完整報告" });
+      if (sectionCount !== 6) return json(res, 400, { message: "Codex 細部審視須完整包含六個 Markdown 區段" });
+      if (!/本報告為草稿[\s\S]*副主席確認/.test(text)) return json(res, 400, { message: "Codex 細部審視結尾須標注本報告為草稿，並由副主席確認後發佈" });
+      draft.aiReview = {
+        provider: "codex",
+        model: "BNI 分析 Skill・人工深度審視",
+        text,
+        generatedAt: new Date().toISOString(),
+        promptChars: JSON.stringify(draft.engine).length,
+        feedbackCount: draft.feedback.length,
+        reviewedBy: identity,
+      };
+      await writeJsonFile(DRAFT_FILE, draft);
+      return json(res, 200, { draft });
+    }
+
     if (body.action === "reject") {
       const reason = String(body.reason || "").trim().slice(0, 2000);
       if (!reason) return json(res, 400, { message: "退回重做必須附上原因" });

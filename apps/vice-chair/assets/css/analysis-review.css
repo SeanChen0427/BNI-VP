@@ -26,6 +26,15 @@ main{max-width:1040px;margin:0 auto;padding:28px 20px 60px}
 .panel-actions button,.decision button{background:#991b1f;color:#fff;border:0;border-radius:9px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px}
 .panel-actions button:disabled{opacity:.5;cursor:wait}
 .panel-actions span{font-size:13px;color:#6b7280}
+.codex-review-entry{margin-top:16px;border:1px solid #d6dde8;border-left:3px solid #315f8f;border-radius:10px;padding:12px 14px;background:#f7faff}
+.codex-review-entry summary{cursor:pointer;font-weight:700;color:#294f77;min-height:44px;display:flex;align-items:center}
+.codex-review-entry p{font-size:13px;color:#5f6f82;margin:2px 0 12px}
+.codex-review-entry label{display:block;font-size:13px;font-weight:700;color:#40566f;margin-bottom:6px}
+.codex-review-entry textarea{width:100%;border:1px solid #c8d4e2;border-radius:9px;padding:12px;font:inherit;font-size:14px;line-height:1.65;resize:vertical;background:#fff}
+.codex-review-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:10px}
+.codex-review-actions button{background:#315f8f;color:#fff;border:0;border-radius:9px;padding:12px 20px;font-size:14px;font-weight:600;cursor:pointer;min-height:44px}
+.codex-review-actions button:disabled{opacity:.5;cursor:wait}
+.codex-review-actions span{font-size:13px;color:#5f6f82}
 .issues{margin-top:14px;display:flex;flex-direction:column;gap:8px}
 .issues[hidden]{display:none}
 .issue{font-size:13px;padding:10px 12px;border-radius:8px;background:#f3f4f6}

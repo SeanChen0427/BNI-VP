@@ -10,7 +10,7 @@
   <script src="assets/js/supabase-data.js?v=2"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/analysis-review.css?v=5">
+  <link rel="stylesheet" href="assets/css/analysis-review.css?v=6">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
 </head>
 <body>
@@ -53,7 +53,7 @@
         <details class="raw-json"><summary>引擎完整結構化結果（JSON）</summary><pre id="draftJson"></pre></details>
       </section>
       <section class="panel" id="reviewPanel" hidden>
-        <div class="panel-head"><h2>三、AI 審視</h2><span class="hint">完整脈絡、品質優先；使用你綁定的個人 API Key</span></div>
+        <div class="panel-head"><h2>三、分析審視</h2><span class="hint">可使用個人 AI API，或保存 Codex 依 BNI 分析 Skill 完成的細部審視</span></div>
         <div class="panel-actions">
           <label>平台
             <select id="providerSelect"><option value="anthropic">Anthropic Claude</option><option value="openai">OpenAI GPT</option><option value="gemini">Google Gemini</option></select>
@@ -69,6 +69,16 @@
           <button type="button" id="reviewButton">執行 AI 審視</button>
           <span id="reviewStatus"></span>
         </div>
+        <details class="codex-review-entry">
+          <summary>保存 Codex 細部審視</summary>
+          <p>只接受已依本期引擎資料完成、且含六個 Markdown 區段的繁體中文關懷報告；不會重算分數或改寫燈號。</p>
+          <label for="codexReviewText">Codex 審視內容</label>
+          <textarea id="codexReviewText" rows="14" placeholder="貼入 Codex 依 BNI 分析 Skill 完成的六區關懷報告"></textarea>
+          <div class="codex-review-actions">
+            <button type="button" id="codexReviewButton">儲存 Codex 細部審視</button>
+            <span id="codexReviewStatus"></span>
+          </div>
+        </details>
         <div class="feedback-list" id="feedbackList" hidden></div>
         <article class="review-output" id="reviewOutput" hidden><header id="reviewOutputMeta"></header><pre id="reviewText"></pre></article>
       </section>
@@ -94,6 +104,6 @@
     </div>
   </main>
   <script src="assets/js/workspace-nav.js?v=8"></script>
-  <script src="assets/js/analysis-review.js?v=7"></script>
+  <script src="assets/js/analysis-review.js?v=8"></script>
 </body>
 </html>

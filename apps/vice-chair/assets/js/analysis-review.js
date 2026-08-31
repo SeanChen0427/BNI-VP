@@ -227,6 +227,7 @@
     if (review) {
       $("#reviewOutputMeta").textContent = `${review.provider}｜${review.model}｜${new Date(review.generatedAt).toLocaleString("zh-TW")}｜脈絡 ${Math.round(review.promptChars / 1000)}K 字元｜已帶入回饋 ${review.feedbackCount} 則`;
       $("#reviewText").textContent = review.text;
+      if (review.provider === "codex") $("#codexReviewText").value = review.text;
     }
   }
 
@@ -273,6 +274,27 @@
       renderDraft(data.draft);
     } catch (error) {
       $("#reviewStatus").textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  $("#codexReviewButton").addEventListener("click", async () => {
+    const button = $("#codexReviewButton");
+    const text = $("#codexReviewText").value.trim();
+    if (!text) {
+      $("#codexReviewText").focus();
+      $("#codexReviewStatus").textContent = "請先貼入 Codex 細部審視";
+      return;
+    }
+    button.disabled = true;
+    $("#codexReviewStatus").textContent = "正在驗證並保存…";
+    try {
+      const data = await post({ action: "codex-review", text });
+      $("#codexReviewStatus").textContent = "Codex 細部審視已保存，請往下確認發佈";
+      renderDraft(data.draft);
+    } catch (error) {
+      $("#codexReviewStatus").textContent = error.message;
     } finally {
       button.disabled = false;
     }
