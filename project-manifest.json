@@ -1,6 +1,6 @@
 {
   "schema": "fulian.unified-project.v1",
-  "updated": "2026-08-29",
+  "updated": "2026-08-31",
   "product": "富聯分會會員委員會整合系統",
   "runtime": {
     "type": "local multi-page prototype with shared analysis backend",
@@ -19,6 +19,7 @@
     "analysisDraftFlow": "apps/vice-chair/services/analysis-draft.mjs",
     "caseAndVotingWorkflow": "apps/vice-chair/core/case-domain.js",
     "calendarWindows": "apps/vice-chair/core/calendar-domain.js",
+    "commonMessageTemplates": "apps/vice-chair/core/message-template-domain.js",
     "analysisBridge": "apps/vice-chair/bni-bridge.mjs",
     "localApi": "apps/vice-chair/preview-server.mjs",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",

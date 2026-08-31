@@ -20,6 +20,7 @@
 | 進行中案件 | `case-board.html`、`assets/js/case-board.js` |
 | 通知鈴鐺 | `assets/js/notification-center.js` |
 | 當責信門檻、待寄提醒與寄發留痕 | `docs/accountability-email-workflow.md`、`core/accountability-email-domain.js`、`accountability-emails.html`、`assets/js/accountability-emails.js`、`assets/js/notification-center.js` |
+| 常用文稿內容、分段與動態欄位 | `docs/email-templates.md`、`core/message-template-domain.js`、`message-templates.html`、`assets/js/message-templates.js` |
 | 表單欄位與 Word | 對應 `*-form.html`、`assets/js/*-form.js`、`services/case-files.js`、`docs/forms/interview-forms.md` |
 | PALMS、燈號、關懷診斷 | 相鄰 `../bni-analysis` 模組；本工作台只讀 `bni-bridge.mjs` |
 | AI 助手 | `assets/js/ai-assistant.js`、`preview-server.mjs`、`docs/architecture-hosting-security.md` |

@@ -73,6 +73,9 @@ let state = loadState();
 let saveTimer;
 let lastPersist=Promise.resolve();
 let feedbackDirty=false;
+let advisorDirty=false;
+let leadersSaving=false;
+let advisorSaving=false;
 let feedbackEditorTarget=currentUser();
 let announcementMembers=[];
 let activeFeedbackCallText="";
@@ -391,14 +394,32 @@ function renderResult(){
   $("#renewalExtra").hidden=$("#caseType").value!=="renewal";
   $("#leadersPreview").textContent=formed?leadersMessage():"尚未形成會員委員會決議，三長群文案會在過半參與且形成多數後產生。";
   $("#copyLeaders").disabled=!formed;
-  $("#sendLeaders").disabled=!(isVp()&&formed&&!state.leadersSent&&!state.closed);
-  $("#sendLeaders").textContent=state.leadersSent?"已發送三長群":"模擬發送三長群";
-  $("#advisorStatus").value=state.advisorStatus;
-  $("#advisorNote").value=state.advisorNote;
-  const advisorEditable=isVp()&&state.leadersSent&&!state.resultAnnouncementSent&&!state.closed;
+  $("#sendLeaders").disabled=leadersSaving||!(isVp()&&formed&&!state.leadersSent&&!state.closed);
+  $("#sendLeaders").textContent=leadersSaving?"正在保存三長群步驟…":state.leadersSent?"三長群步驟已保存":"模擬發送三長群";
+  if(!advisorDirty){$("#advisorStatus").value=state.advisorStatus;$("#advisorNote").value=state.advisorNote;}
+  const advisorEditable=isVp()&&state.leadersSent&&!state.resultAnnouncementSent&&!state.closed&&!advisorSaving&&!leadersSaving;
   $("#advisorStatus").disabled=!advisorEditable;
   $("#advisorNote").disabled=!advisorEditable;
   $("#saveAdvisor").disabled=!advisorEditable;
+  $("#saveAdvisor").textContent=advisorSaving?"正在保存…":"保存董顧確認";
+  const advisorSaveState=$("#advisorSaveState");
+  advisorSaveState.classList.toggle("sent",state.advisorStatus==="confirmed");
+  advisorSaveState.classList.toggle("warning",state.advisorStatus==="returned"||(!advisorEditable&&!state.closed&&state.advisorStatus!=="confirmed"));
+  advisorSaveState.textContent=advisorSaving
+    ? "正在保存董事顧問確認，請等候 Supabase 回覆。"
+    : state.closed
+    ? "案件已結案，董事顧問確認紀錄已鎖定。"
+    : state.resultAnnouncementSent
+      ? "正式公告已送達，董事顧問確認紀錄已鎖定。"
+      : !formed
+        ? "等待會員委員會形成正式投票決議。"
+        : !state.leadersSent
+          ? "請先完成「模擬發送三長群」步驟。"
+          : state.advisorStatus==="confirmed"
+            ? "董事顧問同意已保存至 Supabase；請依下方提示完成公告與結案。"
+            : state.advisorStatus==="returned"
+              ? "董事顧問退回補充資料已保存；補充完成後可再次登記實際回覆。"
+              : "尚未保存董事顧問回覆；選擇實際狀態後，請按「保存董顧確認」。";
   $("#resultReferrerRow").hidden=!isNew;
   $("#resultReferrerName").disabled=!(isVp()&&isNew&&!state.resultAnnouncementSent&&!state.closed);
   const oldProfession=String(caseDraft().currentProfession||state.form?.currentProfession||"").trim();
@@ -422,8 +443,22 @@ function renderResult(){
             ? isNew?"請先從正式會員名單選擇引薦人。":"公告欄位不完整，請回到訪談資料確認。"
             : "已可發布；按下按鈕後仍會顯示正式群警告與完整文案，確認後才送出。";
   const mayClose=state.advisorStatus==="confirmed"&&(rejected||(approved&&state.resultAnnouncementSent));
-  $("#closeCase").disabled=!(isVp()&&mayClose&&!state.closed);
-  if(state.closed)$("#closeSection").innerHTML=`<div class="closed-banner">案件已結案存檔・${$("#caseId").textContent}</div>`;
+  const closeCaseButton=$("#closeCase"),closeCaseHint=$("#closeCaseHint");
+  if(closeCaseButton)closeCaseButton.disabled=!(isVp()&&mayClose&&!state.closed);
+  if(closeCaseHint)closeCaseHint.textContent=state.closed
+    ? "案件已結案存檔。"
+    : !formed
+      ? "尚未形成正式投票決議，不能結案。"
+      : state.advisorStatus==="returned"
+        ? "董事顧問已退回補充資料，暫時不能結案。"
+        : state.advisorStatus!=="confirmed"
+          ? "請先保存董事顧問的實際回覆。"
+          : approved&&!state.resultAnnouncementSent
+            ? "董顧確認已完成；請先發送正式公告群，LINE 確認送達後即可結案。"
+            : rejected
+              ? "董顧確認已完成；本案不發布公告，可直接結案。"
+              : "董顧確認與正式公告皆已完成，可結案存檔。";
+  if(state.closed&&!$("#closeSection .closed-banner"))$("#closeSection").innerHTML=`<div class="closed-banner">案件已結案存檔・${$("#caseId").textContent}</div>`;
 }
 
 function renderSummary(){
@@ -604,6 +639,15 @@ function bindEvents(){
     persistNow();
     toast("截止時間已更新，請重新通知委員投票");
   });
+  const markAdvisorDirty=()=>{
+    advisorDirty=true;
+    const hint=$("#advisorSaveState");
+    hint.classList.remove("sent");
+    hint.classList.add("warning");
+    hint.textContent="目前選擇尚未保存；請按「保存董顧確認」，待 Supabase 回覆成功後才會生效。";
+  };
+  $("#advisorStatus").addEventListener("change",markAdvisorDirty);
+  $("#advisorNote").addEventListener("input",markAdvisorDirty);
   $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $("#copyFeedbackNotice").addEventListener("click",async()=>{
@@ -672,8 +716,41 @@ function bindEvents(){
     finally{button.textContent=original;renderVote();}
   });
   $("#copyLeaders").addEventListener("click",async()=>{if(!isVp())return;await navigator.clipboard.writeText(leadersMessage());toast("三長群文案已複製");});
-  $("#sendLeaders").addEventListener("click",()=>{if(!isVp())return;state.leadersSent=true;addLog("投票結果已模擬發送至三長群");persistNow();toast("已模擬發送三長群");});
-  $("#saveAdvisor").addEventListener("click",()=>{if(!isVp())return;state.advisorStatus=$("#advisorStatus").value;state.advisorNote=$("#advisorNote").value.trim();addLog(state.advisorStatus==="confirmed"?"董事顧問已同意會員委員會決議":state.advisorStatus==="returned"?"董事顧問退回補充資料":"董事顧問確認仍待回覆");persistNow();toast("董顧確認狀態已保存");});
+  $("#sendLeaders").addEventListener("click",async()=>{
+    if(!isVp()||!["pass","reject"].includes(voteDecision().status))return;
+    const button=$("#sendLeaders");
+    leadersSaving=true;
+    clearTimeout(saveTimer);
+    state.form=collectForm();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    button.disabled=true;button.textContent="正在保存三長群步驟…";
+    $("#saveState").textContent="正在先同步案件欄位…";
+    lastPersist=window.FulianCaseStateStore.flush();
+    try{await lastPersist}
+    catch(error){leadersSaving=false;state=loadState();render();$("#saveState").textContent="案件欄位同步失敗";return toast(error.message||"案件同步失敗")}
+    $("#saveState").textContent="正在保存三長群步驟…";
+    lastPersist=window.FulianCaseStateStore.saveLeadersStep(CASE_ID);
+    try{await lastPersist;leadersSaving=false;state=loadState();render();$("#saveState").textContent="三長群步驟已保存至 Supabase";toast("三長群步驟已保存")}
+    catch(error){leadersSaving=false;state=loadState();render();$("#saveState").textContent="三長群步驟保存失敗";toast(error.message||"三長群步驟保存失敗")}
+  });
+  $("#saveAdvisor").addEventListener("click",async()=>{
+    if(!isVp())return;
+    const advisorStatus=$("#advisorStatus").value,advisorNote=$("#advisorNote").value.trim(),button=$("#saveAdvisor"),hint=$("#advisorSaveState");
+    advisorSaving=true;
+    clearTimeout(saveTimer);
+    state.form=collectForm();
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+    button.disabled=true;button.textContent="正在保存…";
+    hint.classList.remove("sent","warning");hint.textContent="正在先同步案件欄位，再保存董事顧問確認…";
+    $("#saveState").textContent="正在同步案件欄位…";
+    lastPersist=window.FulianCaseStateStore.flush();
+    try{await lastPersist}
+    catch(error){advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="案件欄位同步失敗";const failure=$("#advisorSaveState");failure.classList.add("warning");failure.textContent=`董事顧問確認尚未保存：${error.message||"案件同步失敗"}`;return toast(error.message||"案件同步失敗")}
+    $("#saveState").textContent="正在保存董事顧問確認…";
+    lastPersist=window.FulianCaseStateStore.saveAdvisorConfirmation(CASE_ID,advisorStatus,advisorNote);
+    try{await lastPersist;advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="董事顧問確認已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;toast("董顧確認狀態已保存")}
+    catch(error){advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="董事顧問確認保存失敗";const failure=$("#advisorSaveState");failure.classList.add("warning");failure.textContent=`董事顧問確認尚未保存：${error.message||"請重新整理後再試"}`;toast(error.message||"董事顧問確認保存失敗")}
+  });
   $("#copyResultAnnouncement").addEventListener("click",async()=>{if(voteDecision().status!=="pass")return;await navigator.clipboard.writeText(resultAnnouncementText());toast("正式公告文案已複製");});
   $("#sendResultAnnouncement").addEventListener("click",async()=>{
     if(!isVp()||voteDecision().status!=="pass"||state.advisorStatus!=="confirmed")return;

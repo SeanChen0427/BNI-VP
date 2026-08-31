@@ -224,7 +224,11 @@
         cache: "no-store",
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || `案件操作失敗：HTTP ${response.status}`);
+      if (!response.ok) {
+        const error = new Error(data.message || `案件操作失敗：HTTP ${response.status}`);
+        error.status = response.status;
+        throw error;
+      }
       syncFailed = false;
       applyState(data);
       return data;
@@ -353,13 +357,19 @@
       {},
       { voteEnvironment },
     ),
+    saveLeadersStep: taskId => postAction(taskId, "leaders-sent", {}),
+    saveAdvisorConfirmation: (taskId, status, note = "") => postAction(
+      taskId,
+      "advisor-confirmation",
+      { status, note },
+    ),
     sendResultAnnouncement: taskId => postAction(taskId, "result-announcement", {}),
     saveWorkflow: (taskId, workflow) => postAction(taskId, "workflow", workflow),
     reset: (taskId) => postAction(taskId, "reset", {}),
   };
 
   document.addEventListener?.("input", event => {
-    if (event.target?.closest?.("[data-save], #myFeedback")) lastEditingAt = Date.now();
+    if (event.target?.closest?.("[data-save], #myFeedback, #advisorStatus, #advisorNote")) lastEditingAt = Date.now();
   });
   window.addEventListener?.("focus", () => refresh().catch(() => undefined));
   document.addEventListener?.("visibilitychange", () => {

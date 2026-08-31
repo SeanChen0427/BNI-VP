@@ -1,6 +1,30 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.16",
+      publishedAt: "2026-08-31",
+      title: "修正董顧確認跳回尚未回覆",
+      level: "important",
+      changes: Object.freeze([
+        "三長群步驟會等 Supabase 保存成功後才解鎖董事顧問確認，不會在背景同步期間提早開放。",
+        "董顧確認改為獨立保存；成功後才更新畫面，失敗或版本衝突會直接顯示原因。",
+        "結案按鈕旁會說明目前還缺董顧確認、正式公告，或已可直接結案。"
+      ]),
+      impact: "不修改既有案件、回饋、票數、Word 或公告；先前未成功保存的董顧狀態需在新版案件頁重新選擇並保存。"
+    }),
+    Object.freeze({
+      version: "1.0.15",
+      publishedAt: "2026-08-31",
+      title: "新增繳費後協助群文稿",
+      level: "normal",
+      changes: Object.freeze([
+        "文稿範本新增「繳費後協助群開場與訪談邀約」，對應申請表與繳費完成後的作業。",
+        "可分別複製「＠ 新會員並自我介紹」與「邀約線上入會訪談」兩段文字。",
+        "自我介紹會自動套用當屆副主席的姓名與行業別；缺資料時會提醒先確認名單。"
+      ]),
+      impact: "系統不會自動發送 LINE，也不讀取或修改新會員案件、申請表、繳費、投票與 Word 資料。"
+    }),
+    Object.freeze({
       version: "1.0.14",
       publishedAt: "2026-08-29",
       title: "測試群圖卡可改發正式群",

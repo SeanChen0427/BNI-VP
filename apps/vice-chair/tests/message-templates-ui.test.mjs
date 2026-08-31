@@ -15,6 +15,19 @@ test("文稿範本頁只供副主席與 Admin，且不會自行發送訊息", ()
   assert.doesNotMatch(source, /line\/v2\/bot\/message|pushMessage|\/api\/line/);
 });
 
+test("新會員繳費後協助群文稿分成兩段複製，並套用當屆副主席資料", () => {
+  const domain = read("core/message-template-domain.js");
+  const source = read("assets/js/message-templates.js");
+  assert.match(domain, /new-member-assistance-group-opening/);
+  assert.match(domain, /秘財建立主席、副主席、秘財與新會員的協助群/);
+  assert.match(domain, /複製自我介紹/);
+  assert.match(domain, /複製訪談邀約/);
+  assert.match(source, /FulianAuth\.getConfig\(\)/);
+  assert.match(source, /members\?status=eq\.active/);
+  assert.match(source, /select=profession,people!inner\(display_name\)/);
+  assert.match(source, /domain\.personalizeContent/);
+});
+
 test("文稿頁不讀取案件、投票或訪談 Word", () => {
   const page = read("message-templates.html");
   const source = read("assets/js/message-templates.js");

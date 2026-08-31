@@ -77,8 +77,8 @@ test("案件頁可選測試／正式群建立回饋呼喚，流程本身不使�
   assert.match(html, /啟動回饋流程並複製文案/);
   assert.match(html, /id="feedbackCallEnvironment"/);
   assert.match(html, /測試群（仍寫入正式案件）/);
-  assert.match(html, /case-state-store\.js\?v=14/);
-  assert.match(html, /case-workflow\.js\?v=28/);
+  assert.match(html, /case-state-store\.js\?v=15/);
+  assert.match(html, /case-workflow\.js\?v=29/);
 });
 
 test("測試群回饋圖卡可單向改發正式群，並保留既有正式回饋", () => {
