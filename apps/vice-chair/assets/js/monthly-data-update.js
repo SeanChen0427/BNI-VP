@@ -1,6 +1,6 @@
 (function(){
   const session=FulianAuth.getSession(),list=document.querySelector("#monthlyDataList"),message=document.querySelector("#monthlyDataMessage");
-  if(!list||session.role!=="vp")return;
+  if(!list||!["vp","admin"].includes(session.role))return;
   const identity=`${session.role}:${session.name}`;
   let current=null;
   const escape=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));

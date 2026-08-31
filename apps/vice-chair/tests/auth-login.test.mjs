@@ -10,6 +10,7 @@ const settingsSource=readFileSync(new URL("../assets/js/settings.js",import.meta
 const supabaseConfig=readFileSync(new URL("../assets/js/supabase-config.js",import.meta.url),"utf8");
 const supabaseData=readFileSync(new URL("../assets/js/supabase-data.js",import.meta.url),"utf8");
 const memberDirectory=readFileSync(new URL("../assets/js/member-directory.js",import.meta.url),"utf8");
+const monthlyDataSource=readFileSync(new URL("../assets/js/monthly-data-update.js",import.meta.url),"utf8");
 const edgeFunction=readFileSync(new URL("../../../supabase/functions/manage-shared-credentials/index.ts",import.meta.url),"utf8");
 const appApiFunction=readFileSync(new URL("../../../supabase/functions/app-api/index.ts",import.meta.url),"utf8");
 
@@ -49,6 +50,7 @@ assert.match(appApiFunction,/payload\?\.stop_reason/,"Claude 回應必須檢查 
 assert.match(appApiFunction,/compactAiSource\(source,/,"會員姓名問題不得傳送無關的全體會員資料");
 assert.match(memberDirectory,/FulianData\.getMemberNames/);
 assert.doesNotMatch(memberDirectory,/members\s*[:=]\s*\[[^\]]+\]/s);
+assert.match(monthlyDataSource,/\["vp","admin"\]\.includes\(session\.role\)/,"副主席與 Admin 都必須能使用後端已授權的每月資料上傳入口");
 assert.match(edgeFunction,/account\.role!=="admin"/);
 assert.match(edgeFunction,/SUPABASE_SERVICE_ROLE_KEY/);
 assert.match(edgeFunction,/passwords\[role\]\.length<12/);
