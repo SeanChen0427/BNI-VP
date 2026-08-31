@@ -202,10 +202,34 @@ function taipeiDay(date = new Date()) {
 }
 
 function monthWindow(offsetMonths: number, countMonths: number) {
-  const now = new Date();
-  const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + offsetMonths + 1, 0));
+  const [year, month] = taipeiDay().split("-").map(Number);
+  const end = new Date(Date.UTC(year, month - 1 + offsetMonths + 1, 0));
   const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - countMonths + 1, 1));
   return { start: isoDay(start), end: isoDay(end), month: isoDay(start).slice(0, 7) };
+}
+
+function monthWindowForReportMonth(reportMonth: string, countMonths: number) {
+  const match = /^(\d{4})-(\d{2})$/.exec(reportMonth);
+  if (!match) throw new Error("報表月份格式不正確");
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (month < 1 || month > 12) throw new Error("報表月份格式不正確");
+  const end = new Date(Date.UTC(year, month, 0));
+  const start = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - countMonths + 1, 1));
+  return { start: isoDay(start), end: isoDay(end), month: reportMonth };
+}
+
+// 一般月份仍在每月 1 日切換至上月；月末當天若官方報表已完整出齊，允許提前驗收當月。
+function operationalReportWindows() {
+  const today = taipeiDay();
+  const currentMonth = today.slice(0, 7);
+  const currentMonthEnd = monthWindowForReportMonth(currentMonth, 1).end;
+  const reportMonth = today === currentMonthEnd ? currentMonth : monthWindow(-1, 1).month;
+  return {
+    monthly: monthWindowForReportMonth(reportMonth, 1),
+    half: monthWindowForReportMonth(reportMonth, 6),
+    annual: monthWindowForReportMonth(reportMonth, 12),
+  };
 }
 
 function reportWindowEnding(periodEnd: string, countMonths: number) {
@@ -1555,9 +1579,7 @@ async function attendanceApi(request: Request, url: URL, context: Context) {
 
 async function monthlyDataStatus() {
   const rows = await reportImports();
-  const monthly = monthWindow(-1, 1);
-  const half = monthWindow(-1, 6);
-  const annual = monthWindow(-1, 12);
+  const { monthly, half, annual } = operationalReportWindows();
   const auditRows = rows.filter((row: any) => {
     const date = auditDate(row);
     return reportCategory(row) === "audit" && date && date >= monthly.start && date <= monthly.end;
@@ -1610,9 +1632,7 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
   if (!["halfYear", "annual", "monthly", "audit"].includes(body.type) || !files.length) throw new Error("請選擇要上傳的資料");
   if (body.type !== "audit" && files.length !== 1) throw new Error("此類資料每次只能上傳一份");
   if (files.length > 8) throw new Error("每次最多上傳 8 份檔案");
-  const monthly = monthWindow(-1, 1);
-  const half = monthWindow(-1, 6);
-  const annual = monthWindow(-1, 12);
+  const { monthly, half, annual } = operationalReportWindows();
   const provisionalReconciliation = { promoted: [] as string[], blocked: [] as string[] };
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
@@ -2564,16 +2584,16 @@ async function aiChatApi(request: Request, context: Context) {
 
 async function loadEngineSources() {
   const imports = await reportImports();
-  const expectedMonth = monthWindow(-1, 1);
-  const expectedHalf = monthWindow(-1, 6);
-  const expectedAnnual = monthWindow(-1, 12);
+  const { monthly: expectedMonth, half: expectedHalf, annual: expectedAnnual } = operationalReportWindows();
   const half = latestByCategory(imports, "halfYear", expectedHalf);
+  const monthlyRow = latestByCategory(imports, "monthly", expectedMonth);
   const expiry = latestByCategory(imports, "membership");
   const tenure = latestByCategory(imports, "tenure");
   const annualRow = latestByCategory(imports, "annual", expectedAnnual);
   const missing = [];
   if (!half) missing.push(`半年 PALMS（${expectedHalf.start} 至 ${expectedHalf.end}）`);
   if (!annualRow) missing.push(`一年 PALMS（${expectedAnnual.start} 至 ${expectedAnnual.end}）`);
+  if (!monthlyRow) missing.push(`單月 PALMS（${expectedMonth.start} 至 ${expectedMonth.end}）`);
   if (!expiry) missing.push("會員到期日報告");
   if (!tenure) missing.push("會齡報告");
   if (missing.length) throw new Error(`正式分析資料尚未完整：請先上傳${missing.join("、")}`);
@@ -2593,10 +2613,10 @@ async function loadEngineSources() {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
-  const [renewalRows, activeMemberRows, completedMidtermRows] = await Promise.all([
+  const [renewalRows, activeMemberRows, midtermRows] = await Promise.all([
     db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
-    db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=eq.completed&completed_at=not.is.null&select=id,member_id,title,completed_at,source_reference&order=completed_at.desc"),
+    db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=in.(pending,in_progress,completed)&select=id,member_id,title,status,created_at,due_at,completed_at,source_reference&order=created_at.desc"),
   ]);
   const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
   const renewalCompletions = (renewalRows || []).map((row: any) => ({
@@ -2607,12 +2627,21 @@ async function loadEngineSources() {
     source: row.source,
     confirmedAt: row.confirmed_at,
   })).filter((row: any) => row.name);
-  const midtermCompletions = (completedMidtermRows || []).map((row: any) => ({
+  const midtermCompletions = (midtermRows || []).filter((row: any) => row.status === "completed" && row.completed_at).map((row: any) => ({
     name: renewalNames.get(row.member_id) || String(row.title || "").replace(/\s+/g, ""),
     completedAt: row.completed_at,
     sourceReference: row.source_reference,
   })).filter((row: any) => row.name && row.completedAt);
-  const sources = [half, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
+  const midtermTasks = (midtermRows || []).filter((row: any) => ["pending", "in_progress"].includes(row.status)).map((row: any) => ({
+    id: row.id,
+    name: renewalNames.get(row.member_id) || String(row.title || "").replace(/\s+/g, ""),
+    status: row.status,
+    createdAt: row.created_at,
+    dueAt: row.due_at,
+    scheduledAt: row.due_at,
+    sourceReference: row.source_reference,
+  })).filter((row: any) => row.name && row.createdAt);
+  const sources = [half, monthlyRow, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   return {
     engine: buildAnalysisFromParsed({
       palms: halfReport,
@@ -2624,6 +2653,7 @@ async function loadEngineSources() {
       auditMonthName: expectedMonth.month,
       renewalCompletions,
       midtermCompletions,
+      midtermTasks,
       sources,
     }),
     formSources: { halfReport, annualReport: annual, tenureReport },

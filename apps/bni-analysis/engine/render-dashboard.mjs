@@ -152,10 +152,13 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
     const member = byName.get(m.name);
     const auditChip = auditNames.has(m.name) ? ' <span class="chip warn">與審計觀察合併談</span>' : "";
     const rejoinChip = m.rejoin ? ' <span class="chip">復會會員</span>' : "";
+    const carryChip = m.carriedForward ? ' <span class="chip warn">跨月延續・完成前持續關懷</span>' : "";
     const focus = m.rejoin ? "面談聚焦：這次回來想要的收穫是否有拿到（復會者再流失風險高）"
       : auditNames.has(m.name) ? "面談聚焦：一對一與引薦的實質收穫，確認是真實成長還是衝量"
       : member && member.light !== "green" ? "面談聚焦：弱項的參與障礙與需要的協助" : "面談聚焦：確認收穫感與續留意願";
-    return `<div class="card${auditNames.has(m.name) ? " amber" : ""}"><div class="t">${esc(m.name)} ${member ? dot(member.light) : ""}${m.total}${rejoinChip}${auditChip}</div><div class="d">${esc(m.startDate || "")} 入會・滿 <b>${m.months} 個月</b>｜燈號${member && member.light === "green" ? "健康" : "待提升"}</div><div class="action">${focus}</div></div>`;
+    const tenureLabel = m.carriedForward ? `已進入第 <b>${m.months} 個月</b>・原期中關懷未完成` : `滿 <b>${m.months} 個月</b>`;
+    const action = m.carriedForward ? `${focus}；沿用既有案件，不另開重複任務` : focus;
+    return `<div class="card${auditNames.has(m.name) || m.carriedForward ? " amber" : ""}"><div class="t">${esc(m.name)} ${member ? dot(member.light) : ""}${m.total}${rejoinChip}${auditChip}${carryChip}</div><div class="d">${esc(m.startDate || "")} 入會・${tenureLabel}｜燈號${member && member.light === "green" ? "健康" : "待提升"}</div><div class="action">${action}</div></div>`;
   }).join("\n    ");
   const newCards = engine.lifecycle.newMembers.map((m) => {
     const member = byName.get(m.name);

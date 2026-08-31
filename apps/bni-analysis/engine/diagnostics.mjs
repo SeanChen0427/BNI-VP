@@ -225,22 +225,41 @@ function dateOnly(value = "") {
 
 // 期中關懷（入會 5–7 個月）與新會員追蹤（未滿 5 個月）。
 // 同一入會／復會週期已完成的正式期中任務不再列為待關懷；舊週期紀錄不能排除新週期。
-export function lifecycleLists(activeScored, tenureByName, reportEnd, { midtermCompletions = [], asOf = reportEnd } = {}) {
+// 一旦同週期已有未完成的正式期中任務，即使超過 7 個月也要跨月延續，直到完成為止。
+export function lifecycleLists(activeScored, tenureByName, reportEnd, {
+  midtermCompletions = [],
+  midtermTasks = [],
+  asOf = reportEnd,
+} = {}) {
   const midterm = [];
   const newMembers = [];
   const completedMidterm = [];
   for (const s of activeScored) {
     const t = memberTenure(tenureByName.get(s.name), reportEnd);
     if (t.months === null) continue;
-    if (t.months >= 5 && t.months <= 7) {
-      const matchingCompletion = midtermCompletions
-        .filter((item) => {
-          const completedOn = dateOnly(item.completedAt);
-          return normalizedMemberName(item.name) === normalizedMemberName(s.name)
-            && completedOn >= t.startDate
-            && completedOn <= asOf;
-        })
-        .sort((left, right) => dateOnly(right.completedAt).localeCompare(dateOnly(left.completedAt)))[0];
+    const matchingCompletion = midtermCompletions
+      .filter((item) => {
+        const completedOn = dateOnly(item.completedAt);
+        return normalizedMemberName(item.name) === normalizedMemberName(s.name)
+          && completedOn >= t.startDate
+          && completedOn <= asOf;
+      })
+      .sort((left, right) => dateOnly(right.completedAt).localeCompare(dateOnly(left.completedAt)))[0];
+    const matchingTask = midtermTasks
+      .filter((item) => {
+        const taskOn = dateOnly(item.createdAt || item.scheduledAt || item.dueAt);
+        const status = String(item.status || "pending");
+        return normalizedMemberName(item.name) === normalizedMemberName(s.name)
+          && ["pending", "in_progress"].includes(status)
+          && taskOn >= t.startDate
+          && taskOn <= asOf;
+      })
+      .sort((left, right) => dateOnly(right.createdAt || right.scheduledAt || right.dueAt)
+        .localeCompare(dateOnly(left.createdAt || left.scheduledAt || left.dueAt)))[0];
+    const inStandardWindow = t.months >= 5 && t.months <= 7;
+    const matchingTaskDate = dateOnly(matchingTask?.createdAt || matchingTask?.scheduledAt || matchingTask?.dueAt);
+    const carriedForward = Boolean(matchingTask && (matchingTaskDate < `${reportEnd.slice(0, 7)}-01` || !inStandardWindow));
+    if (inStandardWindow || matchingTask) {
       if (matchingCompletion) {
         completedMidterm.push({
           name: s.name,
@@ -250,7 +269,18 @@ export function lifecycleLists(activeScored, tenureByName, reportEnd, { midtermC
         });
         continue;
       }
-      midterm.push({ name: s.name, startDate: t.startDate, months: t.months, rejoin: t.rejoin, total: s.total, light: s.light });
+      midterm.push({
+        name: s.name,
+        startDate: t.startDate,
+        months: t.months,
+        rejoin: t.rejoin,
+        total: s.total,
+        light: s.light,
+        carriedForward,
+        taskReference: matchingTask?.sourceReference || matchingTask?.id || "",
+        taskStatus: matchingTask?.status || "",
+        scheduledAt: matchingTask?.scheduledAt || matchingTask?.dueAt || "",
+      });
     }
     else if (t.months < 5) newMembers.push({ name: s.name, startDate: t.startDate, months: t.months, weeks: s.weeks, total: s.total, light: s.light });
   }

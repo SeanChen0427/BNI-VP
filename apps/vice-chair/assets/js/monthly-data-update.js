@@ -6,7 +6,7 @@
   const escape=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
   function setMessage(text,tone=""){message.textContent=text;message.className=tone}
   function render(data){
-    current=data;document.querySelector("#monthlyDataPeriod").textContent=`${data.month} 資料更新・每月 1 日自動換成新一期`;
+    current=data;document.querySelector("#monthlyDataPeriod").textContent=`${data.month} 資料更新・月末可提前驗收，否則每月 1 日自動換期`;
     document.querySelector("#monthlyDataProgress").textContent=`${data.completed}／${data.total}`;
     document.querySelector("#monthlyDataProgressBar").style.width=`${data.total?data.completed/data.total*100:0}%`;
     list.innerHTML=data.items.map(item=>`<article class="monthly-data-item ${item.complete?"complete":""}" data-type="${item.type}">

@@ -37,12 +37,26 @@ test("分析差異中的歷史離會者即使不在現任主檔也可建立離�
   assert.match(edgeSource, /仍存在於本期 PALMS，不可由名單差異流程登記離會/);
 });
 
-test("正式分析只接受本期半年、全年及審計報表", () => {
+test("正式分析只接受本期半年、全年、單月及審計報表", () => {
   assert.match(edgeSource, /latestByCategory\(imports, "halfYear", expectedHalf\)/);
   assert.match(edgeSource, /latestByCategory\(imports, "annual", expectedAnnual\)/);
+  assert.match(edgeSource, /latestByCategory\(imports, "monthly", expectedMonth\)/);
+  assert.match(edgeSource, /if \(!monthlyRow\) missing\.push\(`單月 PALMS/);
   assert.match(edgeSource, /date >= expectedMonth\.start && date <= expectedMonth\.end/);
   assert.match(edgeSource, /每週審計報告預計/);
   assert.doesNotMatch(edgeSource, /latestByCategory\(imports, "halfYear"\) \|\|/);
+});
+
+test("月末可提前驗收當月，其他日期仍以台北時區的上月為準", () => {
+  assert.match(edgeSource, /const \[year, month\] = taipeiDay\(\)\.split\("-"\)\.map\(Number\)/);
+  assert.match(edgeSource, /function operationalReportWindows\(\)/);
+  assert.match(edgeSource, /today === currentMonthEnd \? currentMonth : monthWindow\(-1, 1\)\.month/);
+});
+
+test("正式分析載入同會籍週期的未完成期中任務供跨月延續", () => {
+  assert.match(edgeSource, /category=eq\.midterm&status=in\.\(pending,in_progress,completed\)/);
+  assert.match(edgeSource, /const midtermTasks = \(midtermRows \|\| \[\]\)\.filter/);
+  assert.match(edgeSource, /midtermCompletions,\s*midtermTasks,\s*sources/);
 });
 
 test("正式快照提供續約表單完整年度資料並可安全修復舊快照", () => {

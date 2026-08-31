@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.18",
+      publishedAt: "2026-08-31",
+      title: "期中關懷未完成會跨月保留",
+      level: "important",
+      changes: Object.freeze([
+        "同一會籍週期的期中關懷只要尚未完成，超過原到點月份後仍會每月持續顯示。",
+        "跨月關懷沿用同一案件，不會重複開案；完成後才從後續期中清單移除。",
+        "月末若官方報表已完整出齊，可提前驗收當月四類資料並產出分析。"
+      ]),
+      impact: "不修改 BNI 計分、燈號或既有案件內容；舊會籍週期任務不會帶入復會新週期。"
+    }),
+    Object.freeze({
       version: "1.0.17",
       publishedAt: "2026-08-31",
       title: "複製文案即可推進案件階段",
