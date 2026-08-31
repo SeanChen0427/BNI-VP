@@ -8,7 +8,7 @@ document.querySelector("#closeMenu").onclick=closeMenu;scrim.onclick=closeMenu;
 const navStateKey="fulian-nav-groups-v1";let navState={};try{navState=JSON.parse(localStorage.getItem(navStateKey)||"{}")||{}}catch{}
 document.querySelectorAll("details[data-nav-key]").forEach(group=>{const key=group.dataset.navKey;if(navState[key])group.open=true;group.addEventListener("toggle",()=>{navState[key]=group.open;localStorage.setItem(navStateKey,JSON.stringify(navState))})});
 document.body.classList.toggle("committee-mode",session.role==="committee");
-document.body.classList.toggle("vp-mode",session.role==="vp");
+document.body.classList.toggle("vp-mode",["vp","admin"].includes(session.role));
 document.querySelectorAll('a[href="#"].disabled').forEach(link=>link.addEventListener("click",event=>event.preventDefault()));
 try{const course=JSON.parse(localStorage.getItem("fulian-vp-course-v2")||"null"),total=course?.totalLessons||0,percent=total?Math.round((course?.done?.length||0)/total*100):0;document.querySelector("#courseProgress").textContent=`${percent}%`;document.querySelector("#courseProgressBar").style.width=`${percent}%`}catch{}
 const memberDataButton=document.querySelector("#status .panel-head button");

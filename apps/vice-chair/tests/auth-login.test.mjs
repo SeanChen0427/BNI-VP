@@ -6,6 +6,7 @@ const appUrl=new URL("../",import.meta.url);
 const html=readFileSync(new URL("../login.html",import.meta.url),"utf8");
 const source=readFileSync(new URL("../assets/js/auth.js",import.meta.url),"utf8");
 const loginSource=readFileSync(new URL("../assets/js/login.js",import.meta.url),"utf8");
+const dashboardSource=readFileSync(new URL("../assets/js/dashboard.js",import.meta.url),"utf8");
 const settingsSource=readFileSync(new URL("../assets/js/settings.js",import.meta.url),"utf8");
 const supabaseConfig=readFileSync(new URL("../assets/js/supabase-config.js",import.meta.url),"utf8");
 const supabaseData=readFileSync(new URL("../assets/js/supabase-data.js",import.meta.url),"utf8");
@@ -51,6 +52,7 @@ assert.match(appApiFunction,/compactAiSource\(source,/,"會員姓名問題不得
 assert.match(memberDirectory,/FulianData\.getMemberNames/);
 assert.doesNotMatch(memberDirectory,/members\s*[:=]\s*\[[^\]]+\]/s);
 assert.match(monthlyDataSource,/\["vp","admin"\]\.includes\(session\.role\)/,"副主席與 Admin 都必須能使用後端已授權的每月資料上傳入口");
+assert.match(dashboardSource,/\["vp","admin"\]\.includes\(session\.role\)/,"Admin 的每月資料上傳區不得被首頁模式隱藏");
 assert.match(edgeFunction,/account\.role!=="admin"/);
 assert.match(edgeFunction,/SUPABASE_SERVICE_ROLE_KEY/);
 assert.match(edgeFunction,/passwords\[role\]\.length<12/);
