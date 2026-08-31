@@ -159,6 +159,12 @@ test("任何 blocking 對帳差異都不能產出、AI 審視或發佈草稿", (
   assert.match(edgeSource, /if \(body\.action === "publish"\) \{\s*assertAnalysisReconciled\(draft\.engine\)/);
 });
 
+test("正式發佈後舊草稿保留稽核但不會重新浮上", () => {
+  assert.match(edgeSource, /analysis_version=like\.draft-%25&generated_at=lte\./);
+  assert.match(edgeSource, /analysis_version: `superseded-\$\{Date\.now\(\)\}`/);
+  assert.match(edgeSource, /新發佈後才產生的草稿不受影響/);
+});
+
 test("Codex 細部審視必須使用六區關懷報告並保留副主席確認門檻", () => {
   assert.match(html, /id="codexReviewText"/);
   assert.match(html, /id="codexReviewButton"/);

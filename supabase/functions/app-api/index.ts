@@ -2706,6 +2706,16 @@ async function analysisSnapshotApi(request: Request, context: Context) {
 const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告，結尾標注本報告為草稿，需副主席確認後才正式發佈。";
 
 async function currentDraft() {
+  const published = await latestPublished();
+  if (published?.published_at) {
+    // 發佈後保留較舊草稿供稽核，但移出可操作的 draft-* 集合，避免刪除
+    // 最新草稿後，上一份舊草稿又浮上並被誤發。新發佈後才產生的草稿不受影響。
+    await db(`analysis_snapshots?is_published=eq.false&analysis_version=like.draft-%25&generated_at=lte.${encodeURIComponent(published.published_at)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ analysis_version: `superseded-${Date.now()}` }),
+    });
+  }
   const rows = await db("analysis_snapshots?is_published=eq.false&analysis_version=like.draft-%25&select=*&order=generated_at.desc&limit=1");
   return rows?.[0] || null;
 }
