@@ -3,6 +3,7 @@ import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysi
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
+import "../../../apps/vice-chair/core/calendar-domain.js";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import "../../../apps/vice-chair/core/accountability-email-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
@@ -60,6 +61,7 @@ const GEMINI_MIN_ATTEMPT_MS = 5_000;
 const GEMINI_MAX_ATTEMPTS = 3;
 const REVIEW_MAX_TOKENS = 6000;
 const SYSTEM_ADMIN_NAME = "系統開發人員 Admin";
+const calendarDomain = (globalThis as any).FulianCalendarDomain;
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
 const accountabilityEmailDomain = (globalThis as any).FulianAccountabilityEmailDomain;
 const messageTemplateDomain = (globalThis as any).FulianMessageTemplateDomain;
@@ -219,16 +221,29 @@ function monthWindowForReportMonth(reportMonth: string, countMonths: number) {
   return { start: isoDay(start), end: isoDay(end), month: reportMonth };
 }
 
-// 一般月份仍在每月 1 日切換至上月；月末當天若官方報表已完整出齊，允許提前驗收當月。
-function operationalReportWindows() {
-  const today = taipeiDay();
-  const currentMonth = today.slice(0, 7);
-  const currentMonthEnd = monthWindowForReportMonth(currentMonth, 1).end;
-  const reportMonth = today === currentMonthEnd ? currentMonth : monthWindow(-1, 1).month;
+function analysisCycle() {
+  const cycle = calendarDomain?.monthlyAnalysisCycle?.(taipeiDay());
+  if (!cycle?.active?.reportMonth) throw new Error("無法判定月度分析週期");
+  return cycle;
+}
+
+// 正式作業永遠在每月 1 日切換；月末只額外開放下一月份的預備資料，不取代目前月份。
+function operationalReportWindows(requestedReportMonth = "") {
+  const cycle = analysisCycle();
+  const allowed = [cycle.active, cycle.preparation].filter(Boolean);
+  const selected = requestedReportMonth
+    ? allowed.find((item: any) => item.reportMonth === requestedReportMonth)
+    : cycle.active;
+  if (!selected) throw new Error(`報表月份 ${requestedReportMonth || "不明"} 尚未開放；正式月份為 ${cycle.active.reportMonth}`);
+  const reportMonth = selected.reportMonth;
   return {
     monthly: monthWindowForReportMonth(reportMonth, 1),
     half: monthWindowForReportMonth(reportMonth, 6),
     annual: monthWindowForReportMonth(reportMonth, 12),
+    reportMonth,
+    meetingMonth: selected.meetingMonth,
+    effectiveOn: selected.effectiveOn,
+    phase: selected.phase,
   };
 }
 
@@ -1577,9 +1592,8 @@ async function attendanceApi(request: Request, url: URL, context: Context) {
   throw new Error("不支援的動作");
 }
 
-async function monthlyDataStatus() {
-  const rows = await reportImports();
-  const { monthly, half, annual } = operationalReportWindows();
+function monthlyDataBundleStatus(rows: any[], windows: any) {
+  const { monthly, half, annual } = windows;
   const auditRows = rows.filter((row: any) => {
     const date = auditDate(row);
     return reportCategory(row) === "audit" && date && date >= monthly.start && date <= monthly.end;
@@ -1591,7 +1605,25 @@ async function monthlyDataStatus() {
     { type: "monthly", label: "單月 PALMS", period: `${monthly.start} 至 ${monthly.end}`, complete: Boolean(latestByCategory(rows, "monthly", monthly)), detail: latestByCategory(rows, "monthly", monthly) ? "已上傳並完成月會摘要" : "供月會與上月出席統計使用", accept: ".xls", multiple: false },
     { type: "audit", label: "每週審計資料", period: `${monthly.start} 至 ${monthly.end}`, complete: auditRows.length >= expectedAudits, detail: `已上傳 ${auditRows.length}／預計 ${expectedAudits} 份`, accept: ".xls", multiple: true },
   ];
-  return { month: monthly.month, items, completed: items.filter((item) => item.complete).length, total: items.length, generatedAt: new Date().toISOString() };
+  return {
+    month: monthly.month,
+    meetingMonth: windows.meetingMonth,
+    effectiveOn: windows.effectiveOn,
+    phase: windows.phase,
+    items,
+    completed: items.filter((item) => item.complete).length,
+    total: items.length,
+  };
+}
+
+async function monthlyDataStatus() {
+  const rows = await reportImports();
+  const cycle = analysisCycle();
+  const active = monthlyDataBundleStatus(rows, operationalReportWindows(cycle.active.reportMonth));
+  const preparation = cycle.preparation
+    ? monthlyDataBundleStatus(rows, operationalReportWindows(cycle.preparation.reportMonth))
+    : null;
+  return { ...active, preparation, generatedAt: new Date().toISOString() };
 }
 
 function decodeBase64(value: string) {
@@ -1632,7 +1664,8 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
   if (!["halfYear", "annual", "monthly", "audit"].includes(body.type) || !files.length) throw new Error("請選擇要上傳的資料");
   if (body.type !== "audit" && files.length !== 1) throw new Error("此類資料每次只能上傳一份");
   if (files.length > 8) throw new Error("每次最多上傳 8 份檔案");
-  const { monthly, half, annual } = operationalReportWindows();
+  const requestedReportMonth = String(body.reportMonth || "").trim();
+  const { monthly, half, annual, meetingMonth, effectiveOn, phase } = operationalReportWindows(requestedReportMonth);
   const provisionalReconciliation = { promoted: [] as string[], blocked: [] as string[] };
   for (let index = 0; index < files.length; index += 1) {
     const file = files[index];
@@ -1672,7 +1705,7 @@ async function monthlyDataApi(request: Request, url: URL, context: Context) {
       storage_path: storagePath,
       sha256: contentHash,
       imported_by: context.personId,
-      metadata: { category: body.type, originalFilename: file.name || "", uploadedBy: context.identity },
+      metadata: { category: body.type, originalFilename: file.name || "", uploadedBy: context.identity, reportMonth: monthly.month, meetingMonth, effectiveOn, phase },
     });
     if (body.type === "monthly") await saveMonthlyAttendance(parsed, imported.id, storagePath);
     if (body.type === "halfYear") {
@@ -2544,6 +2577,12 @@ async function latestPublished() {
   return rows?.[0] || null;
 }
 
+async function activePublished() {
+  const activePeriodEnd = operationalReportWindows().monthly.end;
+  const rows = await db(`analysis_snapshots?is_published=eq.true&period_end=lte.${activePeriodEnd}&select=*&order=period_end.desc,generated_at.desc&limit=1`);
+  return rows?.[0] || null;
+}
+
 async function loadPublishedFormSources(periodStart: string, periodEnd: string) {
   const imports = await reportImports();
   const halfPeriod = { start: periodStart, end: periodEnd };
@@ -2572,7 +2611,7 @@ async function aiChatApi(request: Request, context: Context) {
   if (!PROVIDERS.includes(provider)) throw new Error("AI 平台不正確");
   const question = String(body.question || "").trim().slice(0, 2000);
   if (!question) throw new Error("請輸入問題");
-  const published = await latestPublished();
+  const published = await activePublished();
   const source = published?.snapshot || {};
   const history = Array.isArray(body.history) ? body.history.slice(-6).map((item: any) => `${item.role === "assistant" ? "助手" : "使用者"}：${String(item.text || "").slice(0, 500)}`).join("\n") : "";
   const prompt = `${history ? `最近對話：\n${history}\n\n` : ""}本次問題：\n${question}\n\n[來源1] Supabase 已發佈會員分析快照\n${compactAiSource(source, `${history}\n${question}`)}`;
@@ -2582,9 +2621,9 @@ async function aiChatApi(request: Request, context: Context) {
   return { answer: result.text, model: result.model, sources: [{ title: "最新已發佈會員分析快照", path: "Supabase/analysis_snapshots" }] };
 }
 
-async function loadEngineSources() {
+async function loadEngineSources(reportMonth = "") {
   const imports = await reportImports();
-  const { monthly: expectedMonth, half: expectedHalf, annual: expectedAnnual } = operationalReportWindows();
+  const { monthly: expectedMonth, half: expectedHalf, annual: expectedAnnual } = operationalReportWindows(reportMonth);
   const half = latestByCategory(imports, "halfYear", expectedHalf);
   const monthlyRow = latestByCategory(imports, "monthly", expectedMonth);
   const expiry = latestByCategory(imports, "membership");
@@ -2679,7 +2718,7 @@ async function loadEngineSources() {
 
 async function analysisSnapshotApi(request: Request, context: Context) {
   if (request.method !== "GET") throw Object.assign(new Error("不支援的操作"), { status: 405 });
-  const published = await latestPublished();
+  const published = await activePublished();
   if (!published?.snapshot) throw Object.assign(new Error("Supabase 尚無已發佈的 BNI 分析資料"), { status: 503 });
   if (hasCompletePublishedMemberData(published.snapshot)) return published.snapshot;
   const formSources = await loadPublishedFormSources(published.period_start, published.period_end);
@@ -2741,7 +2780,7 @@ async function analysisDraftApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   if (body.action === "generate") {
-    const { engine } = await loadEngineSources();
+    const { engine } = await loadEngineSources(String(body.reportMonth || "").trim());
     assertAnalysisReconciled(engine);
     const previous = await currentDraft();
     const draft = { id: `draft-${Date.now()}`, status: "draft", engine, aiReview: null, feedback: previous?.snapshot?.draft?.engine?.meta?.period?.end === engine.meta.period.end ? previous.snapshot.draft.feedback || [] : [], createdAt: new Date().toISOString(), createdBy: context.identity };
@@ -2783,7 +2822,7 @@ async function analysisDraftApi(request: Request, context: Context) {
         revoked_by: null,
       }),
     });
-    const { engine } = await loadEngineSources();
+    const { engine } = await loadEngineSources(String(draft.engine?.meta?.period?.end || "").slice(0, 7));
     assertAnalysisReconciled(engine);
     draft.engine = engine;
     draft.aiReview = null;
@@ -2805,7 +2844,7 @@ async function analysisDraftApi(request: Request, context: Context) {
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ revoked_at: new Date().toISOString(), revoked_by: context.personId }),
     });
-    const { engine } = await loadEngineSources();
+    const { engine } = await loadEngineSources(String(draft.engine?.meta?.period?.end || "").slice(0, 7));
     assertAnalysisReconciled(engine);
     draft.engine = engine;
     draft.aiReview = null;
@@ -2859,7 +2898,7 @@ async function analysisDraftApi(request: Request, context: Context) {
   if (body.action === "publish") {
     assertAnalysisReconciled(draft.engine);
     if (!draft.aiReview) throw new Error("尚未執行 AI 審視，請先完成審視再發佈");
-    const currentSources = await loadEngineSources();
+    const currentSources = await loadEngineSources(String(draft.engine?.meta?.period?.end || "").slice(0, 7));
     assertAnalysisReconciled(currentSources.engine);
     if (analysisSourceFingerprint(currentSources.engine) !== analysisSourceFingerprint(draft.engine)) {
       throw Object.assign(new Error("正式報表已在分析草稿產生後更新，請重新產出草稿再發佈"), { status: 409 });
@@ -2892,23 +2931,55 @@ async function analysisDraftApi(request: Request, context: Context) {
     snapshot.memberData = publishedMemberData.memberData;
     snapshot.analysisReview = draft.aiReview;
     snapshot.publishedVersion = version;
+    const reportMonth = String(draft.engine.meta.period.end).slice(0, 7);
+    const effectiveOn = calendarDomain.analysisEffectiveOn(draft.engine.meta.period.end);
+    const meetingMonth = String(effectiveOn).slice(0, 7);
+    const scheduled = Boolean(effectiveOn && effectiveOn > taipeiDay());
+    snapshot.analysisCycle = { reportMonth, meetingMonth, effectiveOn, status: scheduled ? "scheduled" : "active" };
     await db("analysis_snapshots", {
       method: "POST",
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ schema_version: "fulian.bni-analysis.v1", analysis_version: `v${version}`, period_start: draft.engine.meta.period.start, period_end: draft.engine.meta.period.end, generated_at: new Date().toISOString(), source_version: "supabase-private-storage", member_count: snapshot.members.length, reconciliation: draft.engine.reconciliation, snapshot, is_published: true, published_at: new Date().toISOString(), published_by: context.personId }),
     });
     await db(`analysis_snapshots?id=eq.${row.id}`, { method: "DELETE" });
-    return { message: `已發佈第 ${version} 版分析快照，會員關懷儀表板已更新`, version };
+    return {
+      message: scheduled
+        ? `已建立第 ${version} 版 ${meetingMonth} 月預備快照；將於 ${effectiveOn} 自動生效，目前會員關懷儀表板不變`
+        : `已發佈第 ${version} 版分析快照，會員關懷儀表板已更新`,
+      version,
+      status: scheduled ? "scheduled" : "active",
+      effectiveOn,
+      meetingMonth,
+    };
   }
   throw new Error("不支援的動作");
 }
 
 async function analysisSnapshotsApi(context: Context) {
   const rows = await db("analysis_snapshots?is_published=eq.true&select=id,analysis_version,period_start,period_end,published_at,published_by&order=published_at.asc");
+  const active = await activePublished();
   const people = await db("people?select=id,display_name");
   const names = new Map(people.map((person: any) => [person.id, person.display_name]));
-  const snapshots = rows.map((row: any, index: number) => ({ version: Number(String(row.analysis_version).replace(/\D/g, "")) || index + 1, id: row.id, publishedAt: row.published_at, publishedBy: `${context.role}:${names.get(row.published_by) || "系統"}`, period: { start: row.period_start, end: row.period_end } }));
-  return { snapshots, latest: snapshots.at(-1) || null };
+  const snapshots = rows.map((row: any, index: number) => {
+    const effectiveOn = calendarDomain.analysisEffectiveOn(row.period_end);
+    const status = row.id === active?.id ? "active" : effectiveOn > taipeiDay() ? "scheduled" : "history";
+    return {
+      version: Number(String(row.analysis_version).replace(/\D/g, "")) || index + 1,
+      id: row.id,
+      publishedAt: row.published_at,
+      publishedBy: `${context.role}:${names.get(row.published_by) || "系統"}`,
+      period: { start: row.period_start, end: row.period_end },
+      reportMonth: String(row.period_end || "").slice(0, 7),
+      meetingMonth: String(effectiveOn).slice(0, 7),
+      effectiveOn,
+      status,
+    };
+  });
+  return {
+    snapshots,
+    latest: snapshots.find((item: any) => item.status === "active") || null,
+    upcoming: snapshots.filter((item: any) => item.status === "scheduled").at(-1) || null,
+  };
 }
 
 const TASK_SOURCE = "vice-chair-work-plan";

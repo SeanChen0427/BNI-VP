@@ -5,9 +5,10 @@
   <title>月度分析審閱｜富聯分會</title>
   <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
   <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <script src="core/calendar-domain.js?v=2"></script>
   <script src="assets/js/supabase-config.js?v=1"></script>
   <script src="assets/js/auth.js?v=7"></script>
-  <script src="assets/js/supabase-data.js?v=2"></script>
+  <script src="assets/js/supabase-data.js?v=3"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/analysis-review.css?v=6">
@@ -24,7 +25,7 @@
     <div id="workspace" hidden>
       <section class="panel" id="generatePanel">
         <div class="panel-head"><h2>一、產出分析</h2><span class="hint">讀取最新已入檔報表，先對帳後計分</span></div>
-        <div class="panel-actions"><button type="button" id="generateButton">產出本月分析草稿</button><span id="generateStatus"></span></div>
+        <div class="panel-actions"><label>分析期別<select id="analysisReportMonth"></select></label><button type="button" id="generateButton">產出所選期別分析草稿</button><span id="generateStatus"></span></div>
         <div class="issues" id="reconcileIssues" hidden></div>
         <section class="departure-resolution" id="departureResolution" hidden>
           <div>
@@ -92,7 +93,7 @@
           </div>
           <div class="decision publish">
             <h3>確認發佈</h3>
-            <p>發佈為版本化快照，委員即可看到；快照不可改寫，之後只能發新版本。</p>
+            <p id="publishEffectNote">正式月份會立即切換；月末提前準備的下月快照則到每月 1 日才自動生效。快照不可改寫，之後只能發新版本。</p>
             <button type="button" id="publishButton">確認無誤，正式發佈</button>
           </div>
         </div>
@@ -104,6 +105,6 @@
     </div>
   </main>
   <script src="assets/js/workspace-nav.js?v=8"></script>
-  <script src="assets/js/analysis-review.js?v=9"></script>
+  <script src="assets/js/analysis-review.js?v=10"></script>
 </body>
 </html>

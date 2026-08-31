@@ -10,10 +10,11 @@
   }
   async function getPublishedAnalysis({refresh=false}={}){
     if(refresh)analysisPromise=null;
-    if(!analysisPromise)analysisPromise=rest("analysis_snapshots?is_published=eq.true&select=snapshot&period_end=not.is.null&order=period_end.desc,generated_at.desc&limit=1")
-      .then(rows=>{
-        if(!rows[0]?.snapshot)throw new Error("Supabase 尚無已發佈的 BNI 分析資料");
-        return rows[0].snapshot;
+    if(!analysisPromise)analysisPromise=edgeApi(new URL("/api/analysis-snapshot",location.origin),{cache:"no-store"})
+      .then(async response=>{
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(data.message||`Supabase HTTP ${response.status}`);
+        return data;
       })
       .catch(error=>{analysisPromise=null;throw error});
     return analysisPromise;

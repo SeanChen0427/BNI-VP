@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.19",
+      publishedAt: "2026-08-31",
+      title: "月末預備不再提前切換儀表板",
+      level: "important",
+      changes: Object.freeze([
+        "8 月正式儀表板會繼續使用 7 月完整資料，不會被 8 月 31 日提前準備的新資料蓋掉。",
+        "月末仍可上傳、審視與發佈下期快照；畫面會標示預備狀態與生效日。",
+        "下期快照只會在台北時間每月 1 日自動成為正式資料，會員儀表板與 AI 查詢使用相同規則。"
+      ]),
+      impact: "7 月來源、8 月月會與所有已發佈版本都完整保留；本次只修正生效指標，不覆寫歷史資料。"
+    }),
+    Object.freeze({
       version: "1.0.18",
       publishedAt: "2026-08-31",
       title: "期中關懷未完成會跨月保留",

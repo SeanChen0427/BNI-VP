@@ -15,6 +15,7 @@
   const radarLabel = { "expired-unrenewed": "已到期未續約", overdue: "已過續約截止", "due-this-month": "本月截止", upcoming: "即將截止", "weak-early-warning": "審查弱項預警" };
   const geminiModelKey = "fulian.analysis.gemini-model";
   let currentDraft = null;
+  let currentCycle = null;
 
   const readJson = async (response) => {
     try {
@@ -43,6 +44,32 @@
     const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
     return `${values.year}-${values.month}-${values.day}`;
   };
+
+  function initializePeriodSelect() {
+    currentCycle = FulianCalendarDomain.monthlyAnalysisCycle(localDay());
+    const select = $("#analysisReportMonth");
+    const targets = [currentCycle?.active, currentCycle?.preparation].filter(Boolean);
+    select.replaceChildren(...targets.map((target) => {
+      const option = document.createElement("option");
+      option.value = target.reportMonth;
+      option.textContent = target.phase === "preparation"
+        ? `${target.meetingMonth} 月會（使用 ${target.reportMonth} 資料・預備，${target.effectiveOn} 生效）`
+        : `${target.meetingMonth} 月會（使用 ${target.reportMonth} 資料・目前正式）`;
+      return option;
+    }));
+    if (currentCycle?.preparation) select.value = currentCycle.preparation.reportMonth;
+  }
+
+  function cycleForPeriodEnd(periodEnd) {
+    const reportMonth = String(periodEnd || "").slice(0, 7);
+    const effectiveOn = FulianCalendarDomain.analysisEffectiveOn(periodEnd);
+    return {
+      reportMonth,
+      meetingMonth: String(effectiveOn || "").slice(0, 7),
+      effectiveOn,
+      status: effectiveOn > localDay() ? "scheduled" : "active",
+    };
+  }
 
   function renderIssues(container, issues) {
     container.hidden = !issues.length;
@@ -175,7 +202,7 @@
     renderIssues($("#reconcileIssues"), []);
     renderDepartureResolution([]);
     try {
-      const data = await post({ action: "generate" });
+      const data = await post({ action: "generate", reportMonth: $("#analysisReportMonth").value });
       $("#generateStatus").textContent = "草稿已產出";
       renderIssues($("#reconcileIssues"), []);
       renderDepartureResolution([]);
@@ -200,7 +227,16 @@
     $("#decisionPanel").hidden = !hasDraft || !draft.aiReview;
     if (!hasDraft) return;
     const e = draft.engine;
-    $("#draftMeta").textContent = `期間 ${e.meta.period.start} ~ ${e.meta.period.end}｜產出於 ${new Date(draft.createdAt).toLocaleString("zh-TW")}`;
+    const cycle = cycleForPeriodEnd(e.meta.period.end);
+    const targetOption = [...$("#analysisReportMonth").options].find((option) => option.value === cycle.reportMonth);
+    if (targetOption) $("#analysisReportMonth").value = cycle.reportMonth;
+    const effect = cycle.status === "scheduled"
+      ? `預備草稿｜${cycle.effectiveOn} 才生效，目前儀表板不變`
+      : "目前正式期";
+    $("#draftMeta").textContent = `${cycle.meetingMonth} 月會｜使用 ${cycle.reportMonth} 資料｜${effect}｜期間 ${e.meta.period.start} ~ ${e.meta.period.end}｜產出於 ${new Date(draft.createdAt).toLocaleString("zh-TW")}`;
+    $("#publishEffectNote").textContent = cycle.status === "scheduled"
+      ? `這是 ${cycle.meetingMonth} 月會預備快照；發佈後依然不改變目前月份，將於 ${cycle.effectiveOn} 自動生效。快照不可改寫，之後只能發新版本。`
+      : "這是目前正式月份；發佈後會立即更新會員關懷儀表板。快照不可改寫，之後只能發新版本。";
     const d = e.distribution;
     const radarTop = e.renewalRadar.slice(0, 6).map((item) => `${radarLabel[item.kind] || item.kind}：${item.name}`).join("；") || "無";
     const auditRed = (e.audit?.observations || []).filter((o) => o.level === "red").map((o) => `${o.name}（${o.families.join("+")}）`).join("、") || "無";
@@ -251,7 +287,8 @@
       const response = await fetch(`/api/analysis-snapshots?identity=${encodeURIComponent(identity)}`, { cache: "no-store" });
       const data = await readJson(response);
       if (!response.ok || !data.snapshots?.length) return;
-      $("#historyList").innerHTML = data.snapshots.slice().reverse().map((s) => `<article><b>第 ${s.version} 版</b><span>期間 ${s.period?.start || "—"} ~ ${s.period?.end || "—"}</span><span>發佈 ${new Date(s.publishedAt).toLocaleString("zh-TW")}｜${s.publishedBy.split(":")[1] || s.publishedBy}</span></article>`).join("");
+      const statusLabel = { active: "目前正式", scheduled: "已發佈・待生效", history: "歷史版本" };
+      $("#historyList").innerHTML = data.snapshots.slice().reverse().map((s) => `<article><b>第 ${s.version} 版・${statusLabel[s.status] || "歷史版本"}</b><span>${s.meetingMonth || "—"} 月會｜使用 ${s.reportMonth || "—"} 資料｜期間 ${s.period?.start || "—"} ~ ${s.period?.end || "—"}</span><span>${s.status === "scheduled" ? `${s.effectiveOn} 自動生效｜` : ""}發佈 ${new Date(s.publishedAt).toLocaleString("zh-TW")}｜${s.publishedBy.split(":")[1] || s.publishedBy}</span></article>`).join("");
     } catch { /* 同上 */ }
   }
 
@@ -322,7 +359,11 @@
 
   $("#publishButton").addEventListener("click", async () => {
     if (!currentDraft?.aiReview) return;
-    if (!confirm("確認發佈本月分析快照？發佈後委員即可看到，且此版本不可改寫。")) return;
+    const cycle = cycleForPeriodEnd(currentDraft.engine?.meta?.period?.end);
+    const confirmation = cycle.status === "scheduled"
+      ? `確認發佈 ${cycle.meetingMonth} 月會預備快照？\n它會在 ${cycle.effectiveOn} 自動生效，不會改變目前儀表板；快照不可改寫。`
+      : "確認發佈目前正式月份的分析快照？\n發佈後委員立即可看到，且此版本不可改寫。";
+    if (!confirm(confirmation)) return;
     try {
       const data = await post({ action: "publish" });
       alert(data.message);
@@ -333,6 +374,7 @@
     }
   });
 
+  initializePeriodSelect();
   loadDraft();
   loadHistory();
 })();

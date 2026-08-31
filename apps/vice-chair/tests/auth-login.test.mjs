@@ -35,7 +35,8 @@ assert.match(settingsSource,/FulianAuth\.updateSharedPasswords/);
 assert.match(settingsSource,/type="password"[^>]+autocomplete="new-password"/);
 assert.match(supabaseConfig,/sb_publishable_/);
 assert.doesNotMatch(supabaseConfig,/service_role|sb_secret_/);
-assert.match(supabaseData,/analysis_snapshots/);
+assert.match(supabaseData,/\/api\/analysis-snapshot/);
+assert.doesNotMatch(supabaseData,/analysis_snapshots\?is_published/,"前端不得繞過後端的正式期選擇器直接取最新快照");
 assert.match(supabaseData,/monthly_attendance_summaries/);
 assert.match(supabaseData,/\/functions\/v1\/app-api/);
 for(const endpoint of ["monthly-data","renewal-data","committee-meetings","analysis-snapshot","analysis-draft","analysis-snapshots","ai-settings","ai-chat","new-member-registration","member-departure","company","test-data-reset","attendance","tasks","case-states","task-file"]){
@@ -52,6 +53,8 @@ assert.match(appApiFunction,/compactAiSource\(source,/,"會員姓名問題不得
 assert.match(memberDirectory,/FulianData\.getMemberNames/);
 assert.doesNotMatch(memberDirectory,/members\s*[:=]\s*\[[^\]]+\]/s);
 assert.match(monthlyDataSource,/\["vp","admin"\]\.includes\(session\.role\)/,"副主席與 Admin 都必須能使用後端已授權的每月資料上傳入口");
+assert.match(monthlyDataSource,/data-report-month/,"正式期與預備期上傳必須傳遞各自報表月份");
+assert.match(monthlyDataSource,/const payload=\{identity,type,reportMonth,files:/);
 assert.match(dashboardSource,/\["vp","admin"\]\.includes\(session\.role\)/,"Admin 的每月資料上傳區不得被首頁模式隱藏");
 assert.match(edgeFunction,/account\.role!=="admin"/);
 assert.match(edgeFunction,/SUPABASE_SERVICE_ROLE_KEY/);

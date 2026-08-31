@@ -10,10 +10,11 @@ const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/i
 const dashboardSource = await readFile(new URL("../../bni-analysis/engine/render-dashboard.mjs", import.meta.url), "utf8");
 
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
+  const calendarIndex = html.indexOf("core/calendar-domain.js?v=2");
   const authIndex = html.indexOf("assets/js/auth.js?v=7");
-  const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=2");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=9");
-  assert.ok(authIndex >= 0 && bridgeIndex > authIndex && pageIndex > bridgeIndex);
+  const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=3");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=10");
+  assert.ok(calendarIndex >= 0 && authIndex > calendarIndex && bridgeIndex > authIndex && pageIndex > bridgeIndex);
   assert.match(html, /assets\/css\/analysis-review\.css\?v=6/);
 });
 
@@ -49,10 +50,23 @@ test("正式分析只接受本期半年、全年、單月及審計報表", () =>
   assert.doesNotMatch(edgeSource, /latestByCategory\(imports, "halfYear"\) \|\|/);
 });
 
-test("月末可提前驗收當月，其他日期仍以台北時區的上月為準", () => {
-  assert.match(edgeSource, /const \[year, month\] = taipeiDay\(\)\.split\("-"\)\.map\(Number\)/);
-  assert.match(edgeSource, /function operationalReportWindows\(\)/);
-  assert.match(edgeSource, /today === currentMonthEnd \? currentMonth : monthWindow\(-1, 1\)\.month/);
+test("月末只開放下期預備，目前正式期仍到每月 1 日才切換", () => {
+  assert.match(edgeSource, /function analysisCycle\(\)/);
+  assert.match(edgeSource, /function operationalReportWindows\(requestedReportMonth = ""\)/);
+  assert.match(edgeSource, /const allowed = \[cycle\.active, cycle\.preparation\]\.filter\(Boolean\)/);
+  assert.match(edgeSource, /: cycle\.active;/);
+  assert.match(edgeSource, /activePublished\(\)[\s\S]*?period_end=lte\.\$\{activePeriodEnd\}/);
+  assert.doesNotMatch(edgeSource, /today === currentMonthEnd \? currentMonth/);
+});
+
+test("分析與上傳明確傳遞報表月份，預備快照不會搶走目前儀表板", () => {
+  assert.match(html, /id="analysisReportMonth"/);
+  assert.match(pageSource, /monthlyAnalysisCycle\(localDay\(\)\)/);
+  assert.match(pageSource, /action: "generate", reportMonth: \$\("#analysisReportMonth"\)\.value/);
+  assert.match(pageSource, /預備草稿｜\$\{cycle\.effectiveOn\} 才生效，目前儀表板不變/);
+  assert.match(edgeSource, /loadEngineSources\(String\(body\.reportMonth \|\| ""\)\.trim\(\)\)/);
+  assert.match(edgeSource, /const requestedReportMonth = String\(body\.reportMonth \|\| ""\)\.trim\(\)/);
+  assert.match(edgeSource, /snapshot\.analysisCycle = \{ reportMonth, meetingMonth, effectiveOn, status: scheduled \? "scheduled" : "active" \}/);
 });
 
 test("正式分析載入同會籍週期的未完成期中任務供跨月延續", () => {

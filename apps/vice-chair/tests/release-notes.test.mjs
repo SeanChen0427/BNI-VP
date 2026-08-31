@@ -29,6 +29,12 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
+test("最新版本明確分開月末預備與每月 1 日正式切換", () => {
+  assert.match(releaseScript, /version: "1\.0\.19"/);
+  assert.match(releaseScript, /8 月正式儀表板會繼續使用 7 月完整資料/);
+  assert.match(releaseScript, /台北時間每月 1 日自動成為正式資料/);
+});
+
 test("目前版本明確聲明訪談重試邊界與歷史資料保護", () => {
   assert.match(releaseScript, /version: "1\.0\.6"/);
   assert.match(releaseScript, /依正式案件編號完成結案/);
