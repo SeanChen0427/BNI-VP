@@ -29,7 +29,14 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
-test("最新版本說明委員任期收權，並保留台北時間、換屆與續約修正", () => {
+test("最新版本說明首頁聚焦與階段摘要校正，並保留既有更新歷史", () => {
+  assert.match(releaseScript, /version: "1\.0\.26"/);
+  assert.match(releaseScript, /最新會員狀態移到公告欄正下方/);
+  assert.match(releaseScript, /移除重複的本月工作節點/);
+  assert.match(releaseScript, /每月資料更新移到優先案件後方/);
+  assert.match(releaseScript, /只統計需要正式訪談表的案件/);
+  assert.match(releaseScript, /不修改會員資料、案件紀錄、權限、投票、附件或 BNI 計分結果/);
+  assert.ok(releaseScript.indexOf('version: "1.0.26"') < releaseScript.indexOf('version: "1.0.25"'));
   assert.match(releaseScript, /version: "1\.0\.25"/);
   assert.match(releaseScript, /一般登入工作階段仍可讀取現任名單，但不能再直接新增、修改或刪除委員任期/);
   assert.match(releaseScript, /由受保護的後端函式一次切換/);

@@ -79,6 +79,7 @@
   function stageText(task, state, stage) {
     if (stage === "closed") return "已結案存檔";
     if (task.handoverPending) return "換屆待新任指派";
+    if (!domain.requiresInterviewForm(task)) return task.stage || "待開始關懷";
     if (stage === "advisor") {
       if (state?.resultAnnouncementSent) return "公告已發布・待結案";
       if (state?.advisorStatus === "confirmed") return "董顧已確認・待公告或結案";
@@ -118,9 +119,14 @@
   }
 
   function counts(list) {
+    const pipeline = list.filter(({ task }) => domain.requiresInterviewForm(task));
     return Object.fromEntries(stages.map(stage => [
       stage,
-      stage === "active" ? list.filter(item => item.stage !== "closed").length : list.filter(item => item.stage === stage).length
+      stage === "active"
+        ? list.filter(item => item.stage !== "closed").length
+        : stage === "closed"
+          ? list.filter(item => item.stage === stage).length
+          : pipeline.filter(item => item.stage === stage).length
     ]));
   }
 
@@ -297,7 +303,11 @@
   function render() {
     const all = records();
     const visible = all
-      .filter(item => filter === "active" ? item.stage !== "closed" : item.stage === filter)
+      .filter(item => filter === "active"
+        ? item.stage !== "closed"
+        : filter === "closed"
+          ? item.stage === "closed"
+          : domain.requiresInterviewForm(item.task) && item.stage === filter)
       .filter(({ task }) => !query || [task.member, task.profession, task.lead, ...(task.companions || [])].join(" ").toLowerCase().includes(query));
     renderSummary(all);
     renderTabs(all);

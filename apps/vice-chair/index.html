@@ -19,7 +19,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/dashboard.css?v=3">
+  <link rel="stylesheet" href="assets/css/dashboard.css?v=4">
   <link rel="stylesheet" href="assets/css/brand-logo.css?v=1">
   <link rel="stylesheet" href="assets/css/work-planner.css?v=3">
   <link rel="stylesheet" href="assets/css/mobile-polish.css?v=2">
@@ -69,7 +69,7 @@
     <main class="workspace">
       <header class="topbar"><button class="menu-button" id="openMenu" aria-label="開啟選單">☰</button><div class="page-heading"><small>富聯分會・會員委員會</small><strong>工作總覽</strong></div><div class="top-actions"><button class="release-trigger" id="releaseNotesTrigger" type="button"><span class="release-trigger-new" id="releaseNotesNew">NEW</span><b id="releaseNotesVersion">v—</b></button><label class="role-switch">登入身份 <b data-auth-name></b>・<span data-auth-role></span></label><button class="notice" id="notificationBell" type="button" aria-label="開啟通知中心" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><span id="notificationCount" hidden>0</span></button><aside class="notification-panel" id="notificationPanel" hidden><div class="notification-head"><div><small>NOTIFICATION CENTER</small><strong>提醒中心</strong></div><button type="button" id="markAllNotificationsRead">全部已讀</button></div><div class="notification-list" id="notificationList"></div></aside></div></header>
       <div class="content">
-        <section class="month-hero"><div><span class="eyebrow" id="monthEyebrow">MONTHLY COMMAND CENTER</span><h1 id="monthTitle">本月會員狀態與工作規劃</h1><p>先處理期限與會員案件，再掌握本週例會準備。從排定第一件工作開始建立本月進度。</p></div><div class="hero-summary"><div><small id="heroPendingLabel">本月待完成</small><strong id="monthPendingCount">0</strong><span>項工作</span></div><div class="warning"><small id="heroDueLabel">3日內到期</small><strong id="monthDueCount">0</strong><span>項工作</span></div><div><small id="heroDoneLabel">本月已完成</small><strong id="monthDoneCount">0</strong><span>項工作</span></div></div></section>
+        <section class="month-hero"><div><span class="eyebrow" id="monthEyebrow">MONTHLY COMMAND CENTER</span><h1 id="monthTitle">本月會員狀態與工作規劃</h1><p>先掌握工作量與期限，再從優先案件直接進入下一步。</p></div><div class="hero-summary"><div><small id="heroPendingLabel">本月待完成</small><strong id="monthPendingCount">0</strong><span>項工作</span></div><div class="warning"><small id="heroDueLabel">3日內到期</small><strong id="monthDueCount">0</strong><span>項工作</span></div><div><small id="heroDoneLabel">本月已完成</small><strong id="monthDoneCount">0</strong><span>項工作</span></div></div></section>
         <section class="panel announcement-board" aria-labelledby="announcementTitle">
           <div class="announcement-head"><div><small>TEAM NOTICE BOARD</small><h2 id="announcementTitle">會員委員會公告欄</h2></div><span>全員可留言</span></div>
           <div class="announcement-layout">
@@ -77,6 +77,14 @@
             <div class="announcement-list" id="announcementList" aria-live="polite"></div>
           </div>
         </section>
+        <section class="panel status-panel" id="status"><div class="panel-head"><div><small>MEMBER STATUS</small><h2>最新會員狀態</h2></div><button>查看會員數據 →</button></div><div class="status-body"><div class="donut" aria-label="會員燈號分布"><div><strong>47</strong><span>位會員</span></div></div><div class="legend"><div><i class="green"></i><span>綠燈</span><strong>24</strong><small>51%</small></div><div><i class="yellow"></i><span>黃燈</span><strong>14</strong><small>30%</small></div><div><i class="red"></i><span>紅燈</span><strong>6</strong><small>13%</small></div><div><i class="black"></i><span>黑燈／灰燈</span><strong>3</strong><small>6%</small></div></div></div><div class="panel-note"><b>本月關注</b><span>3 位會員燈號下降、2 位進入續約審查月份、1 位接近代理上限。</span></div></section>
+        <section class="metrics" aria-label="本月會員概況">
+          <article><span class="metric-icon members">員</span><div><small>目前會員</small><strong>0</strong><p>依 BNI 資料同步</p></div></article>
+          <article><span class="metric-icon renewal">續</span><div><small>本月續約案件</small><strong id="renewalCaseCount">0</strong><p id="renewalCaseNote">目前沒有進行中案件</p></div></article>
+          <article><span class="metric-icon applicant">新</span><div><small>新會員申請</small><strong id="newCaseCount">0</strong><p id="newCaseNote">目前沒有進行中案件</p></div></article>
+          <article><span class="metric-icon care">關</span><div><small>關懷進行中</small><strong id="careCaseCount">0</strong><p id="careCaseNote">目前沒有進行中案件</p></div></article>
+        </section>
+        <section class="panel cases-panel" id="cases"><div class="panel-head"><div><small id="priorityCasesEyebrow">PRIORITY CASES</small><h2 id="priorityCasesTitle">優先處理案件</h2></div><div class="filters"><button class="active">待處理 0</button><button>我的工作 0</button><button>3日內／逾期 0</button></div></div><div class="case-table" role="table"><div class="case-row header" role="row"><span>案件</span><span>目前階段／我的動作</span><span>負責委員</span><span>時程</span><span>下一步</span></div><div class="planner-empty"><b>正在整理你的待辦</b><span>新指派、待回饋與待投票會顯示在這裡。</span></div></div><button class="view-all">＋ 排定新工作</button></section>
         <section class="panel monthly-data-panel strict-vp-only" id="monthlyDataUpdate" aria-labelledby="monthlyDataTitle">
           <div class="monthly-data-head">
             <div><small>MONTHLY DATA CHECKLIST</small><h2 id="monthlyDataTitle">每月資料更新</h2><p id="monthlyDataPeriod">每月月初自動產生新一期待辦</p></div>
@@ -85,22 +93,7 @@
           <div class="monthly-data-list" id="monthlyDataList"><div class="monthly-data-loading">正在檢查 BNI 資料夾…</div></div>
           <footer><span id="monthlyDataMessage">完成上傳後，系統會驗證報表期間並自動入檔。</span><button type="button" id="monthlyDataRefresh">重新檢查</button></footer>
         </section>
-        <section class="metrics" aria-label="本月會員概況">
-          <article><span class="metric-icon members">員</span><div><small>目前會員</small><strong>0</strong><p>依 BNI 資料同步</p></div></article>
-          <article><span class="metric-icon renewal">續</span><div><small>本月續約案件</small><strong id="renewalCaseCount">0</strong><p id="renewalCaseNote">目前沒有進行中案件</p></div></article>
-          <article><span class="metric-icon applicant">新</span><div><small>新會員申請</small><strong id="newCaseCount">0</strong><p id="newCaseNote">目前沒有進行中案件</p></div></article>
-          <article><span class="metric-icon care">關</span><div><small>關懷進行中</small><strong id="careCaseCount">0</strong><p id="careCaseNote">目前沒有進行中案件</p></div></article>
-        </section>
-        <section class="panel cases-panel" id="cases"><div class="panel-head"><div><small id="priorityCasesEyebrow">PRIORITY CASES</small><h2 id="priorityCasesTitle">優先處理案件</h2></div><div class="filters"><button class="active">待處理 0</button><button>我的工作 0</button><button>3日內／逾期 0</button></div></div><div class="case-table" role="table"><div class="case-row header" role="row"><span>案件</span><span>目前階段／我的動作</span><span>負責委員</span><span>時程</span><span>下一步</span></div><div class="planner-empty"><b>正在整理你的待辦</b><span>新指派、待回饋與待投票會顯示在這裡。</span></div></div><button class="view-all">＋ 排定新工作</button></section>
-        <div class="dashboard-grid">
-          <section class="panel status-panel" id="status"><div class="panel-head"><div><small>MEMBER STATUS</small><h2>最新會員狀態</h2></div><button>查看會員數據 →</button></div><div class="status-body"><div class="donut" aria-label="會員燈號分布"><div><strong>47</strong><span>位會員</span></div></div><div class="legend"><div><i class="green"></i><span>綠燈</span><strong>24</strong><small>51%</small></div><div><i class="yellow"></i><span>黃燈</span><strong>14</strong><small>30%</small></div><div><i class="red"></i><span>紅燈</span><strong>6</strong><small>13%</small></div><div><i class="black"></i><span>黑燈／灰燈</span><strong>3</strong><small>6%</small></div></div></div><div class="panel-note"><b>本月關注</b><span>3 位會員燈號下降、2 位進入續約審查月份、1 位接近代理上限。</span></div></section>
-          <section class="panel plan-panel"><div class="panel-head"><div><small>MONTHLY PLAN</small><h2>本月工作節點</h2></div><button>查看完整規劃 →</button></div><ol class="timeline" id="monthlyTimeline"><li><div><strong>目前沒有排定工作</strong><p>從下方「排定新工作」建立第一個工作節點。</p></div><span>尚未排定</span></li></ol></section>
-        </div>
-        <div class="lower-grid">
-          <section class="panel meeting-panel vp-only-card" id="meeting"><div class="panel-head"><div><small>NEXT MEETING</small><h2>下週例會準備</h2></div><span class="date-chip">尚未設定</span></div><div class="meeting-list"><label><input type="checkbox"><span><b>出席名單與代理接龍</b><small>尚未開始確認</small></span><em>待處理</em></label><label><input type="checkbox"><span><b>新會員宣誓名單</b><small>尚未設定</small></span><em>待處理</em></label><label><input type="checkbox"><span><b>續約宣誓名單</b><small>尚未設定</small></span><em>待處理</em></label><label><input type="checkbox"><span><b>會員畢業環節</b><small>尚未設定</small></span><em>待處理</em></label></div></section>
-          <section class="panel stage-panel" id="caseStages"><div class="panel-head"><div><small>CASE PIPELINE</small><h2>案件階段摘要</h2></div><a href="case-board.html#active">查看全部案件 →</a></div><div class="stage-summary"><a href="case-board.html#waiting"><span>待</span><div><small>待安排訪談</small><strong id="stageWaitingCount">0</strong></div></a><a href="case-board.html#interview"><span>談</span><div><small>訪談進行中</small><strong id="stageInterviewCount">0</strong></div></a><a href="case-board.html#feedback"><span>饋</span><div><small>等待委員回饋</small><strong id="stageFeedbackCount">0</strong></div></a><a href="case-board.html#vote"><span>決</span><div><small>投票進行中</small><strong id="stageVoteCount">0</strong></div></a><a href="case-board.html#advisor"><span>顧</span><div><small>等待董顧確認</small><strong id="stageAdvisorCount">0</strong></div></a></div><p class="stage-note" id="stageCaseNote">目前沒有進行中的案件。</p></section>
-          <section class="panel learning-panel vp-only-card"><small>副主席專用工具</small><h2>交接與學習</h2><p>課程會保留你的閱讀進度，需要時再回來繼續，不影響日常工作。</p><div class="mini-progress"><span>上手指南</span><b id="courseProgress">0%</b><i><em id="courseProgressBar"></em></i></div><a href="course.html">繼續新任副主席課程 →</a></section>
-        </div>
+        <section class="panel learning-panel vp-only-card"><small>副主席專用工具</small><h2>交接與學習</h2><p>課程會保留你的閱讀進度，需要時再回來繼續，不影響日常工作。</p><div class="mini-progress"><span>上手指南</span><b id="courseProgress">0%</b><i><em id="courseProgressBar"></em></i></div><a href="course.html">繼續新任副主席課程 →</a></section>
       </div>
     </main>
   </div>
@@ -125,9 +118,9 @@
       <footer class="release-dialog-actions"><a href="settings.html#releaseNotes">查看完整更新紀錄</a><button type="button" id="acknowledgeRelease">我知道了</button></footer>
     </div>
   </dialog>
-  <script src="assets/js/release-notes.js?v=24"></script>
+  <script src="assets/js/release-notes.js?v=25"></script>
   <script src="assets/js/dashboard.js?v=7"></script>
-  <script src="assets/js/work-planner.js?v=12"></script>
+  <script src="assets/js/work-planner.js?v=13"></script>
   <script src="assets/js/announcement-board.js?v=3"></script>
   <script src="core/accountability-email-domain.js?v=1"></script>
   <script src="assets/js/notification-center.js?v=8"></script>
