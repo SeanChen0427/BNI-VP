@@ -1,4 +1,9 @@
-import { collectGroupEvents, collectVoteCallEvents, resolveLineWebhookChannel } from "./domain.mjs";
+import {
+  collectGroupEvents,
+  collectReplyOpportunityEvents,
+  collectVoteCallEvents,
+  resolveLineWebhookChannel,
+} from "./domain.mjs";
 import { LINE_OA_CHANNELS } from "../_shared/line-channel-domain.mjs";
 import {
   buildVoteCallReplyMessages,
@@ -17,6 +22,7 @@ import {
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
+const viceChairAccessToken = Deno.env.get("LINE_CHANNEL_ACCESS_TOKEN") || "";
 const committeeAccessToken = Deno.env.get("LINE_COMMITTEE_CHANNEL_ACCESS_TOKEN") || "";
 const channelSecrets = [
   { channel: LINE_OA_CHANNELS.VICE_CHAIR, secret: Deno.env.get("LINE_CHANNEL_SECRET") || "" },
@@ -44,7 +50,7 @@ async function db(path: string, options: RequestInit = {}) {
   if (!response.ok) {
     let message = `Supabase HTTP ${response.status}`;
     try { message = JSON.parse(text)?.message || message; } catch { /* keep safe status */ }
-    throw new Error(message);
+    throw Object.assign(new Error(message), { status: response.status });
   }
   return text ? JSON.parse(text) : null;
 }
@@ -86,6 +92,106 @@ function hex(bytes: ArrayBuffer) {
 
 async function sha256Text(value: string) {
   return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+async function finishPendingAnnouncement(id: string, webhookEventId: string, patch: Record<string, unknown>) {
+  const eventFilter = webhookEventId ? `&webhook_event_id=eq.${encodeURIComponent(webhookEventId)}` : "&webhook_event_id=is.null";
+  await db(`pending_announcements?id=eq.${id}&status=eq.replying${eventFilter}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function processReplyOpportunityEvent(event: {
+  groupId: string;
+  replyToken: string;
+  webhookEventId: string;
+  lineMessageId: string;
+}) {
+  if (!viceChairAccessToken) return false;
+  const targets = await db(
+    `line_group_targets?oa_channel=eq.vice_chair&line_group_id=eq.${encodeURIComponent(event.groupId)}`
+      + `&status=eq.active&purpose=eq.${encodeURIComponent("production")}`
+      + "&route_key=eq.exchange&delivery_strategy=eq.opportunistic&select=id&limit=1",
+  );
+  const target = targets?.[0];
+  if (!target) return false;
+  const now = new Date();
+  const nowIso = now.toISOString();
+  const rows = await db(
+    `pending_announcements?group_target_id=eq.${target.id}&oa_channel=eq.vice_chair&status=eq.pending`
+      + `&window_start=lte.${encodeURIComponent(nowIso)}&window_end=gte.${encodeURIComponent(nowIso)}`
+      + "&select=*&order=created_at.asc&limit=1",
+  );
+  const announcement = rows?.[0];
+  if (!announcement || (event.webhookEventId && announcement.webhook_event_id === event.webhookEventId)) return false;
+  let claimed;
+  try {
+    claimed = await db(`pending_announcements?id=eq.${announcement.id}&status=eq.pending`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "replying",
+        reply_attempt_count: Number(announcement.reply_attempt_count || 0) + 1,
+        reply_claimed_at: nowIso,
+        webhook_event_id: event.webhookEventId || null,
+        line_message_id: event.lineMessageId || null,
+        failed_at: null,
+        error_code: null,
+        error_message: null,
+      }),
+    });
+  } catch (error) {
+    if (Number((error as any)?.status) === 409 || /duplicate key/i.test(String((error as Error)?.message))) return false;
+    throw error;
+  }
+  if (!claimed?.[0]) return false;
+  let response: Response;
+  try {
+    response = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${viceChairAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ replyToken: event.replyToken, messages: [claimed[0].message_payload] }),
+      signal: AbortSignal.timeout(3_000),
+    });
+  } catch (error) {
+    await finishPendingAnnouncement(claimed[0].id, event.webhookEventId, {
+      status: "pending",
+      reply_claimed_at: null,
+      failed_at: new Date().toISOString(),
+      error_code: "NETWORK",
+      error_message: String((error as Error)?.message || error).slice(0, 1000),
+    });
+    return true;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    await finishPendingAnnouncement(claimed[0].id, event.webhookEventId, {
+      status: "pending",
+      reply_claimed_at: null,
+      failed_at: new Date().toISOString(),
+      line_request_id: response.headers.get("x-line-request-id") || null,
+      error_code: `HTTP_${response.status}`,
+      error_message: String(payload?.message || `LINE HTTP ${response.status}`).slice(0, 1000),
+    });
+    return true;
+  }
+  await finishPendingAnnouncement(claimed[0].id, event.webhookEventId, {
+    status: "delivered",
+    delivery_mode: "reply",
+    reply_claimed_at: null,
+    delivered_at: new Date().toISOString(),
+    failed_at: null,
+    error_code: null,
+    error_message: null,
+    line_request_id: response.headers.get("x-line-request-id") || null,
+    line_message_id: payload?.sentMessages?.[0]?.id || event.lineMessageId || null,
+  });
+  return true;
 }
 
 async function finishVoteCall(callId: string, patch: Record<string, unknown>) {
@@ -295,9 +401,16 @@ Deno.serve(async (request) => {
   try { payload = JSON.parse(rawBody); }
   catch { return json(400, { message: "Invalid JSON" }); }
   try {
-    // 普通聊天內容不落地；只有包含一次性 Token 且完整雜湊相符的回饋／投票呼喚會觸發 Reply。
+    // 普通聊天內容不落地。副主席秘書Bot只使用當次 message 事件的
+    // replyToken 投遞已排程公告；會員委員秘書Bot只解析精準命中的案件呼喚。
     await Promise.all(collectGroupEvents(payload).map(event => recordGroupEvent(event, oaChannel)));
-    if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
+    if (oaChannel === LINE_OA_CHANNELS.VICE_CHAIR) {
+      // 同一 webhook request 最多投遞一則待發公告，避免多事件或多待發項造成洗版。
+      for (const opportunity of collectReplyOpportunityEvents(payload)) {
+        if (await processReplyOpportunityEvent(opportunity)) break;
+      }
+    } else if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
+      // 委員會的回饋／投票呼喚只有 Token 與完整雜湊相符才會回覆。
       const callEvents = collectVoteCallEvents(payload);
       await Promise.all(callEvents.flatMap(event => [
         processFeedbackCallEvent(event),

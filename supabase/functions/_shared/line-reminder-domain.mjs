@@ -1,4 +1,12 @@
 export const LINE_REMINDER_KEYS = ["weekly_meeting_alarm", "monthly_data_entry", "monthly_committee_meeting"];
+export const OPPORTUNISTIC_REMINDER_KEYS = ["weekly_meeting_alarm", "monthly_data_entry"];
+
+const OPPORTUNISTIC_KEYS = new Set(OPPORTUNISTIC_REMINDER_KEYS);
+const REMINDER_LABELS = {
+  weekly_meeting_alarm: "每週例會鬧鐘提醒",
+  monthly_data_entry: "月底數據 Key in 提醒",
+  monthly_committee_meeting: "每月會員委員會會議提醒",
+};
 
 const WEEKDAYS = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"];
 
@@ -82,6 +90,14 @@ export function reminderRouteKey(reminderKey) {
   return reminderKey === "monthly_committee_meeting" ? "committee" : "exchange";
 }
 
+export function isOpportunisticReminder(reminderKey) {
+  return OPPORTUNISTIC_KEYS.has(String(reminderKey || ""));
+}
+
+export function reminderDisplayName(reminderKey) {
+  return REMINDER_LABELS[String(reminderKey || "")] || "交流群常態提醒";
+}
+
 function shiftedYearMonth(year, month, offset) {
   const zeroBased = Number(year) * 12 + Number(month) - 1 + Number(offset);
   return { year: Math.floor(zeroBased / 12), month: (zeroBased % 12) + 1 };
@@ -122,6 +138,80 @@ export function nextRuleOccurrence(rule, now = new Date()) {
     timezone: "Asia/Taipei",
     weekday: new Date(`${date}T00:00:00Z`).getUTCDay() || 7,
   };
+}
+
+function taipeiLocalDateTime(value) {
+  const normalized = String(value || "");
+  if (!/^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized)) return null;
+  const parsed = new Date(`${normalized}:00+08:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+export function opportunisticDeliveryWindow(rule, now = new Date(), windowMinutes = 720, graceMinutes = 360) {
+  if (!rule?.enabled || !isOpportunisticReminder(rule.reminder_key)) return null;
+  const duration = Number(windowMinutes);
+  const grace = Number(graceMinutes);
+  if (!Number.isInteger(duration) || duration < 5 || duration > 1440) return null;
+  if (!Number.isInteger(grace) || grace < 0 || grace > 1440) return null;
+  const sendTime = String(rule.send_time || "").slice(0, 5);
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(sendTime)) return null;
+
+  const dueToday = ruleDueDate(rule, now);
+  const next = nextRuleOccurrence(rule, now);
+  const localCandidates = [
+    dueToday ? `${dueToday}T${sendTime}` : "",
+    next?.localDateTime || "",
+  ].filter(Boolean);
+  const candidates = [...new Set(localCandidates)]
+    .map(localDateTime => ({ localDateTime, deadline: taipeiLocalDateTime(localDateTime) }))
+    .filter(item => item.deadline)
+    .sort((left, right) => left.deadline.getTime() - right.deadline.getTime());
+  const nowTime = now.getTime();
+  const selected = candidates.find(({ deadline }) => {
+    const end = deadline.getTime();
+    return nowTime >= end - duration * 60_000 && nowTime <= end + grace * 60_000;
+  });
+  if (!selected) return null;
+  const windowEnd = selected.deadline;
+  const windowStart = new Date(windowEnd.getTime() - duration * 60_000);
+  return {
+    localDueDate: selected.localDateTime.slice(0, 10),
+    deadlineLocal: selected.localDateTime,
+    scheduledFor: windowEnd.toISOString(),
+    windowStart: windowStart.toISOString(),
+    windowEnd: windowEnd.toISOString(),
+    expired: nowTime > windowEnd.getTime(),
+  };
+}
+
+export function formatTaipeiReminderDeadline(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "時間待確認";
+  const local = taipeiDateParts(date);
+  return `${local.year}/${local.month}/${local.day}（${weekdayLabel(local.weekday)}）${local.hour}:${local.minute}`;
+}
+
+export function buildReminderFallbackMessages({ reminderKey, scheduledFor, content, groupName = "富聯交流群", waitingHours = 12 } = {}) {
+  const body = String(content || "").trim();
+  if (!body) throw new Error("備援提醒內容不可為空");
+  const target = String(groupName || "富聯交流群").trim().slice(0, 200) || "富聯交流群";
+  const hours = Number.isFinite(Number(waitingHours)) ? Number(waitingHours) : 12;
+  const instruction = [
+    "🔔【交流群提醒尚未送達】",
+    `副主席秘書 Bot 在 ${hours} 小時等待期間內，沒有遇到可用的交流群新訊息，因此尚未將提醒送到交流群。`,
+    "",
+    "請副主席或管理者：",
+    "1. 長按並複製下一則訊息",
+    `2. 貼到「${target}」`,
+    "3. 送出前在群內手動標註 @所有人",
+    "",
+    `提醒項目：${reminderDisplayName(reminderKey)}`,
+    `原訂最晚送達：${formatTaipeiReminderDeadline(scheduledFor)}`,
+  ].join("\n");
+  return [
+    { type: "text", text: instruction },
+    { type: "text", text: body },
+  ];
 }
 
 export function validateReminderUpdate(input) {

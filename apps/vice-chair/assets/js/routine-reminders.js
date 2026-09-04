@@ -4,7 +4,12 @@
   const $=selector=>document.querySelector(selector);
   const labels={weekly_meeting_alarm:"每週例會鬧鐘提醒",monthly_data_entry:"月底數據 Key in 提醒",monthly_committee_meeting:"每月會員委員會會議提醒"};
   const routes={weekly_meeting_alarm:"exchange",monthly_data_entry:"exchange",monthly_committee_meeting:"committee"};
-  const statusLabels={sent:"已送達",failed:"失敗",processing:"發送中",skipped:"已略過"};
+  const statusLabels={
+    sent:"已推播送達",failed:"失敗",processing:"發送中",skipped:"已略過",
+    pending:"等待群訊息",replying:"正在回覆",fallback_processing:"正在通知好友",
+    fallback_notified:"已通知好友人工處理",fallback_failed:"好友通知待重試",
+    delivered:"已由 Reply 送達",manual_delivered:"已人工貼出",expired:"已逾期",cancelled:"已取消",
+  };
   let state={target:null,targets:{exchange:null,committee:null},rules:[],deliveries:[],workDigest:null};
   let digestFingerprint="",digestDirty=false;
   $("#loginIdentity").value=`${session.name}・${session.role==="admin"?"系統管理員":"副主席"}`;
@@ -30,16 +35,22 @@
   }
   function renderNextReminder(selector,item){
     const element=$(selector);
+    const opportunistic=item.deliveryStrategy==="opportunistic";
     element.classList.toggle("disabled",!item.enabled);
+    element.querySelector("small").textContent=opportunistic?"下次最晚送達時間":"下次推播時間";
     element.querySelector("strong").textContent=formatNextReminder(item.nextScheduledLocal);
-    element.querySelector("span").textContent=item.enabled?"已啟用・系統將依此時間自動發送":"目前未啟用・啟用後才會自動發送";
+    element.querySelector("span").textContent=item.enabled
+      ?opportunistic?"已啟用・系統會提前 12 小時等待交流群新訊息":"已啟用・系統將依此時間自動推播"
+      :"目前未啟用・啟用後才會開始排程";
   }
   function renderTarget(selector,route,label){
     const element=$(selector),target=routeTarget(route);
     element.className=`target-state ${target?.channelConfigured?"ready":"missing"}`;
     element.querySelector("strong").textContent=target?target.displayName:`尚未指定${label}`;
     element.querySelector("span").textContent=target
-      ?`${target.oaName||"LINE 助理"}・${target.environment==="test"?"測試群":"正式群"}・${target.channelConfigured?"已可發送":"後端憑證尚未設定"}`
+      ?route==="exchange"
+        ?`${target.oaName||"副主席秘書Bot"}・${target.environment==="test"?"測試群":"正式群"}・${target.channelConfigured?"12 小時 Reply 等待；未命中通知全部好友":"後端憑證尚未設定"}`
+        :`${target.oaName||"會員委員秘書Bot"}・${target.environment==="test"?"測試群":"正式群"}・${target.channelConfigured?"已可推播":"後端憑證尚未設定"}`
       :`請先將${route==="committee"?"會員委員秘書Bot":"副主席秘書Bot"}加入群組並在設定頁指定「${label}」用途`;
   }
   function preview(){
@@ -47,7 +58,25 @@
     $("#monthlyPreview").textContent=`@所有人\n${$("#monthlyMessage").value.trim()}`;
     $("#committeePreview").textContent=`@所有人\n${$("#committeeMessage").value.trim()}`;
   }
-  function formatDateTime(value){return value?new Date(value).toLocaleString("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}
+  function formatDateTime(value){return value?new Date(value).toLocaleString("zh-TW",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"}):"—"}
+  function deliverySource(item){
+    if(item.triggerSource!=="manual_test")return"自動排程";
+    return routes[item.reminderKey]==="exchange"?"15 分鐘回覆測試":"人工推播測試";
+  }
+  function deliveryTiming(item){
+    if(["pending","replying"].includes(item.status))return`等待窗口 ${formatDateTime(item.windowStart)} ～ ${formatDateTime(item.windowEnd)}`;
+    if(item.status==="fallback_notified")return`好友備援通知 ${formatDateTime(item.fallbackNotifiedAt)}`;
+    if(["sent","delivered","manual_delivered"].includes(item.status))return`完成 ${formatDateTime(item.sentAt)}`;
+    if(item.scheduledFor)return`原訂最晚送達 ${formatDateTime(item.scheduledFor)}`;
+    return`建立 ${formatDateTime(item.requestedAt)}`;
+  }
+  function renderDeliveries(){
+    $("#deliveryList").innerHTML=state.deliveries.length?state.deliveries.map(item=>{
+      const actions=item.canMarkManual?`<div class="delivery-actions"><button type="button" data-copy-reminder="${escapeHtml(item.id)}">複製原提醒</button><button type="button" class="primary" data-mark-manual="${escapeHtml(item.id)}">已貼至交流群</button></div>`:"";
+      const error=item.errorMessage?`<p class="delivery-error">${escapeHtml(item.errorMessage)}</p>`:"";
+      return`<article><div class="delivery-title"><b>${escapeHtml(labels[item.reminderKey]||item.reminderKey)}</b><span>${escapeHtml(deliverySource(item))}</span></div><time>${escapeHtml(deliveryTiming(item))}</time><em class="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status]||item.status)}</em>${error}${actions}</article>`;
+    }).join(""):`<article><span>尚無發送紀錄</span></article>`;
+  }
   function renderWorkDigest(force=false){
     const item=state.workDigest||{},target=item.target,message=$("#workDigestMessage");
     const sourceChanged=Boolean(item.sourceFingerprint&&item.sourceFingerprint!==digestFingerprint);
@@ -71,14 +100,15 @@
     $("#weeklyEnabled").checked=Boolean(weekly.enabled);$("#weeklyWeekday").value=String(weekly.sendWeekday||1);$("#weeklyTime").value=weekly.sendTime||"20:00";$("#weeklyMessage").value=weekly.messageTemplate||"";
     $("#monthlyEnabled").checked=Boolean(monthly.enabled);$("#monthlyTime").value=monthly.sendTime||"20:00";$("#monthlyMessage").value=monthly.messageTemplate||"";$("#meetingWeekday").value=String(monthly.meetingWeekday||2);$("#daysBefore").value=String(monthly.daysBefore??1);
     $("#committeeEnabled").checked=Boolean(committee.enabled);$("#committeeMeetingWeekday").value=String(committee.meetingWeekday||2);$("#committeeTime").value=committee.sendTime||"20:00";$("#committeeMessage").value=committee.messageTemplate||"";
+    renderNextReminder("#weeklyNextReminder",weekly);
     renderNextReminder("#monthlyNextReminder",monthly);
     renderNextReminder("#committeeNextReminder",committee);
     renderTarget("#exchangeTargetState","exchange","交流群常態通知");
     renderTarget("#committeeTargetState","committee","會員委員會通知");
     document.querySelectorAll("[data-test]").forEach(button=>button.disabled=!targetForRule(button.dataset.test)?.channelConfigured);
     $("#saveState").textContent=state.rules.some(item=>item.enabled)?"已有提醒啟用":"所有提醒目前關閉";
-    $("#saveDetail").textContent=state.schedulerReady?"Supabase 排程服務已就緒":"排程尚未啟用；現在可先設定與測試";
-    $("#deliveryList").innerHTML=state.deliveries.length?state.deliveries.map(item=>`<article><b>${escapeHtml(labels[item.reminderKey]||item.reminderKey)}</b><span>${item.triggerSource==="manual_test"?"人工測試":"自動排程"}</span><time>${escapeHtml(new Date(item.requestedAt).toLocaleString("zh-TW"))}</time><em class="${escapeHtml(item.status)}">${escapeHtml(statusLabels[item.status]||item.status)}</em>${item.errorMessage?`<span>${escapeHtml(item.errorMessage)}</span>`:""}</article>`).join(""):`<article><span>尚無發送紀錄</span></article>`;
+    $("#saveDetail").textContent=state.schedulerReady?"交流群採 Reply；未命中只通知副主席秘書Bot好友":"排程尚未啟用；現在可先設定與測試";
+    renderDeliveries();
     preview();
     renderWorkDigest(forceDigest);
   }
@@ -101,10 +131,32 @@
   document.querySelectorAll("[data-test]").forEach(button=>button.onclick=async()=>{
     const key=button.dataset.test,label=labels[key],target=targetForRule(key),defaultText=button.textContent;
     if(!target?.channelConfigured)return toast(`${routes[key]==="committee"?"會員委員秘書Bot":"副主席秘書Bot"}尚未完成群組或憑證設定`);
-    if(!confirm(`將目前已保存的「${label}」文案立即測試發送到「${target.displayName}」？\n\n測試訊息會真的 @所有人。若剛修改文案，請先按保存。`))return;
-    button.disabled=true;button.textContent="發送中…";
+    const isReplyTest=routes[key]==="exchange";
+    const confirmation=isReplyTest
+      ?`要為「${label}」建立 15 分鐘回覆測試嗎？\n\n「${target.displayName}」的下一則新訊息會觸發副主席秘書Bot Reply，並真的 @所有人。15 分鐘未命中就結束測試，不會群發好友備援。若剛修改文案，請先按保存。`
+      :`將目前已保存的「${label}」文案立即測試發送到「${target.displayName}」？\n\n測試訊息會真的 @所有人。若剛修改文案，請先按保存。`;
+    if(!confirm(confirmation))return;
+    button.disabled=true;button.textContent=isReplyTest?"建立等待中…":"發送中…";
     try{const result=await api("POST",{action:"test",reminderKey:key});state=result.state;render();toast(result.message)}catch(error){toast(error.message)}finally{button.textContent=defaultText;button.disabled=!targetForRule(key)?.channelConfigured}
   });
+  $("#deliveryList").onclick=async event=>{
+    const copyButton=event.target.closest("[data-copy-reminder]");
+    if(copyButton){
+      const item=state.deliveries.find(delivery=>delivery.id===copyButton.dataset.copyReminder);
+      if(!item?.messageText)return toast("這則原提醒目前無法複製");
+      try{await navigator.clipboard.writeText(item.messageText);toast("原提醒已複製；貼到交流群前請手動標註 @所有人")}
+      catch{toast("瀏覽器無法複製，請從副主席秘書Bot的第二則訊息長按複製")}
+      return;
+    }
+    const doneButton=event.target.closest("[data-mark-manual]");
+    if(!doneButton)return;
+    const item=state.deliveries.find(delivery=>delivery.id===doneButton.dataset.markManual);
+    if(!item?.canMarkManual)return toast("這則提醒狀態已更新");
+    if(!confirm("請確認：原提醒已貼到交流群，且送出前已手動標註 @所有人？"))return;
+    doneButton.disabled=true;doneButton.textContent="記錄中…";
+    try{const result=await api("POST",{action:"mark_manual",announcementId:item.id});state=result.state;render();toast(result.message)}
+    catch(error){doneButton.disabled=false;doneButton.textContent="已貼至交流群";toast(error.message)}
+  };
   ["weeklyMessage","monthlyMessage","committeeMessage"].forEach(id=>$("#"+id).addEventListener("input",preview));
   $("#workDigestMessage").addEventListener("input",()=>{digestDirty=true;renderWorkDigest()});
   $("#refreshWorkDigest").onclick=async()=>{

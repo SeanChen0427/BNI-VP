@@ -19,7 +19,13 @@ import {
   caseVoteNoticeFingerprintSource,
   lineAttendanceFingerprintSource,
 } from "./line-message.mjs";
-import { LINE_REMINDER_KEYS, nextRuleOccurrence, reminderRouteKey, validateReminderUpdate } from "../_shared/line-reminder-domain.mjs";
+import {
+  LINE_REMINDER_KEYS,
+  isOpportunisticReminder,
+  nextRuleOccurrence,
+  reminderRouteKey,
+  validateReminderUpdate,
+} from "../_shared/line-reminder-domain.mjs";
 import { buildCommitteeWorkDigest } from "../_shared/committee-work-digest.mjs";
 import {
   LINE_OA_CHANNELS,
@@ -477,6 +483,8 @@ function publicLineTarget(row: any) {
     oaChannel,
     oaName: lineChannelLabel(oaChannel),
     channelConfigured: Boolean(lineAccessToken(oaChannel)),
+    deliveryStrategy: row.delivery_strategy || "push",
+    opportunisticWindowMinutes: Number(row.opportunistic_window_minutes || 720),
   };
 }
 
@@ -534,6 +542,21 @@ async function lineAttendanceState(currentSession: any, context: Context) {
 const LINE_ROUTE_KEYS = new Set(["attendance", "committee", "leadership", "exchange"]);
 const LINE_ENVIRONMENTS = new Set(["test", "production"]);
 
+async function cancelPendingAnnouncementsForTarget(targetId: string, reason: string) {
+  await db(
+    `pending_announcements?group_target_id=eq.${encodeURIComponent(targetId)}&status=in.(pending,fallback_failed)`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({
+        status: "cancelled",
+        error_code: "TARGET_CHANGED",
+        error_message: String(reason || "LINE 群組設定已變更").slice(0, 1000),
+      }),
+    },
+  );
+}
+
 async function assignLineTarget(targetId: string, routeKey: string, environment: string, context: Context) {
   leadership(context);
   if (!/^[0-9a-f-]{36}$/i.test(targetId)) throw new Error("LINE 群組識別資料不正確");
@@ -553,11 +576,17 @@ async function assignLineTarget(targetId: string, routeKey: string, environment:
     throw Object.assign(new Error("LINE Bot 目前無法確認此群組，請確認 Bot 仍在測試群中"), { status: 502 });
   }
   const now = new Date().toISOString();
-  await db(`line_group_targets?status=eq.active&route_key=eq.${routeKey}&purpose=eq.${environment}&id=neq.${target.id}`, {
+  const replacedTargets = await db(`line_group_targets?status=eq.active&route_key=eq.${routeKey}&purpose=eq.${environment}&id=neq.${target.id}`, {
     method: "PATCH",
-    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    headers: { "Content-Type": "application/json", Prefer: "return=representation" },
     body: JSON.stringify({ status: "disabled", purpose: null, route_key: null, verified_by: null, verified_at: null }),
   });
+  for (const replaced of replacedTargets || []) {
+    await cancelPendingAnnouncementsForTarget(replaced.id, "LINE 群組已被新的路由目標取代");
+  }
+  if (target.status === "active" && (target.route_key !== routeKey || target.purpose !== environment)) {
+    await cancelPendingAnnouncementsForTarget(target.id, "LINE 群組用途已變更");
+  }
   const activated = await db(`line_group_targets?id=eq.${target.id}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Prefer: "return=representation" },
@@ -565,6 +594,8 @@ async function assignLineTarget(targetId: string, routeKey: string, environment:
       display_name: String(summary.groupName || target.display_name || "LINE 測試群").trim().slice(0, 200),
       purpose: environment,
       route_key: routeKey,
+      delivery_strategy: routeKey === "exchange" ? "opportunistic" : "push",
+      opportunistic_window_minutes: 720,
       status: "active",
       verified_by: context.personId,
       verified_at: now,
@@ -584,6 +615,7 @@ async function disableLineTarget(targetId: string, context: Context) {
     body: JSON.stringify({ status: "disabled", purpose: null, route_key: null, verified_by: null, verified_at: null }),
   });
   if (!updated?.[0]) throw Object.assign(new Error("群組設定已更新，請重新整理"), { status: 409 });
+  await cancelPendingAnnouncementsForTarget(targetId, "LINE 群組已停用");
   return { message: `已停用「${updated[0].display_name}」`, target: publicLineTarget(updated[0]) };
 }
 
@@ -619,6 +651,8 @@ function publicLineReminderRule(row: any) {
     daysBefore: row.days_before,
     messageTemplate: row.message_template,
     mentionAll: Boolean(row.mention_all),
+    deliveryStrategy: isOpportunisticReminder(row.reminder_key) ? "opportunistic" : "push",
+    opportunisticWindowMinutes: isOpportunisticReminder(row.reminder_key) ? 720 : null,
     nextScheduledLocal: next?.localDateTime || null,
     updatedAt: row.updated_at,
   };
@@ -626,14 +660,40 @@ function publicLineReminderRule(row: any) {
 
 function publicLineReminderDelivery(row: any) {
   return {
+    id: row.id,
     reminderKey: row.reminder_key,
     triggerSource: row.trigger_source,
     localDueDate: row.local_due_date,
     status: row.status,
+    deliveryMode: row.status === "sent" ? "push" : null,
     requestedAt: row.requested_at,
+    scheduledFor: row.scheduled_for || null,
     sentAt: row.sent_at,
     failedAt: row.failed_at,
     errorMessage: row.error_message || "",
+  };
+}
+
+function publicPendingAnnouncement(row: any) {
+  const canHandleManually = row.trigger_source === "scheduled"
+    && ["fallback_notified", "failed", "expired"].includes(row.status);
+  return {
+    id: row.id,
+    reminderKey: row.reminder_key,
+    triggerSource: row.trigger_source,
+    localDueDate: row.local_due_date,
+    status: row.status,
+    deliveryMode: row.delivery_mode || null,
+    requestedAt: row.requested_at,
+    scheduledFor: row.scheduled_for,
+    windowStart: row.window_start,
+    windowEnd: row.window_end,
+    sentAt: row.delivered_at || row.manual_completed_at || null,
+    fallbackNotifiedAt: row.fallback_notified_at || null,
+    failedAt: row.failed_at,
+    errorMessage: row.error_message || "",
+    messageText: canHandleManually ? row.message_text : "",
+    canMarkManual: canHandleManually,
   };
 }
 
@@ -700,10 +760,11 @@ async function committeeWorkDigestState(target: any) {
 }
 
 async function lineRemindersState() {
-  const [rules, targets, deliveries] = await Promise.all([
+  const [rules, targets, deliveries, pendingAnnouncements] = await Promise.all([
     db("line_reminder_rules?select=*&order=reminder_key.asc"),
     db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
-    db("line_reminder_deliveries?select=reminder_key,trigger_source,local_due_date,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
+    db("line_reminder_deliveries?select=id,reminder_key,trigger_source,local_due_date,scheduled_for,status,requested_at,sent_at,failed_at,error_message&order=requested_at.desc&limit=20"),
+    db("pending_announcements?select=id,reminder_key,trigger_source,local_due_date,scheduled_for,window_start,window_end,status,delivery_mode,requested_at,delivered_at,fallback_notified_at,manual_completed_at,failed_at,error_message,message_text&order=requested_at.desc&limit=30"),
   ]);
   const targetByRoute = Object.fromEntries((targets || []).map((target: any) => [target.route_key, publicLineTarget(target)]));
   const workDigest = await committeeWorkDigestState((targets || []).find((target: any) => target.route_key === "committee") || null);
@@ -720,7 +781,10 @@ async function lineRemindersState() {
       committee: targetByRoute.committee || null,
     },
     rules: (rules || []).map(publicLineReminderRule),
-    deliveries: (deliveries || []).map(publicLineReminderDelivery),
+    deliveries: [
+      ...(deliveries || []).map(publicLineReminderDelivery),
+      ...(pendingAnnouncements || []).map(publicPendingAnnouncement),
+    ].sort((left, right) => String(right.requestedAt || "").localeCompare(String(left.requestedAt || ""))).slice(0, 30),
     workDigest,
   };
 }
@@ -1065,6 +1129,49 @@ async function finishCaseResultLineDelivery(deliveryId: string, patch: any) {
   });
 }
 
+async function queueReplyDrivenReminderTest(rule: any, target: any, context: Context) {
+  if (target.delivery_strategy !== "opportunistic" || target.oa_channel !== LINE_OA_CHANNELS.VICE_CHAIR) {
+    throw Object.assign(new Error("交流群尚未啟用回覆驅動投遞，請重新指定群組"), { status: 409 });
+  }
+  const liveTests = await db(
+    `pending_announcements?reminder_key=eq.${encodeURIComponent(rule.reminder_key)}`
+      + `&group_target_id=eq.${target.id}&trigger_source=eq.manual_test&status=in.(pending,replying)&select=id,window_end&limit=1`,
+  );
+  if (liveTests?.[0]) {
+    throw Object.assign(new Error("這項提醒已在等待交流群新訊息，請勿重複建立測試"), { status: 409 });
+  }
+  const now = new Date();
+  const windowEnd = new Date(now.getTime() + 15 * 60_000);
+  const content = String(rule.message_template || "").trim();
+  const message = rule.mention_all ? buildLineMentionAllMessage(content) : { type: "text", text: content };
+  await db("pending_announcements", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify({
+      delivery_key: `manual-reply:${rule.reminder_key}:${crypto.randomUUID()}`,
+      reminder_key: rule.reminder_key,
+      group_target_id: target.id,
+      oa_channel: LINE_OA_CHANNELS.VICE_CHAIR,
+      trigger_source: "manual_test",
+      local_due_date: taipeiDay(now),
+      scheduled_for: windowEnd.toISOString(),
+      window_start: now.toISOString(),
+      window_end: windowEnd.toISOString(),
+      group_display_name: String(target.display_name || "富聯交流群").trim().slice(0, 200),
+      message_text: content,
+      message_payload: message,
+      message_sha256: await sha256Text(JSON.stringify(message)),
+      requested_by: context.personId,
+      requested_by_auth_user_id: context.userId,
+      requested_at: now.toISOString(),
+    }),
+  });
+  return {
+    message: `已開啟 15 分鐘回覆測試；「${target.display_name}」的下一則新訊息將觸發免費 @所有人提醒`,
+    state: await lineRemindersState(),
+  };
+}
+
 async function sendLineReminderTest(reminderKey: string, context: Context) {
   if (!LINE_REMINDER_KEYS.includes(reminderKey)) throw new Error("提醒類型不正確");
   const routeKey = reminderRouteKey(reminderKey);
@@ -1078,6 +1185,7 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
   if (!target) throw Object.assign(new Error(`尚未在後台指定${routeKey === "committee" ? "會員委員會群" : "交流群"}`), { status: 409 });
   const oaChannel = lineTargetChannel(target, routeKey);
   if (!lineAccessToken(oaChannel)) throw Object.assign(new Error(`${lineChannelLabel(oaChannel)} Channel Access Token 尚未設定`), { status: 503 });
+  if (isOpportunisticReminder(reminderKey)) return queueReplyDrivenReminderTest(rule, target, context);
   const content = String(rule.message_template || "").trim();
   const message = rule.mention_all ? buildLineMentionAllMessage(content) : { type: "text", text: content };
   const id = crypto.randomUUID();
@@ -1128,12 +1236,38 @@ async function sendLineReminderTest(reminderKey: string, context: Context) {
   return { message: `測試提醒已由${lineChannelLabel(oaChannel)}發送到「${target.display_name}」`, state: await lineRemindersState() };
 }
 
+async function markLineReminderManuallyDelivered(announcementId: string, context: Context) {
+  if (!/^[0-9a-f-]{36}$/i.test(announcementId)) throw new Error("待發提醒識別資料不正確");
+  const now = new Date().toISOString();
+  const rows = await db(
+    `pending_announcements?id=eq.${encodeURIComponent(announcementId)}`
+      + "&trigger_source=eq.scheduled&status=in.(fallback_notified,failed,expired)",
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        status: "manual_delivered",
+        delivery_mode: "manual",
+        delivered_at: now,
+        manual_completed_at: now,
+        manual_completed_by: context.personId,
+        failed_at: null,
+        error_code: null,
+        error_message: null,
+      }),
+    },
+  );
+  if (!rows?.[0]) throw Object.assign(new Error("這則提醒狀態已變更，請重新整理後再確認"), { status: 409 });
+  return { message: "已記錄由人工貼至交流群", state: await lineRemindersState() };
+}
+
 async function lineRemindersApi(request: Request, context: Context) {
   leadership(context);
   if (request.method === "GET") return lineRemindersState();
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   if (body.action === "test") return sendLineReminderTest(String(body.reminderKey || ""), context);
+  if (body.action === "mark_manual") return markLineReminderManuallyDelivered(String(body.announcementId || ""), context);
   if (body.action === "work_digest_send") return sendCommitteeWorkDigest(body.content, body.sourceFingerprint, context);
   if (body.action !== "save") throw new Error("常態通知操作不正確");
   if (!Array.isArray(body.rules) || body.rules.length !== LINE_REMINDER_KEYS.length) throw new Error("提醒設定不完整");
@@ -1143,9 +1277,10 @@ async function lineRemindersApi(request: Request, context: Context) {
   if (updates.some((rule: any) => rule.enabled)) {
     if (!Deno.env.get("LINE_REMINDER_CRON_SECRET")) throw Object.assign(new Error("Supabase 排程尚未啟用，請先保持提醒關閉"), { status: 409 });
     const requiredRoutes = new Set(updates.filter((rule: any) => rule.enabled).map((rule: any) => reminderRouteKey(rule.reminder_key)));
-    const targets = await db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=route_key,oa_channel");
+    const targets = await db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=route_key,oa_channel,delivery_strategy");
     const activeRoutes = new Set((targets || [])
       .filter((target: any) => lineChannelForRoute(target.route_key) === normalizeLineChannel(target.oa_channel)
+        && (target.route_key !== "exchange" || target.delivery_strategy === "opportunistic")
         && Boolean(lineAccessToken(target.oa_channel)))
       .map((target: any) => target.route_key));
     const missingRoute = [...requiredRoutes].find(route => !activeRoutes.has(route));
@@ -1157,6 +1292,20 @@ async function lineRemindersApi(request: Request, context: Context) {
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
       body: JSON.stringify({ ...rule, updated_by: context.personId }),
     });
+    if (!rule.enabled && isOpportunisticReminder(rule.reminder_key)) {
+      await db(
+        `pending_announcements?reminder_key=eq.${encodeURIComponent(rule.reminder_key)}&status=in.(pending,fallback_failed)`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+          body: JSON.stringify({
+            status: "cancelled",
+            error_code: "RULE_DISABLED",
+            error_message: "提醒規則已停用",
+          }),
+        },
+      );
+    }
   }
   return { message: "常態通知設定已保存", state: await lineRemindersState() };
 }

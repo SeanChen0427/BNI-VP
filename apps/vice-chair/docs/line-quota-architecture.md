@@ -1,12 +1,14 @@
 # LINE Bot 訊息額度架構設計
 
 - 建立日期：2026-08-19
-- 更新日期：2026-08-28
-- 分支：`codex/line-bot-groups`
+- 更新日期：2026-09-04
+- 分支：`main`
 - 文件性質：設計決策紀錄與實作規格
 - 適用範圍：`supabase/functions/line-webhook/`、`supabase/functions/app-api/`、`supabase/functions/line-reminder-cron/`、副主席工作台前端
 
 > 2026-08-28 追加決策：會員委員會的案件開票與案件回饋都不再走一般 Push。副主席從系統複製對應完整公版並貼至委員群，會員委員秘書Bot驗證文案內的一次性呼喚識別與指紋後，以該文字事件的 `replyToken` 免費回覆真正 @所有人通知與 Flex 圖卡。月會提醒與工作摘要維持既有 Push。
+
+> 2026-09-04 追加決策：交流群的每週例會與月底 Key-in 提醒開啟 12 小時機會性投遞窗口；窗口未命中時，不自動 Push 到交流群，改由「副主席秘書Bot」對該官方帳號的全部好友發送 broadcast 備援通知。不保存個人 LINE `userId`。目前可送達好友為副主席與管理者共 2 人時，每次未命中備援預計計入 2 則。
 
 ---
 
@@ -16,7 +18,7 @@
 
 - 本系統不營利，無任何預算，只能使用 LINE 官方帳號免費方案。
 - 台灣輕用量方案：月費 0 元，免費訊息 200 則，不可加購。
-- 一般排程提醒的需求判準仍是「副主席不用記、不用搬、不用貼」；案件開票與案件回饋是 2026-08-28 確認的例外，副主席接受在流程節點複製並貼出必要公版，以換取免建 Google 表單、免登入填寫、免人工搬運回饋及不消耗 Push 額度。
+- 一般排程提醒的主要路徑仍是「副主席不用記、不用搬、不用貼」。2026-09-04 確認交流群在 12 小時窗口內未命中時，接受改向副主席秘書Bot的全部好友群發人工處理提醒，以避免單次大群 Push 消耗約 45 則。案件開票與案件回饋另為 2026-08-28 確認的人工貼公版例外。
 
 ### 1.2 LINE 計費模型
 
@@ -152,7 +154,7 @@ Bot 只要在群組內即可 push 至該 groupId，會員無須加官方帳號�
 
 | 群組 | 內容 | 機制 | 月成本 | 副主席操作 |
 |---|---|---|---|---|
-| 交流群（約 45 人） | 每週例會提醒、每月 Key-in 提醒 | **機會性投遞**（免費 Reply） | 0 | 無 |
+| 交流群（約 45 人） | 每週例會提醒、每月 Key-in 提醒 | **12 小時機會性投遞**（免費 Reply）；未命中時改向 OA 全部好友群發備援 | 命中 0；以 2 位好友、每月 5 次全數未命中計算上限約 10 | 未命中後由副主席／管理者人工貼至交流群 |
 | 委員群（8 人） | 委員會提醒、工作摘要 | **第二個 OA 直接 Push** | 每月約 40 | 無或二次確認 |
 | 委員群（8 人） | 案件回饋通知與免登入回饋圖卡 | **副主席貼完整公版呼喚 Bot，以 Reply 免費回覆** | 0 | 複製後貼群 |
 | 委員群（8 人） | 案件開票通知與投票圖卡 | **副主席貼完整公版呼喚 Bot，以 Reply 免費回覆** | 0 | 複製後貼群 |
@@ -161,7 +163,7 @@ Bot 只要在群組內即可 push 至該 groupId，會員無須加官方帳號�
 
 額度分配：
 
-- 副主席助理（交流群 ＋ 公告群）：55–100／200
+- 副主席助理（交流群 ＋ 公告群）：45–100／200
 - 會員委員會助理（委員群）：以每月 2 案估算仍為 40／200；案件回饋與開票 Reply 都是 0 則
 
 ### 已否決的方案與理由
@@ -172,7 +174,7 @@ Bot 只要在群組內即可 push 至該 groupId，會員無須加官方帳號�
 | LIFF Share Target Picker ＋ 一次性指令 | 工程成本高（LINE Login channel、LIFF App、scope、前端部署），僅省下打字，且會在群組永久留下無意義的指令訊息。Web Share API 可用十行程式碼達成近似效果。 |
 | 開多個 OA 分攤大群額度 | 無法解決「發送次數 × 人數」的乘法問題，只是延後破功時間。委員群例外，理由見 3.2。 |
 | 全面改用 Email／Calendar／PWA | 有效但改變會員既有習慣，且分會溝通中心在 LINE。列為未來備案，非本次範圍。 |
-| Bot 只 Push 給副主席再轉傳 | LINE 轉傳會失去 mention，@All 效果消失。 |
+| Bot 只通知副主席再轉傳（作為主要投遞路徑） | LINE 轉傳會失去 mention，@All 效果消失，因此不取代窗口內的 Reply 主路徑。2026-09-04 起只在 12 小時未命中後採用，並改為對 OA 全部好友群發的人工處理備援。 |
 
 ### 3.1 為何交流群適用機會性投遞
 
@@ -212,10 +214,10 @@ Bot 只要在群組內即可 push 至該 groupId，會員無須加官方帳號�
 ### 4.1 流程
 
 ```
-排程時間到（例：週一 19:00）
+進入排程最晚送達時間的前 12 小時（例：週一 08:00）
    ↓
 系統產生公告內容，寫入 pending_announcements
-（不發送、不扣額度，設定投遞窗口 19:00–23:00）
+（不發送、不扣額度，設定投遞窗口 08:00–20:00）
    ↓
 交流群任何成員發出任何訊息
    ↓
@@ -225,47 +227,67 @@ Webhook 收到 message 事件（含 replyToken）
    ↓
 有 → 原子性佔位 → 立即以該 replyToken 回覆 @All 公告 → 扣 0 則
    ↓
-窗口到期仍未命中 → 進入降級鏈（見第七節）
+窗口到期仍未命中 → 副主席秘書Bot向全部好友群發「待人工貼出」通知
 ```
+
+使用者在系統設定的時間定義為「最晚送達時間」，系統從該時間前 12 小時開始等待群組新訊息，不得在原設定時間後再延遲 12 小時。
 
 觸發者為群組內任意成員，其本人不會察覺觸發了任何機制。LINE 的 reply message 不會呈現為「引用回覆」樣式，視覺上與一般 bot 訊息無異。
 
 ### 4.2 資料表
 
 ```sql
+alter table line_group_targets
+  add column delivery_strategy text not null default 'push',
+  add column opportunistic_window_minutes integer not null default 720;
+
 create table pending_announcements (
   id uuid primary key default gen_random_uuid(),
-  line_group_id text not null,
+  delivery_key text not null unique,
+  reminder_key text not null references line_reminder_rules(reminder_key),
+  group_target_id uuid not null references line_group_targets(id),
   oa_channel text not null default 'vice_chair',
-  announcement_kind text not null,
-  message_payload jsonb not null,
-  content_hash text not null,
+  trigger_source text not null default 'scheduled',
+  local_due_date date not null,
+  scheduled_for timestamptz not null,
   window_start timestamptz not null,
   window_end timestamptz not null,
+  group_display_name text not null,
+  message_text text not null,
+  message_payload jsonb not null,
+  message_sha256 text not null,
   status text not null default 'pending',
   delivery_mode text,
+  reply_attempt_count integer not null default 0,
+  fallback_attempt_count integer not null default 0,
+  fallback_retry_key uuid not null default gen_random_uuid() unique,
   delivered_at timestamptz,
-  attempt_count integer not null default 0,
-  last_error text,
+  fallback_notified_at timestamptz,
+  manual_completed_at timestamptz,
+  webhook_event_id text,
+  line_request_id text,
+  error_code text,
+  error_message text,
   created_at timestamptz not null default now()
 );
 
 create index pending_announcements_lookup
-  on pending_announcements (line_group_id, status, window_end);
+  on pending_announcements (group_target_id, status, window_start, window_end, created_at);
 
 create unique index pending_announcements_dedupe
-  on pending_announcements (line_group_id, content_hash)
-  where status = 'pending';
+  on pending_announcements (reminder_key, group_target_id, local_due_date)
+  where trigger_source = 'scheduled';
 ```
 
 欄位說明：
 
-- `announcement_kind`：對應 `LINE_REMINDER_KEYS`（`weekly_meeting_alarm`／`monthly_data_entry`／`monthly_committee_meeting`）或其他公告類型。
+- `reminder_key`：本表只接受交流群的 `weekly_meeting_alarm`／`monthly_data_entry`；委員會月會提醒仍沿用既有 Push 稽核表。
 - `message_payload`：完整的 LINE message object（`buildLineMentionAllMessage` 的輸出），投遞時直接使用，確保排程當下的內容與實際發出的內容一致。
-- `content_hash`：內容指紋，用於去重。系統既有的 `sha256Text` 與 fingerprint 機制可複用（參考 `app-api/index.ts:3597` 的 `announcementHash` 作法）。
-- `status`：`pending` → `delivered`（Reply 成功）／`pushed`（降級 Push）／`manual`（降級人工）／`expired`／`cancelled`。
-- `delivery_mode`：`reply`／`push`／`manual`，供稽核與命中率統計。
-- RLS：本表可能含會員資料，必須設定與現有敏感資料表一致的存取政策。
+- `message_text`：原提醒純文字，只在好友備援完成後提供工作台複製；`message_sha256` 與 `delivery_key` 防止同一排程重複建立。
+- `status`：`pending` → `replying` → `delivered`；未命中則 `fallback_processing` → `fallback_notified` → `manual_delivered`。另保留 `fallback_failed`、`failed`、`expired`、`cancelled` 作為異常與停用稽核。好友群發成功只到 `fallback_notified`，不冒充交流群已送達。
+- `delivery_mode`：只有交流群實際送達時才寫入 `reply` 或 `manual`；好友 Broadcast 是備援通知，不是原提醒的投遞模式。
+- `fallback_notified`、`failed` 或 `expired` 的正式排程會在工作台保留「複製原提醒」與人工完成入口；15 分鐘人工測試逾期不會被誤列為正式待貼工作。
+- RLS：本表啟用 RLS 並撤銷 `anon`／`authenticated` 全部權限，只允許 `service_role` 讀寫。表內不含好友 `userId`、觸發訊息全文或 `replyToken`。
 
 ### 4.3 Webhook 改動
 
@@ -286,13 +308,13 @@ event.type === "message"
 2. **原子性佔位**（關鍵）：
    ```sql
    UPDATE pending_announcements
-      SET status = 'delivered', delivery_mode = 'reply', delivered_at = now()
+      SET status = 'replying', reply_claimed_at = now()
     WHERE id = $1 AND status = 'pending'
    RETURNING *;
    ```
    若回傳 0 列，代表已被同時間的另一個事件搶先，直接略過本次。此步驟用於防止同一秒多則訊息造成的重複投遞。
 3. 呼叫 `POST https://api.line.me/v2/bot/message/reply`，body 為 `{ replyToken, messages: [message_payload] }`。
-4. Reply 失敗時將 `status` 回滾為 `pending`、`attempt_count += 1`、記錄 `last_error`，讓下一個事件重試。
+4. Reply 成功後才寫入 `status = 'delivered'`、`delivery_mode = 'reply'` 與 `delivered_at`。失敗時回滾為 `pending`、增加 `reply_attempt_count` 並記錄錯誤，讓下一個新事件重試。
 
 實作限制：
 
@@ -303,7 +325,7 @@ event.type === "message"
 
 ### 4.4 隱私影響
 
-機會性投遞只使用 `event.source.groupId`、`event.replyToken`、`event.timestamp` 三個欄位，**不讀取任何訊息內容**。`line-webhook/index.ts` 現有註解「Only opaque group IDs and timestamps are retained. User message content is ignored.」在新增 `replyToken` 後仍然成立，僅需補充說明 replyToken 為即用即棄、不落地儲存。
+機會性投遞只擷取 `event.source.groupId`、`event.replyToken`、事件／訊息 ID 與 `event.timestamp`，**不讀取任何訊息內容或 `source.userId`**。`replyToken` 僅在同一次 Webhook 內即時使用且不落地；事件／訊息 ID 只用於防止 webhook 重送造成重複投遞。
 
 案件開票呼喚是上述原則的窄幅例外。Webhook只對會員委員秘書Bot、本次正式案件明確綁定的 `committee` 測試群或正式群、文字 `message` 事件暫時讀取內容，解析系統產生的一次性呼喚識別並計算正規化文案指紋；不保存完整文字，也不對一般聊天做關鍵字、語意或會員內容分析。稽核只保存案件、快照、群組環境、群組、呼喚識別雜湊、文案雜湊、`webhookEventId`、LINE message ID、時間與回覆結果。
 
@@ -342,10 +364,10 @@ Webhook 驗證 OA、群組、文字事件、呼喚識別、文案指紋、快照
 ```sql
 alter table line_group_targets
   add column delivery_strategy text not null default 'push',
-  add column opportunistic_window_minutes integer not null default 240;
+  add column opportunistic_window_minutes integer not null default 720;
 ```
 
-- `delivery_strategy = 'opportunistic'`：不 push，改寫入 `pending_announcements`，`window_start = now()`，`window_end = now() + opportunistic_window_minutes`。
+- `delivery_strategy = 'opportunistic'`：不 push，改寫入 `pending_announcements`。交流群規則以原排程時點為 `window_end`，`window_start = window_end - opportunistic_window_minutes`。
 - `delivery_strategy = 'push'`：維持現行直接推播。
 
 同一支 cron 每次執行時追加一段過期掃描：查出 `status = 'pending' AND window_end < now()` 的紀錄，依降級鏈處理。掃描頻率需與 cron 實際執行頻率相符（待確認，見第八節）。
@@ -368,7 +390,7 @@ alter table line_group_targets
 
 | OA | Channel | 負責群組 | 額度用途 |
 |---|---|---|---|
-| 副主席助理 | 現有 | 交流群、公告群 | 結果公告 Push、私訊備援 |
+| 副主席助理 | 現有 | 交流群、公告群 | 結果公告 Push、OA 好友群發備援 |
 | 會員委員會助理 | 新增 | 委員群 | 委員會提醒、工作摘要、案件回饋與投票 |
 
 中央排程系統決定使用哪一個 OA、哪個群組與哪一池額度。兩個 Bot 之間不互相呼叫。
@@ -405,21 +427,35 @@ Webhook 需支援兩組 channel secret，各自驗證各自的簽章。可採兩
 
 ## 七、降級鏈與額度守門員
 
-### 7.1 降級鏈
+### 7.1 未命中備援鏈
 
 ```
 【第一順位】機會性投遞
   窗口內群組有訊息事件 → 免費 Reply ＋ 真 @All → 0 則 → 無人操作
       ↓ 窗口到期未命中
-【第二順位】額度檢查
-  剩餘額度足夠 → 自動 Push → 扣群組人數 → 無人操作
-      ↓ 額度不足
-【第三順位】私訊副主席（1 則）
-  系統推送「公告已備妥」＋ 內容 → 副主席自行貼至群組
-      ↓ 逾時未處理
-【第四順位】轉通知會員委員會主席或值班委員（1 則）
+【第二順位】副主席秘書Bot對全部好友群發
+  同一次 Broadcast API 請求發送「操作說明」＋「原提醒全文」兩則訊息
+  不儲存個人 userId；目前只有 2 位可送達好友時，預計扣 2 則
+  不得自動 Push 原提醒至交流群
       ↓
-【第五順位】工作台顯示待發清單，人工處理
+【第三順位】工作台顯示待發清單，人工處理
+```
+
+LINE Official Account Manager 的「管理員」權限不代表該 LINE 帳號自動成為 Bot 好友。要收到本備援通知，副主席與管理者的 LINE 帳號都必須實際加入「副主席秘書Bot」好友且未封鎖。未來若新增好友，broadcast 將同時送給新好友，額度也會依實際可送達人數增加。
+
+第一則固定操作說明如下，第二則為原提醒全文，讓收件人可直接長按複製：
+
+```text
+🔔【交流群提醒尚未送達】
+副主席秘書 Bot 在 12 小時等待期間內，沒有遇到可用的交流群新訊息，因此尚未將提醒送到交流群。
+
+請副主席或管理者：
+1. 長按並複製下一則訊息
+2. 貼到「{交流群名稱}」
+3. 送出前在群內手動標註 @所有人
+
+提醒項目：{提醒名稱}
+原訂最晚送達：{台北日期時間}
 ```
 
 ### 7.2 額度守門員
@@ -435,9 +471,9 @@ Webhook 需支援兩組 channel secret，各自驗證各自的簽章。可採兩
 規則：
 
 - 三項結果快取約 10 分鐘，避免每次發送都多打三次 API。
-- 群組人數即時讀取，**不得寫死 44 或 45**，隨分會增減自動重算。
+- 群組人數即時讀取，**不得寫死 44 或 45**，隨分會增減自動重算。OA 好友群發的預估人數也不可永久寫死為 2，工作台應提醒管理者定期核對好友數。
 - 發送前於工作台顯示「本次將扣 N 則，發送後剩餘 M 則」。
-- 保留至少 20 則緊急額度（供私訊備援與異常通知），一般群發不得吃掉此保留額。
+- 保留至少 20 則緊急額度（供小範圍好友群發備援與異常通知），一般大群推播不得吃掉此保留額。
 - 額度不足時自動切換至降級鏈，不得靜默失敗。
 - 每個 `oa_channel` 各自獨立計算額度。
 
@@ -494,8 +530,8 @@ if (navigator.share) {
 | 交流群 Key-in 提醒（1 次） | 副主席助理 | 0 |
 | 公告群出席公告（4 次） | — | 0（人工分享） |
 | 公告群通過結果公告（1–2 案） | 副主席助理 | 45–90 |
-| 私訊備援與異常通知 | 副主席助理 | ~10 |
-| **副主席助理小計** | | **55–100／200** |
+| 未命中好友群發備援與異常通知 | 副主席助理 | 0–10（以 2 位好友、每月最多 5 次未命中估算） |
+| **副主席助理小計** | | **45–100／200** |
 | 委員會提醒（1 次） | 會員委員會助理 | 8 |
 | 委員工作摘要（4 次） | 會員委員會助理 | 32 |
 | 案件回饋 Reply（2 案） | 會員委員會助理 | 0 |
@@ -506,10 +542,10 @@ if (navigator.share) {
 
 | 分會人數 | 副主席助理 | 會員委員會助理 |
 |---|---|---|
-| 45 | 55–100 | 40 |
-| 60 | 70–130 | 40 |
-| 80 | 90–170 | 40 |
-| 100 | 110–210 | 40 |
+| 45 | 45–100 | 40 |
+| 60 | 60–130 | 40 |
+| 80 | 80–170 | 40 |
+| 100 | 100–210 | 40 |
 
 會員委員會助理不隨分會人數變動。副主席助理唯一隨人數成長的項目是「通過結果公告」，其發布時機同樣落在副主席結案操作的當下，因此在逼近額度時可沿用 8.2 的人工分享路徑降至 0 則。
 
@@ -536,8 +572,9 @@ if (navigator.share) {
 
 | 風險 | 說明 | 緩解 |
 |---|---|---|
-| 送達時間為窗口而非時刻 | 機會性投遞的實際送達時間取決於群組活躍度，例會提醒可能在 19:03 或 21:40 送達 | 對「前一天提醒」用途判定可接受；窗口到期有降級鏈保底 |
-| 交流群長期靜默 | 連假、農曆年期間可能整段窗口無訊息 | 降級至 Push 或私訊備援；可將窗口長度設為可調參數 |
+| 送達時間為窗口而非時刻 | 機會性投遞的實際送達時間取決於群組活躍度，會落在設定截止時間前的 12 小時窗口內 | 對「前一天或更早提醒」用途判定可接受；窗口到期改向 OA 好友群發備援 |
+| 交流群長期靜默 | 連假、農曆年期間可能整段窗口無訊息 | 12 小時到期時向副主席秘書Bot的全部好友群發備援，不對交流群自動 Push |
+| OA 好友人數日後增加 | Broadcast 會送給所有可送達好友，不只是現任副主席與管理者 | 不公開宣傳該 OA，換屆與日常巡檢時核對好友數；如果用途擴大，重新評估是否改回明確收件人綁定 |
 | 併發重複投遞 | 同一秒多則訊息觸發多個 webhook 並行 | 以 `UPDATE ... WHERE status='pending' RETURNING` 做原子性佔位 |
 | Webhook 延遲 | 同步呼叫 LINE Reply API 增加回應時間，可能觸發 LINE 端逾時重送 | 設定 fetch timeout，確保整體處理在秒級完成 |
 | 公告群無法使用免費通道 | 群組定位即為不回應，永遠無 replyToken，且 token 不可囤積 | 已決策改為人工分享，並限縮該群內容為正式決議 |

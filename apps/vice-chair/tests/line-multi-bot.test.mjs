@@ -9,7 +9,10 @@ import {
   lineChannelMatchesRoute,
   normalizeLineChannel,
 } from "../../../supabase/functions/_shared/line-channel-domain.mjs";
-import { resolveLineWebhookChannel } from "../../../supabase/functions/line-webhook/domain.mjs";
+import {
+  collectReplyOpportunityEvents,
+  resolveLineWebhookChannel,
+} from "../../../supabase/functions/line-webhook/domain.mjs";
 
 const root = new URL("../../../", import.meta.url);
 const read = path => readFileSync(new URL(path, root), "utf8");
@@ -40,6 +43,26 @@ test("共用 webhook 依各 OA Channel Secret 辨識來源", async () => {
   assert.equal(await resolveLineWebhookChannel(body, committeeSignature, secrets), "committee");
   assert.equal(await resolveLineWebhookChannel(body, viceSignature, secrets), "vice_chair");
   assert.equal(await resolveLineWebhookChannel(body, "invalid", secrets), null);
+});
+
+test("交流群事件只擷取當次 Reply 所需欄位，不讀取訊息內容或使用者 ID", () => {
+  const payload = {
+    events: [{
+      type: "message",
+      replyToken: "reply-token",
+      webhookEventId: "event-1",
+      timestamp: Date.parse("2026-09-04T08:00:00Z"),
+      source: { type: "group", groupId: "C12345678", userId: "U-secret" },
+      message: { id: "message-1", type: "text", text: "私人聊天內容" },
+    }],
+  };
+  assert.deepEqual(collectReplyOpportunityEvents(payload), [{
+    groupId: "C12345678",
+    replyToken: "reply-token",
+    webhookEventId: "event-1",
+    lineMessageId: "message-1",
+    occurredAt: "2026-09-04T08:00:00.000Z",
+  }]);
 });
 
 test("資料庫、Webhook 與發送端都保留 OA 邊界", () => {

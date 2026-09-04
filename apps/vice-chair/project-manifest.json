@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-08-31",
+  "updated": "2026-09-04",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -24,7 +24,7 @@
     "storage": "docs/STORAGE_SCHEMA.md",
     "roadmap": "docs/REFACTOR_ROADMAP.md",
     "changeHistory": "CHANGELOG.md",
-    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-07-20.md"
+    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_LINE_REPLY_DRIVEN_REMINDERS.md"
   },
   "domainOwners": {
     "caseStageAndStorageKeys": "core/case-domain.js",
@@ -60,7 +60,7 @@
     "attendance.html": "每週點名與出席公告",
     "accountability-emails.html": "副主席當責信待寄提醒、複製與人工寄送留痕",
     "message-templates.html": "副主席／Admin 常用文稿、當屆副主席欄位套用與人工複製",
-    "routine-reminders.html": "交流群與會員委員會群的常態通知、測試發送及發送紀錄",
+    "routine-reminders.html": "交流群 12 小時 Reply 提醒、好友備援，以及會員委員會群常態通知",
     "terminal-form.html": "終期輔導／續約訪談",
     "midterm-form.html": "期中輔導",
     "new-member-form.html": "新會員訪談",

@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.20",
+      publishedAt: "2026-09-04",
+      title: "交流群提醒改為回覆驅動省額度",
+      level: "important",
+      changes: Object.freeze([
+        "每週例會與月底 Key-in 提醒會在最晚送達時間前 12 小時等待交流群新訊息，命中後由副主席秘書Bot免費 Reply 並 @所有人。",
+        "12 小時未命中時不再耗額度推播整個交流群，只通知副主席秘書Bot的全部好友，請副主席或管理者人工貼出。",
+        "好友通知分成操作說明與原提醒兩則，原提醒可直接長按複製；工作台也可複製並記錄已人工貼出。"
+      ]),
+      impact: "不保存好友 LINE ID、群組聊天內容或 replyToken；會員委員會提醒與工作摘要仍由會員委員秘書Bot照原方式推播。"
+    }),
+    Object.freeze({
       version: "1.0.19",
       publishedAt: "2026-08-31",
       title: "月末預備不再提前切換儀表板",

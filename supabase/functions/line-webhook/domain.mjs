@@ -20,6 +20,25 @@ export function collectGroupEvents(payload) {
   return [...groups.values()];
 }
 
+export function collectReplyOpportunityEvents(payload) {
+  const events = [];
+  for (const event of Array.isArray(payload?.events) ? payload.events : []) {
+    const groupId = event?.source?.type === "group" ? event.source.groupId : "";
+    const replyToken = event?.type === "message" ? String(event?.replyToken || "") : "";
+    if (!validLineGroupId(groupId) || !replyToken) continue;
+    events.push({
+      groupId,
+      replyToken,
+      webhookEventId: String(event?.webhookEventId || "").slice(0, 200),
+      lineMessageId: String(event?.message?.id || "").slice(0, 200),
+      occurredAt: Number.isFinite(Number(event.timestamp))
+        ? new Date(Number(event.timestamp)).toISOString()
+        : new Date().toISOString(),
+    });
+  }
+  return events;
+}
+
 export function collectVoteCallEvents(payload) {
   const events = [];
   for (const event of Array.isArray(payload?.events) ? payload.events : []) {

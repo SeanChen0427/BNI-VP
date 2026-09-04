@@ -14,7 +14,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/terminal-form.css">
-  <link rel="stylesheet" href="assets/css/routine-reminders.css?v=2">
+  <link rel="stylesheet" href="assets/css/routine-reminders.css?v=3">
   <link rel="stylesheet" href="assets/css/work-digest.css?v=1">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
   <link rel="stylesheet" href="assets/css/routine-reminders-mobile.css?v=4">
@@ -30,26 +30,28 @@
         <div class="target-state" id="exchangeTargetState"><div><small>交流群常態通知</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理交流群</a></div>
         <div class="target-state" id="committeeTargetState"><div><small>會員委員秘書Bot</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理委員會群</a></div>
       </div>
+      <p class="reply-strategy-note"><b>交流群省額度模式：</b>設定時間是「最晚送達時間」。系統會提前 12 小時等待交流群新訊息，命中後用免費 Reply 發送；仍未命中時，不 Push 大群，只由副主席秘書Bot向全部好友送出兩則人工處理提醒。目前好友只有副主席與管理者時，預計只計 2 則。</p>
     </section>
 
     <div class="reminder-grid">
       <section class="form-card reminder-card" data-rule="weekly_meeting_alarm">
-        <div class="section-head"><span>02</span><div><h2>每週例會鬧鐘提醒</h2><p>可自行設定每週發送日與時間，提醒夥伴隔天例會並設定鬧鐘</p></div></div>
+        <div class="section-head"><span>02</span><div><h2>每週例會鬧鐘提醒</h2><p>設定最晚送達日與時間；系統會從前 12 小時開始等待群訊息</p></div></div>
         <label class="toggle-row"><span><b>啟用每週提醒</b><small>關閉時只保存設定，不會排程發送</small></span><input id="weeklyEnabled" type="checkbox"></label>
-        <div class="rule-fields"><label>發送日<select id="weeklyWeekday"><option value="1">每週一</option><option value="2">每週二</option><option value="3">每週三</option><option value="4">每週四</option><option value="5">每週五</option><option value="6">每週六</option><option value="7">每週日</option></select></label><label>發送時間<input id="weeklyTime" type="time" required></label></div>
+        <div class="rule-fields"><label>最晚送達日<select id="weeklyWeekday"><option value="1">每週一</option><option value="2">每週二</option><option value="3">每週三</option><option value="4">每週四</option><option value="5">每週五</option><option value="6">每週六</option><option value="7">每週日</option></select></label><label>最晚送達時間<input id="weeklyTime" type="time" required></label></div>
+        <div class="next-reminder" id="weeklyNextReminder"><small>下次最晚送達時間</small><strong>正在計算…</strong><span></span></div>
         <label>提醒文案<textarea id="weeklyMessage" rows="5" maxlength="4500"></textarea></label>
         <div class="message-preview"><small>LINE 預覽</small><pre id="weeklyPreview"></pre></div>
-        <button type="button" class="test-button" data-test="weekly_meeting_alarm">測試發送到交流群</button>
+        <button type="button" class="test-button" data-test="weekly_meeting_alarm">建立 15 分鐘回覆測試</button>
       </section>
 
       <section class="form-card reminder-card" data-rule="monthly_data_entry">
-        <div class="section-head"><span>03</span><div><h2>月底數據 Key in 提醒</h2><p>依每月最後一次例會計算提醒日，不用每個月重新設定日期</p></div></div>
+        <div class="section-head"><span>03</span><div><h2>月底數據 Key in 提醒</h2><p>依每月最後一次例會計算最晚送達日，並從前 12 小時開始等待群訊息</p></div></div>
         <label class="toggle-row"><span><b>啟用月底提醒</b><small>預設以週二例會、提前一天計算</small></span><input id="monthlyEnabled" type="checkbox"></label>
-        <div class="rule-fields three"><label>固定例會日<select id="meetingWeekday"><option value="1">週一</option><option value="2">週二</option><option value="3">週三</option><option value="4">週四</option><option value="5">週五</option><option value="6">週六</option><option value="7">週日</option></select></label><label>提前幾天<select id="daysBefore"><option value="0">當天</option><option value="1">提前 1 天</option><option value="2">提前 2 天</option><option value="3">提前 3 天</option></select></label><label>發送時間<input id="monthlyTime" type="time" required></label></div>
-        <div class="next-reminder" id="monthlyNextReminder"><small>下次提醒時間</small><strong>正在計算…</strong><span></span></div>
+        <div class="rule-fields three"><label>固定例會日<select id="meetingWeekday"><option value="1">週一</option><option value="2">週二</option><option value="3">週三</option><option value="4">週四</option><option value="5">週五</option><option value="6">週六</option><option value="7">週日</option></select></label><label>提前幾天<select id="daysBefore"><option value="0">當天</option><option value="1">提前 1 天</option><option value="2">提前 2 天</option><option value="3">提前 3 天</option></select></label><label>最晚送達時間<input id="monthlyTime" type="time" required></label></div>
+        <div class="next-reminder" id="monthlyNextReminder"><small>下次最晚送達時間</small><strong>正在計算…</strong><span></span></div>
         <label>提醒文案<textarea id="monthlyMessage" rows="5" maxlength="4500"></textarea></label>
         <div class="message-preview"><small>LINE 預覽</small><pre id="monthlyPreview"></pre></div>
-        <button type="button" class="test-button" data-test="monthly_data_entry">測試發送到交流群</button>
+        <button type="button" class="test-button" data-test="monthly_data_entry">建立 15 分鐘回覆測試</button>
       </section>
 
       <section class="form-card reminder-card" data-rule="monthly_committee_meeting">
@@ -64,7 +66,7 @@
       </section>
     </div>
 
-    <section class="form-card action-card"><div><b>啟用前請先測試</b><span>測試會立即送到該通知對應的群組，不受設定日期與時間限制；保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
+    <section class="form-card action-card"><div><b>啟用前請先測試</b><span>交流群測試會等待下一則新訊息，15 分鐘未命中即結束且不通知好友；委員會測試仍會立即推播。保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
 
     <section class="form-card work-digest-card">
       <div class="section-head"><span>05</span><div><h2>每週會員委員會工作進度</h2><p>即時讀取正式案件、主責、陪訪及期限；副主席先確認排版與內容，系統不會自動發送</p></div></div>
@@ -85,12 +87,12 @@
     </section>
 
     <section class="form-card history-card">
-      <div class="section-head"><span>06</span><div><h2>最近發送紀錄</h2><p>排程與人工測試都會留下結果，方便確認通知是否送到正確群組</p></div></div>
+      <div class="section-head"><span>06</span><div><h2>最近投遞紀錄</h2><p>可查看 Reply 等待、送達、好友備援與人工貼出狀態；好友備援後可在這裡複製原提醒並完成留痕</p></div></div>
       <div class="delivery-list" id="deliveryList"><article>尚無發送紀錄</article></div>
     </section>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/routine-reminders.js?v=7"></script>
+  <script src="assets/js/routine-reminders.js?v=8"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>
