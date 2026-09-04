@@ -371,6 +371,17 @@ Deno.serve(async request => {
   if (!cronSecret || request.headers.get("x-cron-secret") !== cronSecret) return response(401, { message: "Unauthorized" });
   if (!supabaseUrl || !serviceKey) return response(503, { message: "Reminder service configuration incomplete" });
   try {
+    let handoverWarning = "";
+    try {
+      await db("rpc/edge_apply_due_committee_handoffs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+      });
+    } catch (error) {
+      handoverWarning = String((error as Error)?.message || error).slice(0, 300);
+      console.error("annual-committee-handover", error);
+    }
     const [rules, targets] = await Promise.all([
       db("line_reminder_rules?enabled=eq.true&select=*&order=reminder_key.asc"),
       db("line_group_targets?status=eq.active&purpose=eq.production&route_key=in.(exchange,committee)&select=*&order=route_key.asc"),
@@ -404,6 +415,7 @@ Deno.serve(async request => {
       fallbackNotified: fallbacks.filter(item => item.outcome === "fallback-notified").length,
       outcomes,
       fallbacks,
+      handoverWarning: handoverWarning || null,
     });
   } catch (error) {
     console.error("line-reminder-cron", error);

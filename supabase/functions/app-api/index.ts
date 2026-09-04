@@ -7,6 +7,7 @@ import "../../../apps/vice-chair/core/calendar-domain.js";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import "../../../apps/vice-chair/core/accountability-email-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
+import "../../../apps/vice-chair/core/annual-handover-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import {
   buildCaseFeedbackNoticeText,
@@ -71,6 +72,7 @@ const calendarDomain = (globalThis as any).FulianCalendarDomain;
 const attendanceDomain = (globalThis as any).FulianAttendanceDomain;
 const accountabilityEmailDomain = (globalThis as any).FulianAccountabilityEmailDomain;
 const messageTemplateDomain = (globalThis as any).FulianMessageTemplateDomain;
+const annualHandoverDomain = (globalThis as any).FulianAnnualHandoverDomain;
 
 type Provider = typeof PROVIDERS[number];
 type Context = {
@@ -162,6 +164,15 @@ async function authenticate(request: Request, identity: string): Promise<Context
   const accounts = await db(`app_accounts?auth_user_id=eq.${encodeURIComponent(user.id)}&select=role,enabled&limit=1`);
   const account = accounts?.[0];
   if (!account?.enabled) throw Object.assign(new Error("此帳號未啟用"), { status: 403 });
+  try {
+    await db("rpc/edge_apply_due_committee_handoffs", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+  } catch (error) {
+    console.error("年度換屆自動生效失敗，保留既有資料並等待 Admin 修正排程", error);
+  }
   const match = String(identity || "").match(/^(admin|vp|committee):(.{1,100})$/u);
   if (!match || match[1] !== account.role) throw Object.assign(new Error("登入身份與帳號角色不一致"), { status: 403 });
   const role = account.role as Context["role"];
@@ -1955,6 +1966,131 @@ function meetingToApi(row: any, names: Map<string, string>) {
   };
 }
 
+const MONTHLY_FOLLOW_UP_DISPOSITION = "follow_up";
+const MONTHLY_NON_RENEWAL_DISPOSITION = "non_renewal";
+const MONTHLY_RENEWAL_RESUMED_AMENDMENT = "renewal_resumed";
+
+function monthlyDecisionAmendments(item: any) {
+  return Array.isArray(item?.decisionAmendments) ? item.decisionAmendments : [];
+}
+
+function isValidMonthlyIsoDate(value: unknown) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(value || ""))) return false;
+  const [year, month, day] = String(value).split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function isValidMonthlyRenewalDecisionAmendment(amendment: any) {
+  const reason = String(amendment?.reason || "").trim();
+  const owner = String(amendment?.owner || "").trim();
+  const companion = String(amendment?.companion || "").trim();
+  const correctedAt = String(amendment?.correctedAt || "").trim();
+  const correctedBy = String(amendment?.correctedBy || "").trim();
+  return amendment?.type === MONTHLY_RENEWAL_RESUMED_AMENDMENT
+    && amendment?.fromDisposition === MONTHLY_NON_RENEWAL_DISPOSITION
+    && amendment?.toDisposition === MONTHLY_FOLLOW_UP_DISPOSITION
+    && /^[A-Za-z0-9._:-]{8,120}$/.test(String(amendment?.id || ""))
+    && reason.length >= 2 && reason.length <= 500
+    && Boolean(owner) && owner.length <= 100
+    && companion.length <= 100
+    && isValidMonthlyIsoDate(amendment?.dueDate)
+    && Boolean(correctedAt) && Number.isFinite(Date.parse(correctedAt))
+    && Boolean(correctedBy) && correctedBy.length <= 160
+    && (!companion || companion !== owner);
+}
+
+function latestMonthlyRenewalDecisionAmendment(item: any) {
+  const amendments = monthlyDecisionAmendments(item).filter(isValidMonthlyRenewalDecisionAmendment);
+  return amendments.at(-1) || null;
+}
+
+function effectiveMonthlyCareDisposition(item: any) {
+  return latestMonthlyRenewalDecisionAmendment(item)?.toDisposition || String(item?.disposition || "");
+}
+
+function isConfirmedMonthlyNonRenewal(item: any) {
+  return item?.taskType === "renewal" && effectiveMonthlyCareDisposition(item) === MONTHLY_NON_RENEWAL_DISPOSITION;
+}
+
+function isValidMonthlyCareDisposition(item: any) {
+  const disposition = String(item?.disposition || "");
+  const amendments = monthlyDecisionAmendments(item);
+  const baseValid = !disposition
+    || disposition === MONTHLY_FOLLOW_UP_DISPOSITION
+    || (item?.taskType === "renewal" && disposition === MONTHLY_NON_RENEWAL_DISPOSITION);
+  return (item?.decisionAmendments === undefined || Array.isArray(item.decisionAmendments))
+    && baseValid
+    && amendments.length <= 1
+    && (!amendments.length || (
+      item?.taskType === "renewal"
+      && disposition === MONTHLY_NON_RENEWAL_DISPOSITION
+      && amendments.every(isValidMonthlyRenewalDecisionAmendment)
+    ));
+}
+
+function applyMonthlyRenewalDecisionCorrection(item: any, correction: any) {
+  if (!isValidMonthlyCareDisposition(item)) {
+    throw Object.assign(new Error("原續約決議資料不完整，請重新整理後再試"), { status: 409 });
+  }
+  if (!isConfirmedMonthlyNonRenewal(item)) {
+    throw Object.assign(new Error("只有目前仍為確認不續約的續約項目可以更正"), { status: 409 });
+  }
+  const amendment = {
+    id: String(correction?.id || "").trim().slice(0, 120),
+    type: MONTHLY_RENEWAL_RESUMED_AMENDMENT,
+    fromDisposition: MONTHLY_NON_RENEWAL_DISPOSITION,
+    toDisposition: MONTHLY_FOLLOW_UP_DISPOSITION,
+    reason: String(correction?.reason || "").trim().slice(0, 500),
+    owner: String(correction?.owner || "").trim().slice(0, 100),
+    companion: String(correction?.companion || "").trim().slice(0, 100),
+    dueDate: String(correction?.dueDate || "").trim().slice(0, 10),
+    correctedAt: String(correction?.correctedAt || "").trim(),
+    correctedBy: String(correction?.correctedBy || "").trim().slice(0, 160),
+  };
+  if (!isValidMonthlyRenewalDecisionAmendment(amendment)) {
+    throw new Error("更正資料缺少原因、主責委員、日期或稽核資訊");
+  }
+  return {
+    ...item,
+    assignmentRequired: true,
+    state: "scheduled",
+    owner: amendment.owner,
+    companion: amendment.companion,
+    dueDate: amendment.dueDate,
+    taskId: String(item?.taskId || "").trim().slice(0, 160),
+    taskCreatedByMeeting: Boolean(item?.taskCreatedByMeeting),
+    taskDeleted: false,
+    syncMissing: false,
+    decisionAmendments: [...monthlyDecisionAmendments(item), amendment],
+  };
+}
+
+function normalizeMonthlyCareItems(items: any[]) {
+  return items.map((item: any) => {
+    if (isConfirmedMonthlyNonRenewal(item)) {
+      return {
+        ...item,
+        assignmentRequired: false,
+        state: "done",
+        owner: "",
+        companion: "",
+        dueDate: "",
+        taskDeleted: false,
+        syncMissing: false,
+      };
+    }
+    if (effectiveMonthlyCareDisposition(item) === MONTHLY_FOLLOW_UP_DISPOSITION) return { ...item, assignmentRequired: true };
+    return { ...item };
+  });
+}
+
+function monthlyCareRequiresAssignment(item: any) {
+  if (isConfirmedMonthlyNonRenewal(item)) return false;
+  if (effectiveMonthlyCareDisposition(item) === MONTHLY_FOLLOW_UP_DISPOSITION) return true;
+  return item?.assignmentRequired !== false;
+}
+
 function monthlyCareTaskReference(record: any, item: any) {
   if (String(item.taskId || "").trim()) return String(item.taskId).trim().slice(0, 160);
   const careId = String(item.id || `${item.taskType}-${item.member}`)
@@ -1965,37 +2101,56 @@ function monthlyCareTaskReference(record: any, item: any) {
   return `monthly-${String(record.id || "meeting").slice(0, 70)}-${careId}`.slice(0, 160);
 }
 
-function monthlyCareTaskInput(record: any, item: any, id: string, context: Context) {
+function monthlyCareCorrectionTaskReference(record: any, item: any, sequence = 1) {
+  const correctionId = String(latestMonthlyRenewalDecisionAmendment(item)?.id || "correction")
+    .replace(/[^A-Za-z0-9-]+/g, "-")
+    .slice(0, 45);
+  const suffix = `-${correctionId}${sequence > 1 ? `-${sequence}` : ""}`;
+  return `${monthlyCareTaskReference(record, { ...item, taskId: "" }).slice(0, 160 - suffix.length)}${suffix}`;
+}
+
+function monthlyCareTaskInput(record: any, item: any, id: string, context: Context, existing?: any, existingNotes = "") {
   const scheduledAt = String(item.dueDate).includes("T") ? item.dueDate : `${item.dueDate}T19:00`;
+  const existingMeta: any = parseTaskJson(existing?.result_summary);
+  const correction = latestMonthlyRenewalDecisionAmendment(item);
+  const correctionNote = correction ? `月會結案後更正：${correction.reason}` : "";
+  const notes = correction
+    ? (String(existingNotes).split("\n").includes(correctionNote) ? String(existingNotes) : [String(existingNotes).trim(), correctionNote].filter(Boolean).join("\n"))
+    : item.note || item.action || "";
   return {
     id,
     type: item.taskType,
     member: item.member,
-    profession: "",
+    memberRecordId: existing?.member_id || "",
+    profession: existingMeta.profession || "",
     scheduledAt,
     lead: item.owner,
     companions: item.companion ? [item.companion] : [],
-    priority: item.taskType === "midterm" ? "normal" : "high",
-    stage: item.taskType === "renewal"
+    priority: existing ? (existingMeta.priority === "high" ? "high" : "normal") : item.taskType === "midterm" ? "normal" : "high",
+    stage: existingMeta.stage || (item.taskType === "renewal"
       ? "續約訪談已排定"
       : item.taskType === "midterm"
         ? "期中關懷已排定"
-        : "會員關懷已排定",
-    notes: item.note || item.action || "",
+        : "會員關懷已排定"),
+    notes,
     completed: false,
     createdAt: new Date().toISOString(),
-    createdBy: context.name,
-    source: "monthly-meeting",
-    sourceMeetingId: record.id,
-    sourceCareId: item.id,
+    createdBy: existingMeta.createdBy || context.name,
+    source: existing ? existingMeta.localSource || "" : "monthly-meeting",
+    sourceMeetingId: existing ? existingMeta.sourceMeetingId || "" : record.id,
+    sourceCareId: existing ? existingMeta.sourceCareId || "" : item.id,
+    ...(existing ? { _revision: Number(existing.revision) } : {}),
   };
 }
 
-async function ensureMonthlyCareTasks(record: any, context: Context, directory?: any) {
+async function ensureMonthlyCareTasks(record: any, context: Context, directory?: any, options: { onlyCareIds?: string[]; updateCareIds?: string[] } = {}) {
   const care = record?.care || {};
-  const items = Array.isArray(care.items) ? care.items.map((item: any) => ({ ...item })) : [];
+  const items = normalizeMonthlyCareItems(Array.isArray(care.items) ? care.items : []);
+  const onlyCareIds = options.onlyCareIds?.length ? new Set(options.onlyCareIds) : null;
+  const updateCareIds = new Set(options.updateCareIds || []);
   const actionable = items.filter((item: any) =>
-    item.assignmentRequired !== false
+    (!onlyCareIds || onlyCareIds.has(String(item.id || "")))
+    && monthlyCareRequiresAssignment(item)
     && item.taskDeleted !== true
     && ["pending", "scheduled", "active"].includes(String(item.state || "pending"))
     && ["renewal", "midterm", "special"].includes(String(item.taskType || ""))
@@ -2003,19 +2158,46 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
     && String(item.owner || "").trim()
     && String(item.dueDate || "").trim()
   );
-  if (!actionable.length) return { record: { ...record, care: { ...care, items } }, created: 0, linked: 0, unlinked: 0 };
+  if (!actionable.length) return { record: { ...record, care: { ...care, items } }, created: 0, linked: 0, updated: 0, unlinked: 0 };
 
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,category,title,status,result_summary`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,member_id,category,title,status,revision,result_summary`);
   const deletedRows = await db(`deleted_task_references?source=eq.${TASK_SOURCE}&select=source_reference`);
+  const privateDetailRows = updateCareIds.size ? await db("task_private_details?select=task_id,details") : [];
+  const privateNotesByTaskId = new Map((privateDetailRows || []).map((row: any) => [row.task_id, parseTaskJson(row.details).notes || ""]));
   const deletedReferences = new Set((deletedRows || []).map((row: any) => row.source_reference));
   const byReference = new Map((rows || []).map((row: any) => [row.source_reference, row]));
   const directoryState = directory || await taskDirectory();
   let created = 0;
   let linked = 0;
+  let updated = 0;
   let unlinked = 0;
 
   for (const item of actionable) {
+    const updateExisting = updateCareIds.has(String(item.id || ""));
     let preferredReference = monthlyCareTaskReference(record, item);
+    let existing = byReference.get(preferredReference);
+    if (updateExisting && (deletedReferences.has(preferredReference) || existing?.status === "completed")) {
+      let replacement: { reference: string; task?: any } | null = null;
+      for (let sequence = 1; sequence <= 20; sequence += 1) {
+        const reference = monthlyCareCorrectionTaskReference(record, item, sequence);
+        if (deletedReferences.has(reference)) continue;
+        const task = byReference.get(reference);
+        if (task?.status === "completed") continue;
+        replacement = { reference, task };
+        break;
+      }
+      if (!replacement) {
+        item.taskId = "";
+        item.taskCreatedByMeeting = false;
+        item.taskDeleted = true;
+        item.syncMissing = true;
+        item.state = "pending";
+        unlinked += 1;
+        continue;
+      }
+      preferredReference = replacement.reference;
+      existing = replacement.task;
+    }
     if (deletedReferences.has(preferredReference)) {
       item.taskId = "";
       item.taskCreatedByMeeting = false;
@@ -2025,8 +2207,10 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
       unlinked += 1;
       continue;
     }
-    let existing = byReference.get(preferredReference);
     if (existing && (existing.category !== item.taskType || existing.title !== item.member)) {
+      if (updateExisting) {
+        throw Object.assign(new Error("更正後工作編號已被其他案件使用，請重新整理後再試"), { status: 409 });
+      }
       item.taskId = "";
       item.taskCreatedByMeeting = false;
       preferredReference = monthlyCareTaskReference(record, item);
@@ -2035,14 +2219,22 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
     if (!existing) {
       existing = (rows || []).find((row: any) => {
         const meta: any = parseTaskJson(row.result_summary);
-        return (meta.sourceMeetingId === record.id && meta.sourceCareId === item.id)
-          || (row.status !== "completed" && row.category === item.taskType && row.title === item.member);
+        return (!updateExisting || row.status !== "completed") && (
+          (meta.sourceMeetingId === record.id && meta.sourceCareId === item.id)
+          || (row.status !== "completed" && row.category === item.taskType && row.title === item.member)
+        );
       });
     }
     if (existing && (existing.category !== item.taskType || existing.title !== item.member)) {
       existing = undefined;
     }
     if (existing) {
+      if (updateExisting) {
+        await saveLeadershipTask(monthlyCareTaskInput(record, item, existing.source_reference, context, existing, privateNotesByTaskId.get(existing.id) || ""), context, directoryState);
+        existing.status = "pending";
+        existing.revision = Number(existing.revision || 0) + 1;
+        updated += 1;
+      }
       if (item.taskId !== existing.source_reference) linked += 1;
       item.taskId = existing.source_reference;
       item.taskCreatedByMeeting = parseTaskJson(existing.result_summary).localSource === "monthly-meeting";
@@ -2082,7 +2274,7 @@ async function ensureMonthlyCareTasks(record: any, context: Context, directory?:
     byReference.set(preferredReference, inserted);
     created += 1;
   }
-  return { record: { ...record, care: { ...care, items } }, created, linked, unlinked };
+  return { record: { ...record, care: { ...care, items } }, created, linked, updated, unlinked };
 }
 
 async function committeeMeetingsApi(request: Request, context: Context) {
@@ -2099,6 +2291,63 @@ async function committeeMeetingsApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   leadership(context);
   const body = await requestBody(request);
+  if (body.action === "amend-renewal-decision") {
+    const meetingId = String(body.meetingId || "");
+    const careItemId = String(body.careItemId || "");
+    if (!/^meeting-\d{4}-\d{2}$/.test(meetingId) || !careItemId) {
+      throw new Error("更正的月會或續約項目不正確");
+    }
+    const meetingMonth = meetingId.slice("meeting-".length);
+    const meetingRows = await db(`committee_meetings?meeting_month=eq.${meetingMonth}-01&status=eq.final&select=*&limit=1`);
+    const meetingRow = meetingRows?.[0];
+    if (!meetingRow) {
+      throw Object.assign(new Error("續約決議更正只適用於已結案月會，不會修改月會草稿"), { status: 409 });
+    }
+    const current = meetingToApi(meetingRow, names);
+    const currentItems = Array.isArray(current.care?.items) ? current.care.items : [];
+    const matches = currentItems.map((item: any, index: number) => ({ item, index })).filter((entry: any) => entry.item.id === careItemId);
+    if (matches.length !== 1) {
+      throw Object.assign(new Error(matches.length ? "續約項目識別重複，請重新整理後再試" : "找不到要更正的續約項目"), { status: matches.length ? 409 : 404 });
+    }
+    const { item: currentItem, index: itemIndex } = matches[0];
+    const correctionId = String(body.correction?.id || "").trim();
+    if (monthlyDecisionAmendments(currentItem).some((amendment: any) => amendment.id === correctionId)) {
+      return { record: current, alreadyApplied: true };
+    }
+    const now = new Date().toISOString();
+    const correctedItem = applyMonthlyRenewalDecisionCorrection(currentItem, {
+      ...(body.correction || {}),
+      id: correctionId,
+      correctedAt: now,
+      correctedBy: context.identity,
+    });
+    const correctedItems = currentItems.map((item: any, index: number) => index === itemIndex ? correctedItem : item);
+    const candidate = { ...current, care: { ...(current.care || {}), items: correctedItems } };
+    if (JSON.stringify(candidate).length > 60_000) throw new Error("會議紀錄內容過大");
+    const synced = await ensureMonthlyCareTasks(candidate, context, undefined, { onlyCareIds: [careItemId], updateCareIds: [careItemId] });
+    const savedItem = synced.record.care.items.find((item: any) => item.id === careItemId);
+    if (!savedItem?.taskId || savedItem.taskDeleted || savedItem.syncMissing) {
+      throw Object.assign(new Error("更正後的續約工作尚未建立，正式月會紀錄未變更"), { status: 409 });
+    }
+    const patchedRows = await db(
+      `committee_meetings?id=eq.${meetingRow.id}&status=eq.final&updated_at=eq.${encodeURIComponent(meetingRow.updated_at)}&select=*`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+        body: JSON.stringify({
+          care_summary: { ...(synced.record.care || {}), _updatedBy: context.identity },
+          updated_at: now,
+        }),
+      },
+    );
+    if (!patchedRows?.[0]) {
+      throw Object.assign(new Error("月會紀錄已在其他裝置更新；工作已保留，請重新整理後再確認"), { status: 409 });
+    }
+    return {
+      record: meetingToApi(patchedRows[0], names),
+      task: { created: synced.created, linked: synced.linked, updated: synced.updated },
+    };
+  }
   if (body.action === "reconcile-care-tasks") {
     const rows = await db("committee_meetings?status=eq.draft&select=*&order=meeting_date.desc");
     const directory = await taskDirectory();
@@ -2134,11 +2383,22 @@ async function committeeMeetingsApi(request: Request, context: Context) {
     return { settings: value };
   }
   let record = body.record;
-  if (!record || !/^meeting-\d{4}-\d{2}$/.test(String(record.id || ""))) throw new Error("會議紀錄編號不正確");
-  const items = Array.isArray(record.care?.items) ? record.care.items : [];
-  if (items.some((item: any) => item.assignmentRequired !== false && item.owner && item.owner === item.companion)) throw new Error("負責委員與陪訪委員不能是同一人");
-  if (record.status === "final" && items.some((item: any) => item.assignmentRequired !== false && (!String(item.owner || "").trim() || !String(item.dueDate || "").trim()))) {
-    throw new Error("續約及輔導項目都必須完成追蹤委員與排定日期後才能結案");
+  if (!record || !/^meeting-\d{4}-\d{2}$/.test(String(record.id || "")) || record.meetingMonth !== String(record.id).slice("meeting-".length)) throw new Error("會議紀錄編號不正確");
+  const existingMeetingRows = await db(`committee_meetings?meeting_month=eq.${record.meetingMonth}-01&select=*&limit=1`);
+  if (existingMeetingRows?.[0]?.status === "final") {
+    if (record.status === "final") return { record: meetingToApi(existingMeetingRows[0], names), alreadyFinal: true };
+    throw Object.assign(new Error("已結案月會不能改回草稿；續約變更請使用專用更正"), { status: 409 });
+  }
+  const rawItems = Array.isArray(record.care?.items) ? record.care.items : [];
+  if (rawItems.some((item: any) => monthlyDecisionAmendments(item).length)) {
+    throw Object.assign(new Error("結案後續約更正只能使用專用操作，不能隨整份月會覆寫"), { status: 409 });
+  }
+  if (rawItems.some((item: any) => !isValidMonthlyCareDisposition(item))) throw new Error("確認不續約只能用於續約項目");
+  const items = normalizeMonthlyCareItems(rawItems);
+  record = { ...record, care: { ...(record.care || {}), items } };
+  if (items.some((item: any) => monthlyCareRequiresAssignment(item) && item.owner && item.owner === item.companion)) throw new Error("負責委員與陪訪委員不能是同一人");
+  if (record.status === "final" && items.some((item: any) => monthlyCareRequiresAssignment(item) && (!String(item.owner || "").trim() || !String(item.dueDate || "").trim()))) {
+    throw new Error("需要後續行動的續約及輔導項目，都必須完成追蹤委員與排定日期後才能結案");
   }
   record = (await ensureMonthlyCareTasks(record, context)).record;
   const recorderId = ids.get(record.recorder) || context.personId;
@@ -3144,6 +3404,219 @@ function parseTaskJson(value: unknown) {
   }
 }
 
+async function currentCommitteeRoster() {
+  const today = taipeiDay();
+  const rows = await db(
+    `committee_terms?status=eq.active&starts_on=lte.${today}`
+      + `&or=(ends_on.is.null,ends_on.gte.${today})`
+      + "&people.status=eq.active&select=id,person_id,role,starts_on,ends_on,has_voting_right,people!inner(display_name,status)&order=created_at.asc",
+  );
+  return (rows || []).map((row: any) => ({
+    termId: row.id,
+    personId: row.person_id,
+    name: row.people?.display_name || "",
+    role: row.role,
+    startsOn: row.starts_on,
+    endsOn: row.ends_on,
+    hasVotingRight: Boolean(row.has_voting_right),
+  })).sort((a: any, b: any) => (a.role === "vp" ? -1 : b.role === "vp" ? 1 : a.name.localeCompare(b.name, "zh-Hant")));
+}
+
+async function handoverMemberDirectory() {
+  const rows = await db(
+    "members?status=eq.active&people.status=eq.active&select=person_id,profession,people!inner(display_name,status)&order=created_at.asc",
+  );
+  return (rows || []).map((row: any) => ({
+    personId: row.person_id,
+    name: row.people?.display_name || "",
+    profession: row.profession || "",
+  })).filter((row: any) => row.personId && row.name);
+}
+
+async function handoverPlans() {
+  const plans = await db("committee_handover_plans?select=*&order=created_at.desc&limit=8");
+  const ids = (plans || []).map((plan: any) => plan.id).filter(Boolean);
+  const members = ids.length
+    ? await db(`committee_handover_members?plan_id=in.(${ids.join(",")})&select=plan_id,person_id,role,has_voting_right,people!inner(display_name)&order=created_at.asc`)
+    : [];
+  const byPlan = new Map<string, any[]>();
+  for (const member of members || []) {
+    if (!byPlan.has(member.plan_id)) byPlan.set(member.plan_id, []);
+    byPlan.get(member.plan_id)!.push({
+      personId: member.person_id,
+      name: member.people?.display_name || "",
+      role: member.role,
+      hasVotingRight: Boolean(member.has_voting_right),
+    });
+  }
+  return (plans || []).map((plan: any) => ({
+    id: plan.id,
+    effectiveOn: plan.effective_on,
+    termEndsOn: plan.term_ends_on,
+    status: plan.status,
+    revision: Number(plan.revision || 1),
+    createdAt: plan.created_at,
+    updatedAt: plan.updated_at,
+    executedAt: plan.executed_at,
+    cancelledAt: plan.cancelled_at,
+    roster: (byPlan.get(plan.id) || []).sort((a: any, b: any) => (a.role === "vp" ? -1 : b.role === "vp" ? 1 : a.name.localeCompare(b.name, "zh-Hant"))),
+  }));
+}
+
+function normalizeHandoverRoster(input: any, members: any[]) {
+  const memberById = new Map(members.map(member => [member.personId, member]));
+  const roster = (Array.isArray(input) ? input : []).map((entry: any) => {
+    const personId = String(entry?.personId || "").trim();
+    const member = memberById.get(personId);
+    return { personId, name: member?.name || "", role: String(entry?.role || "").trim() };
+  });
+  const validation = annualHandoverDomain.validateRoster(roster);
+  if (!validation.valid || validation.roster.some((entry: any) => !memberById.has(entry.personId))) {
+    throw Object.assign(new Error(validation.errors[0] || "下一屆名單包含非現任會員"), { status: 400 });
+  }
+  return validation.roster;
+}
+
+async function handoverImpact(currentRoster: any[], nextRoster: any[]) {
+  const diff = annualHandoverDomain.rosterDiff(currentRoster, nextRoster);
+  const outgoingIds = new Set([
+    ...diff.outgoing.map((entry: any) => entry.personId),
+    ...diff.roleChanges.map((entry: any) => entry.personId),
+  ]);
+  if (!outgoingIds.size) return { ...diff, impactedTasks: [], activeDecisionTasks: [] };
+  const [tasks, assignments, people] = await Promise.all([
+    db(`tasks?source=eq.${TASK_SOURCE}&status=in.(pending,in_progress)&handover_pending=eq.false&select=id,case_id,source_reference,title,category,lead_person_id,revision,result_summary&order=created_at.asc`),
+    db("task_assignments?select=task_id,person_id,role"),
+    db("people?select=id,display_name"),
+  ]);
+  const names = new Map((people || []).map((person: any) => [person.id, person.display_name]));
+  const assignmentsByTask = new Map<string, any[]>();
+  for (const assignment of assignments || []) {
+    if (!assignmentsByTask.has(assignment.task_id)) assignmentsByTask.set(assignment.task_id, []);
+    assignmentsByTask.get(assignment.task_id)!.push({
+      personId: assignment.person_id,
+      name: names.get(assignment.person_id) || "",
+      role: assignment.role,
+    });
+  }
+  const impactedTasks = (tasks || []).filter((task: any) => {
+    const assigned = assignmentsByTask.get(task.id) || [];
+    return outgoingIds.has(task.lead_person_id) || assigned.some(item => outgoingIds.has(item.personId));
+  }).map((task: any) => {
+    const meta: any = parseTaskJson(task.result_summary);
+    const assigned = assignmentsByTask.get(task.id) || [{
+      personId: task.lead_person_id,
+      name: names.get(task.lead_person_id) || "",
+      role: "lead",
+    }];
+    return {
+      taskId: task.id,
+      id: task.source_reference,
+      member: task.title,
+      type: task.category,
+      stage: meta.stage || "",
+      revision: Number(task.revision || 1),
+      assignments: assigned,
+    };
+  });
+  const impactedIds = impactedTasks.map((task: any) => task.taskId);
+  const states = impactedIds.length
+    ? await db(`task_case_states?task_id=in.(${impactedIds.join(",")})&select=task_id,workflow`)
+    : [];
+  const workflowByTask = new Map((states || []).map((row: any) => [row.task_id, row.workflow || {}]));
+  const activeDecisionTasks = impactedTasks.filter((task: any) => {
+    const workflow: any = workflowByTask.get(task.taskId) || {};
+    return Boolean(workflow.feedbackNotified || workflow.votingOpen || workflow.voteNoticeSent || workflow.leadersSent || workflow.advisorStatus === "confirmed");
+  });
+  return { ...diff, impactedTasks, activeDecisionTasks };
+}
+
+async function annualHandoverState() {
+  const [currentRoster, activeMembers, plans] = await Promise.all([
+    currentCommitteeRoster(),
+    handoverMemberDirectory(),
+    handoverPlans(),
+  ]);
+  const plan = plans.find((item: any) => item.status === "scheduled") || null;
+  const impact = plan ? await handoverImpact(currentRoster, plan.roster) : null;
+  const activeIds = new Set(activeMembers.map((member: any) => member.personId));
+  const inactivePlanMembers = plan?.roster?.filter((member: any) => !activeIds.has(member.personId)) || [];
+  return {
+    today: taipeiDay(),
+    currentRoster,
+    activeMembers,
+    plan,
+    impact,
+    planIssues: inactivePlanMembers.length
+      ? [`排定名單中 ${inactivePlanMembers.map((member: any) => member.name).join("、")} 已非現任會員，請重新選擇名單與未來生效日`]
+      : [],
+    history: plans.filter((item: any) => item.status !== "scheduled"),
+  };
+}
+
+function handoverRpcError(error: unknown): never {
+  const message = String((error as any)?.message || error);
+  if (message.includes("HANDOVER_CONFLICT")) throw Object.assign(new Error("換屆設定已在其他裝置更新，請重新載入"), { status: 409 });
+  if (message.includes("HANDOVER_DATE_NOT_FUTURE")) throw Object.assign(new Error("換屆生效日必須晚於今天"), { status: 409 });
+  if (message.includes("HANDOVER_MEMBER_INACTIVE")) throw Object.assign(new Error("下一屆名單包含已非現任的會員，請重新選擇"), { status: 409 });
+  if (message.includes("HANDOVER_ROSTER_DUPLICATE")) throw Object.assign(new Error("同一人不能在下一屆名單重複出現"), { status: 409 });
+  if (message.includes("HANDOVER_ALREADY_DUE")) throw Object.assign(new Error("換屆已到生效日，不能再取消"), { status: 409 });
+  if (message.includes("HANDOVER_NOT_FOUND")) throw Object.assign(new Error("找不到這筆換屆排程"), { status: 404 });
+  if (message.includes("HANDOVER_ROSTER_INVALID")) throw Object.assign(new Error("下一屆必須有一位副主席及至少一位會員委員"), { status: 400 });
+  throw error;
+}
+
+async function annualHandoverApi(request: Request, context: Context) {
+  if (context.role !== "admin") throw Object.assign(new Error("只有系統開發人員 Admin 可以管理年度換屆"), { status: 403 });
+  if (request.method === "GET") return annualHandoverState();
+  if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
+  const body = await requestBody(request);
+  if (body.action === "cancel") {
+    const planId = String(body.planId || "");
+    if (!UUID_REFERENCE.test(planId)) throw new Error("換屆排程識別碼不正確");
+    try {
+      await db("rpc/edge_cancel_committee_handover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          p_plan_id: planId,
+          p_actor: context.personId,
+          p_expected_revision: Number(body.revision),
+        }),
+      });
+    } catch (error) { handoverRpcError(error); }
+    return { ...(await annualHandoverState()), message: "年度換屆排程已取消；目前名單與工作均未變更" };
+  }
+  if (!["preview", "save"].includes(body.action)) throw new Error("不支援的換屆操作");
+  const effectiveOn = String(body.effectiveOn || "");
+  if (!annualHandoverDomain.isoDateParts(effectiveOn) || effectiveOn <= taipeiDay()) {
+    throw new Error("換屆生效日必須是晚於今天的有效日期");
+  }
+  const [currentRoster, activeMembers] = await Promise.all([currentCommitteeRoster(), handoverMemberDirectory()]);
+  const roster = normalizeHandoverRoster(body.roster, activeMembers);
+  const impact = await handoverImpact(currentRoster, roster);
+  const preview = {
+    effectiveOn,
+    termEndsOn: annualHandoverDomain.termEndsOn(effectiveOn),
+    roster,
+    ...impact,
+  };
+  if (body.action === "preview") return { preview };
+  try {
+    await db("rpc/edge_schedule_committee_handover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        p_effective_on: effectiveOn,
+        p_roster: roster.map((entry: any) => ({ personId: entry.personId, role: entry.role })),
+        p_actor: context.personId,
+        p_expected_revision: body.revision == null ? null : Number(body.revision),
+      }),
+    });
+  } catch (error) { handoverRpcError(error); }
+  return { ...(await annualHandoverState()), message: `年度換屆已排定於 ${effectiveOn} 自動生效` };
+}
+
 function cleanTaskInput(value: any) {
   const id = String(value?.id || "").trim().slice(0, 160);
   const type = String(value?.type || "").trim();
@@ -3204,10 +3677,11 @@ async function taskDirectory() {
 }
 
 async function taskResponse(context: Context) {
-  const [rows, assignments, details, directory] = await Promise.all([
+  const [rows, assignments, details, assignmentHistory, directory] = await Promise.all([
     db(`tasks?source=eq.${TASK_SOURCE}&select=*&order=created_at.asc`),
     db("task_assignments?select=task_id,person_id,role&order=assigned_at.asc"),
     db("task_private_details?select=task_id,details"),
+    db("task_assignment_history?select=task_id,task_source_reference,event_type,previous_assignments,new_assignments,reason,actor_name_snapshot,occurred_at&order=occurred_at.asc"),
     taskDirectory(),
   ]);
   const assignmentByTask = new Map<string, any[]>();
@@ -3216,6 +3690,19 @@ async function taskResponse(context: Context) {
     assignmentByTask.get(assignment.task_id)!.push(assignment);
   }
   const detailByTask = new Map((details || []).map((detail: any) => [detail.task_id, detail.details]));
+  const historyByTask = new Map<string, any[]>();
+  for (const event of assignmentHistory || []) {
+    if (!event.task_id) continue;
+    if (!historyByTask.has(event.task_id)) historyByTask.set(event.task_id, []);
+    historyByTask.get(event.task_id)!.push({
+      eventType: event.event_type,
+      previousAssignments: event.previous_assignments || [],
+      newAssignments: event.new_assignments || [],
+      reason: event.reason || "",
+      actor: event.actor_name_snapshot || "",
+      occurredAt: event.occurred_at,
+    });
+  }
   const isLeader = ["admin", "vp"].includes(context.role);
   const tasks = (rows || []).map((row: any) => {
     const assigned = assignmentByTask.get(row.id) || [];
@@ -3243,9 +3730,13 @@ async function taskResponse(context: Context) {
       notes: privateMeta.notes || "",
       completed: row.status === "completed",
       completedAt: row.completed_at || null,
-      completedBy: directory.personById.get(row.completed_by) || meta.completedBy || "",
+      completedBy: meta.completedBy || directory.personById.get(row.completed_by) || "",
       createdAt: row.created_at,
       createdBy: meta.createdBy || "",
+      handoverPending: Boolean(row.handover_pending),
+      handoverPendingSince: row.handover_pending_since || null,
+      handoverOriginalAssignments: row.handover_original_assignments || [],
+      assignmentHistory: historyByTask.get(row.id) || [],
       _revision: Number(row.revision || 1),
       ...(meta.localSource ? { source: meta.localSource } : {}),
       ...(meta.sourceMeetingId ? { sourceMeetingId: meta.sourceMeetingId } : {}),
@@ -3328,13 +3819,14 @@ async function completeAssignedTask(input: any, context: Context) {
   if (!["special", "midterm", "departure"].includes(task.type) || !task.completed) {
     throw Object.assign(new Error("此案件必須依正式流程完成，不能直接結案"), { status: 403 });
   }
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,title,category,lead_person_id,status,revision&limit=1`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(task.id)}&select=id,title,category,lead_person_id,status,handover_pending,revision&limit=1`);
   const row = rows?.[0];
   if (!row || row.lead_person_id !== context.personId) throw Object.assign(new Error("只有此工作的主責委員可以完成"), { status: 403 });
   if (row.title !== task.member || row.category !== task.type) {
     throw Object.assign(new Error("案件會員或類型與正式任務不一致，請重新整理後再操作"), { status: 409 });
   }
   if (row.status === "completed") return;
+  if (row.handover_pending) throw Object.assign(new Error("此工作正在換屆待指派，請由副主席或 Admin 先完成集中交接"), { status: 409 });
   if (task.revision !== Number(row.revision)) {
     throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
   }
@@ -3361,7 +3853,7 @@ async function completeRecordOnlyTask(sourceReference: string, context: Context)
   const id = String(sourceReference || "").trim();
   if (!id) throw new Error("缺少要完成的案件編號");
   const rows = await db(
-    `tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,title,category,lead_person_id,status,revision&limit=1`,
+    `tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,title,category,lead_person_id,status,handover_pending,revision&limit=1`,
   );
   const row = rows?.[0];
   if (!row) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
@@ -3373,6 +3865,7 @@ async function completeRecordOnlyTask(sourceReference: string, context: Context)
     throw Object.assign(new Error("只有副主席、Admin 或本案主要負責人可以完成"), { status: 403 });
   }
   if (row.status === "completed") return;
+  if (row.handover_pending) throw Object.assign(new Error("此工作正在換屆待指派，請先完成集中交接"), { status: 409 });
   const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow&limit=1`);
   const workflow = states?.[0]?.workflow || {};
   if (!workflow.wordSaved || !workflow.closed) {
@@ -3460,11 +3953,69 @@ async function performStorageDeletionJobs(jobs: any[]) {
   return outcomes;
 }
 
+async function reassignHandoverTasks(input: any, context: Context) {
+  leadership(context);
+  const assignments = Array.isArray(input) ? input : [];
+  if (!assignments.length || assignments.length > 250) throw new Error("請至少選擇一筆待交接工作");
+  const [directory, rows] = await Promise.all([
+    taskDirectory(),
+    db(`tasks?source=eq.${TASK_SOURCE}&handover_pending=eq.true&status=in.(pending,in_progress)&select=id,source_reference,revision`),
+  ]);
+  const taskByReference = new Map((rows || []).map((row: any) => [row.source_reference, row]));
+  if (assignments.length !== taskByReference.size) {
+    throw Object.assign(new Error("待交接清單已變更，請重新整理後一次確認全部指派"), { status: 409 });
+  }
+  const seen = new Set<string>();
+  const payload = assignments.map((assignment: any) => {
+    const reference = String(assignment?.id || "").trim();
+    const task = taskByReference.get(reference);
+    if (!reference || seen.has(reference) || !task) throw Object.assign(new Error("待交接工作已變更，請重新整理"), { status: 409 });
+    seen.add(reference);
+    const lead = String(assignment?.lead || "").trim();
+    const companions = [...new Set((Array.isArray(assignment?.companions) ? assignment.companions : [])
+      .map((name: unknown) => String(name || "").trim()).filter(Boolean))];
+    if (!lead || companions.length > 2 || companions.includes(lead)) throw new Error("每筆工作需指定一位主責，陪訪最多兩位且不可重複");
+    const leadPersonId = directory.personByName.get(lead);
+    const companionPersonIds = companions.map(name => directory.personByName.get(name));
+    if (!leadPersonId || companionPersonIds.some(personId => !personId)) {
+      throw new Error("工作只能指派給目前有效的副主席或會員委員");
+    }
+    if (Number(assignment?.revision) !== Number(task.revision)) {
+      throw Object.assign(new Error("待交接工作已在其他裝置更新，請重新整理"), { status: 409 });
+    }
+    return {
+      taskId: task.id,
+      expectedRevision: Number(task.revision),
+      leadPersonId,
+      companionPersonIds,
+    };
+  });
+  try {
+    await db("rpc/edge_reassign_handover_tasks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ p_assignments: payload, p_actor: context.personId }),
+    });
+  } catch (error) {
+    const message = String((error as any)?.message || error);
+    if (message.includes("TASK_CONFLICT")) throw Object.assign(new Error("待交接工作已在其他裝置更新，請重新整理"), { status: 409 });
+    if (message.includes("HANDOVER_TASK_NOT_PENDING")) throw Object.assign(new Error("其中一筆工作已完成交接或不再有效，請重新整理"), { status: 409 });
+    if (message.includes("HANDOVER_ASSIGNMENTS_CHANGED")) throw Object.assign(new Error("待交接清單已變更，請重新整理後一次確認全部指派"), { status: 409 });
+    if (message.includes("HANDOVER_ASSIGNEE_INACTIVE")) throw Object.assign(new Error("指派名單已換屆或停用，請重新登入後再操作"), { status: 409 });
+    if (message.includes("TASK_HISTORY_IMMUTABLE")) throw Object.assign(new Error("已結案歷史不可重新指派"), { status: 409 });
+    throw error;
+  }
+}
+
 async function tasksApi(request: Request, context: Context) {
   if (request.method === "GET") return taskResponse(context);
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
-  if (!["upsert", "import", "delete", "complete-record-only"].includes(body.action)) throw new Error("不支援的排程動作");
+  if (!["upsert", "import", "delete", "complete-record-only", "handover-reassign"].includes(body.action)) throw new Error("不支援的排程動作");
+  if (body.action === "handover-reassign") {
+    await reassignHandoverTasks(body.assignments, context);
+    return taskResponse(context);
+  }
   if (body.action === "complete-record-only") {
     await completeRecordOnlyTask(body.id, context);
     return taskResponse(context);
@@ -3473,8 +4024,11 @@ async function tasksApi(request: Request, context: Context) {
     leadership(context);
     const id = String(body.id || "").trim();
     if (!id) throw new Error("缺少要刪除的案件編號");
-    const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,case_id,revision&limit=1`);
+    const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(id)}&select=id,case_id,status,revision&limit=1`);
     const row = rows?.[0];
+    if (row?.status === "completed") {
+      throw Object.assign(new Error("已結案歷史不可刪除；如需補充請使用追加紀錄"), { status: 409 });
+    }
     const files = row
       ? await db(`task_case_files?task_id=eq.${row.id}&select=bucket_id,object_path`)
       : [];
@@ -3520,6 +4074,12 @@ async function tasksApi(request: Request, context: Context) {
         if (String((error as any)?.message).includes("TASK_IDENTITY_IMMUTABLE")) {
           throw Object.assign(new Error("既有案件的會員與類型不可變更；請建立新案件"), { status: 409 });
         }
+        if (String((error as any)?.message).includes("TASK_HISTORY_IMMUTABLE")) {
+          throw Object.assign(new Error("已結案歷史不可修改；如需補充請使用追加紀錄"), { status: 409 });
+        }
+        if (String((error as any)?.message).includes("HANDOVER_TASK_PENDING")) {
+          throw Object.assign(new Error("此工作正在換屆待指派，請先從集中交接清單完成指派"), { status: 409 });
+        }
         throw error;
       }
     }
@@ -3531,7 +4091,7 @@ async function tasksApi(request: Request, context: Context) {
 }
 
 async function taskAccess(sourceReference: string, context: Context) {
-  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,case_id,member_id,title,source_reference,category,lead_person_id,revision,result_summary&limit=1`);
+  const rows = await db(`tasks?source=eq.${TASK_SOURCE}&source_reference=eq.${encodeURIComponent(sourceReference)}&select=id,case_id,member_id,title,source_reference,category,status,handover_pending,lead_person_id,revision,result_summary&limit=1`);
   const task = rows?.[0];
   if (!task) throw Object.assign(new Error("找不到指定案件"), { status: 404 });
   const assignments = await db(`task_assignments?task_id=eq.${task.id}&select=person_id`);
@@ -4698,6 +5258,12 @@ async function caseStatesApi(request: Request, context: Context) {
   if (request.method !== "POST") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const body = await requestBody(request);
   const access = await taskAccess(String(body.taskId || ""), context);
+  if (access.task.status === "completed") {
+    throw Object.assign(new Error("已結案歷史不可修改；原主責、陪訪、回饋、投票與結案人均維持原紀錄"), { status: 409 });
+  }
+  if (access.task.handover_pending) {
+    throw Object.assign(new Error("此案件正在換屆待指派，請先完成集中交接"), { status: 409 });
+  }
   const rows = await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
   const existing = rows?.[0] || null;
   const expectedRevision = Number(body.revision || 0);
@@ -5078,6 +5644,12 @@ async function taskFileApi(request: Request, url: URL, context: Context) {
   if (!access.leadership && !access.assigned) {
     throw Object.assign(new Error("只有副主席或本案受指派人員可以保存附件"), { status: 403 });
   }
+  if (access.task.status === "completed") {
+    throw Object.assign(new Error("案件已結案，正式 Word 只能下載，不能覆寫"), { status: 409 });
+  }
+  if (access.task.handover_pending) {
+    throw Object.assign(new Error("此案件正在換屆待指派，請先完成集中交接"), { status: 409 });
+  }
   const filename = String(body.filename || "interview.docx").trim().slice(0, 240);
   const contentType = String(body.type || "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
   if (contentType !== "application/vnd.openxmlformats-officedocument.wordprocessingml.document") {
@@ -5126,6 +5698,11 @@ async function companyApi(url: URL) {
 async function testResetApi(request: Request, context: Context) {
   if (context.role !== "admin") {
     throw Object.assign(new Error("只有系統開發人員 Admin 可以清除測試資料"), { status: 403 });
+  }
+  const origin = request.headers.get("origin") || "";
+  const localOrigin = origin === "http://127.0.0.1:4173" || origin === "http://localhost:4173";
+  if (!localOrigin || Deno.env.get("ALLOW_DESTRUCTIVE_TEST_RESET") !== "true") {
+    throw Object.assign(new Error("正式環境已停用測試資料重置"), { status: 403 });
   }
   const [meetings, tasks, files, protectedRegistrations] = await Promise.all([
     db("committee_meetings?select=id"),
@@ -5595,6 +6172,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/analysis-draft") result = await analysisDraftApi(request, context);
     else if (path === "/api/analysis-snapshots") result = await analysisSnapshotsApi(context);
     else if (path === "/api/tasks") result = await tasksApi(request, context);
+    else if (path === "/api/annual-handover") result = await annualHandoverApi(request, context);
     else if (path === "/api/case-states") result = await caseStatesApi(request, context);
     else if (path === "/api/task-file") result = await taskFileApi(request, url, context);
     else if (path === "/api/company") result = await companyApi(url);

@@ -62,7 +62,7 @@ assert.match(edgeFunction,/passwords\[role\]\.length<12/);
 
 for(const file of readdirSync(appUrl).filter(name=>name.endsWith(".html"))){
   const page=readFileSync(new URL(file,appUrl),"utf8");
-  const authIndex=page.indexOf("assets/js/auth.js?v=7");
+  const authIndex=page.indexOf("assets/js/auth.js?v=8");
   if(authIndex<0)continue;
   const configIndex=page.indexOf("assets/js/supabase-config.js?v=1");
   assert.ok(configIndex>=0&&configIndex<authIndex,`${file} 必須先載入 Supabase 公開設定`);
@@ -108,6 +108,7 @@ const successfulFetch=async url=>{
     user:{id:"admin-user"}
   });
   if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"admin",label:"Admin",enabled:true}]);
+  if(url.includes("/rest/v1/rpc/edge_apply_due_committee_handoffs"))return response(200,0);
   if(url.includes("/rest/v1/committee_terms"))return response(200,[]);
   throw new Error(`unexpected URL ${url}`);
 };
@@ -133,6 +134,7 @@ const committeeSandbox=authSandbox(async url=>{
     user:{id:"committee-user"}
   });
   if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"committee",label:"Committee",enabled:true}]);
+  if(url.includes("/rest/v1/rpc/edge_apply_due_committee_handoffs"))return response(200,0);
   if(url.includes("/rest/v1/committee_terms"))return response(200,[
     {role:"vp",people:{display_name:"測試副主席"}},
     {role:"committee",people:{display_name:"測試委員甲"}},
@@ -157,6 +159,7 @@ const logoutSandbox=authSandbox(async url=>{
     user:{id:"admin-user"}
   });
   if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"admin",enabled:true}]);
+  if(url.includes("/rest/v1/rpc/edge_apply_due_committee_handoffs"))return response(200,0);
   if(url.includes("/rest/v1/committee_terms"))return response(200,[]);
   if(url.includes("/auth/v1/logout"))return response(204,{});
   throw new Error(`unexpected URL ${url}`);
@@ -186,6 +189,7 @@ const refreshSandbox=authSandbox(async url=>{
     });
   }
   if(url.includes("/rest/v1/app_accounts"))return response(200,[{role:"admin",enabled:true}]);
+  if(url.includes("/rest/v1/rpc/edge_apply_due_committee_handoffs"))return response(200,0);
   if(url.includes("/rest/v1/committee_terms"))return response(200,[]);
   if(url.includes("/rest/v1/test"))return response(200,{ok:true});
   throw new Error(`unexpected URL ${url}`);

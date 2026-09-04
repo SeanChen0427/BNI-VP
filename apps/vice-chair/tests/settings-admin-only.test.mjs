@@ -15,11 +15,14 @@ test("登入帳密、設定紀錄與測試資料重置只提供 Admin", () => {
   assert.match(page, /id="credentialsCard" hidden/);
   assert.match(page, /id="auditCard" hidden/);
   assert.match(page, /id="testDataResetCard" hidden/);
-  assert.match(page, /assets\/js\/settings\.js\?v=17/);
+  assert.match(page, /id="annualHandoverCard" hidden/);
+  assert.match(page, /assets\/js\/settings\.js\?v=18/);
   assert.match(settings, /#credentialsCard"\)\.hidden=!admin/);
   assert.match(settings, /#auditCard"\)\.hidden=!admin/);
-  assert.match(settings, /canResetTestData=session\.role==="admin"/);
+  assert.match(settings, /canResetTestData=session\.role==="admin"&&\["localhost","127\.0\.0\.1"\]\.includes\(location\.hostname\)/);
   assert.match(preview, /identityRole\(identity\)!=="admin"/);
   assert.match(resetHandler, /context\.role !== "admin"/);
+  assert.match(resetHandler, /ALLOW_DESTRUCTIVE_TEST_RESET/);
+  assert.match(resetHandler, /localhost/);
   assert.doesNotMatch(resetHandler, /leadership\(context\)/);
 });

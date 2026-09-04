@@ -21,7 +21,7 @@ test("所有排程頁面都載入最新版 Supabase task 與 case state store", 
     "apps/vice-chair/departure-form.html",
   ];
   for (const page of pages) {
-    assert.match(read(page), /assets\/js\/task-store\.js\?v=7/, `${page} 未載入 task-store v7`);
+    assert.match(read(page), /assets\/js\/task-store\.js\?v=8/, `${page} 未載入 task-store v8`);
   }
   const caseStatePages = pages.filter(page => ![
     "apps/vice-chair/member-care.html",
@@ -129,7 +129,7 @@ test("刪除案件前先完成草稿同步，成功後才清除該案件本機�
   assert.match(caseStore, /function beforeTaskDelete\(task\)/);
   assert.match(caseStore, /function discardDeletedTask\(task\)/);
   assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
-  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=13/);
+  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=14/);
   const deleteHandler = caseBoard.match(/async function confirmDelete\(\)[\s\S]*?function bindDeleteDialog/)[0];
   assert.match(deleteHandler, /await window\.FulianTaskStore\.remove\(id\)/);
   assert.doesNotMatch(deleteHandler, /localStorage\.removeItem/);

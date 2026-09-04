@@ -221,6 +221,20 @@
         throw error;
       }
     },
+    reassignHandover: async function (assignments) {
+      await queue.catch(() => undefined);
+      try {
+        const tasks = await api({ action: "handover-reassign", assignments });
+        syncFailed = false;
+        conflictBlocked = false;
+        queue = Promise.resolve(tasks);
+        return tasks;
+      } catch (error) {
+        showError(error.message);
+        await this.refresh().catch(() => undefined);
+        throw error;
+      }
+    },
     flush: function () {
       return queue;
     },

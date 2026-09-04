@@ -1,26 +1,29 @@
 (async function(){
 await window.FulianMemberDirectory.ready;
-const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1",memberDirectory=window.FulianMemberDirectory?.members||[];let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s);
+const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1";let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s);
 const taipeiDay=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 function toast(message){const t=$("#toast");t.textContent=message;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),1800)}
 function log(text){audit.unshift({text,time:new Date().toLocaleString("zh-TW")});audit=audit.slice(0,20);localStorage.setItem(AUDIT_KEY,JSON.stringify(audit));}
-function memberOptions(excluded=[]){const blocked=new Set(excluded);return memberDirectory.filter(name=>!blocked.has(name)).map(name=>`<option value="${name}"></option>`).join("")}
-function renderMemberPickers(){$("#vpMemberOptions").innerHTML=memberOptions(config.committee);$("#committeeMemberOptions").innerHTML=memberOptions([config.vpName,...config.committee]);}
 function render(){
-  const admin=session.role==="admin",manager=FulianAuth.can("manageCommittee");
+  const admin=session.role==="admin";
   $("#credentialsCard").hidden=!admin;$("#auditCard").hidden=!admin;
-  $("#committeeTotal").textContent=config.committee.length;$("#vpName").value=config.vpName;$("#vpName").disabled=!admin;$("#saveVp").disabled=!admin;
-  $("#newMember").disabled=!manager;$("#addMember").disabled=!manager;
-  $("#committeeList").innerHTML=config.committee.map(name=>`<article class="committee-member"><i>${name.slice(-1)}</i><div><b>${name}</b><small>會員委員・可使用共用委員帳號</small></div><button data-remove="${name}" ${manager?"":"disabled"}>移除</button></article>`).join("");
+  $("#committeeTotal").textContent=config.committee.length;$("#vpName").textContent=config.vpName||"尚未設定";
+  $("#committeeList").innerHTML=config.committee.length
+    ?config.committee.map(name=>`<article class="committee-member"><i>${escapeHtml(name.slice(-1))}</i><div><b>${escapeHtml(name)}</b><small>會員委員・可使用共用委員帳號</small></div></article>`).join("")
+    :`<div class="hint">目前沒有生效中的會員委員。</div>`;
   $("#credentialFields").innerHTML=admin?[['admin','系統開發人員 Admin'],['vp','副主席共用帳號'],['committee','委員共用帳號']].map(([key,label])=>`<div class="credential-box"><b>${label}</b><label>帳號<input id="${key}Username" value="${config.accounts[key].username}" readonly></label><label>設定新密碼<input id="${key}Password" type="password" autocomplete="new-password" minlength="12" placeholder="至少 12 個字元"></label></div>`).join(""):"";
   $("#saveCredentials").hidden=!admin;
   $("#auditLog").innerHTML=admin?(audit.length?audit:[{text:"尚無設定異動",time:""}]).map(item=>`<li><b>${item.text}</b><span>${item.time}</span></li>`).join(""):"";
-  renderMemberPickers();
-  document.querySelectorAll("[data-remove]").forEach(button=>button.onclick=()=>{const name=button.dataset.remove;if(!manager)return;config.committee=config.committee.filter(x=>x!==name);FulianAuth.saveConfig(config);log(`${session.name}移除會員委員：${name}`);render();toast("委員已移除");});
 }
-$("#saveVp").onclick=()=>{if(session.role!=="admin")return;const name=$("#vpName").value.trim();if(!name)return toast("請選擇副主席");if(!memberDirectory.includes(name))return toast("請從現有會員名單中選擇");config.vpName=name;config.committee=config.committee.filter(x=>x!==name);FulianAuth.saveConfig(config);log(`Admin指定副主席：${name}`);render();toast("副主席已更新")};
-$("#addMember").onclick=()=>{if(!FulianAuth.can("manageCommittee"))return;const name=$("#newMember").value.trim();if(!name)return toast("請選擇會員");if(!memberDirectory.includes(name))return toast("請從現有會員名單中選擇");if(name===config.vpName||config.committee.includes(name))return toast("此姓名已在名單中");config.committee.push(name);FulianAuth.saveConfig(config);log(`${session.name}新增會員委員：${name}`);$("#newMember").value="";render();toast("委員已新增")};
+window.addEventListener("fulian:roster-updated",event=>{
+  const roster=Array.isArray(event.detail?.roster)?event.detail.roster:[];
+  const vp=roster.find(item=>item.role==="vp");
+  const committee=roster.filter(item=>item.role==="committee").map(item=>item.name).filter(Boolean);
+  if(!vp?.name)return;
+  config=FulianAuth.saveConfig({...config,vpName:vp.name,committee});
+  render();
+});
 $("#saveCredentials").onclick=async()=>{
   if(session.role!=="admin")return;
   const passwords={};
@@ -43,7 +46,7 @@ $("#saveCredentials").onclick=async()=>{
     button.textContent="更新三組密碼";
   }
 };
-const TEST_RESET_CONFIRMATION="清除測試資料",canResetTestData=session.role==="admin";
+const TEST_RESET_CONFIRMATION="清除測試資料",canResetTestData=session.role==="admin"&&["localhost","127.0.0.1"].includes(location.hostname);
 function resetIdentity(){return`${session.role}:${session.name}`}
 async function resetServerSummary(){
   const response=await fetch(`/api/test-data-reset?identity=${encodeURIComponent(resetIdentity())}`,{cache:"no-store"}),data=await response.json().catch(()=>({}));
@@ -226,9 +229,8 @@ async function loadDepartureState(){
 }
 function departureWarnings(name){
   const warnings=[];
-  if(name===config.vpName)warnings.push("此會員是現任副主席：離會前必須先由 Admin 指定新副主席。");
-  if(config.committee.includes(name))warnings.push("此會員是會員委員：登記後請到上方委員名單移除，其委員登入將失效。");
-  try{const plan=localStorage.getItem("fulian-work-plan-v1")||"";if(plan.includes(name))warnings.push("此會員出現在案件資料中：請確認其進行中案件已結案或移轉負責人（系統不會自動處理案件）。")}catch{}
+  if(name===config.vpName)warnings.push("此會員是現任副主席：請先由 Admin 排定換屆或確認接任名單，避免生效後沒有副主席。");
+  if(config.committee.includes(name))warnings.push("此會員是現任會員委員：換屆生效時，其未完成工作會保留原主責紀錄並集中列入待指派。");
   return warnings;
 }
 function refreshDepartureForm(){

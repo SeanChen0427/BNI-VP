@@ -32,6 +32,7 @@
     "caseWordStorageAndAdvance": "services/case-files.js",
     "interviewCompletionFeedback": "services/interview-completion.js",
     "monthlyMeetingCareAssignments": "core/monthly-meeting-domain.js",
+    "annualCommitteeHandover": "core/annual-handover-domain.js",
     "weeklyAttendanceReconciliation": "core/attendance-domain.js",
     "accountabilityEmailRules": "core/accountability-email-domain.js",
     "commonMessageTemplates": "core/message-template-domain.js",
@@ -67,7 +68,7 @@
     "industry-change-form.html": "轉換行業別訪談",
     "departure-form.html": "離會訪談",
     "course.html": "副主席交接課程",
-    "settings.html": "角色、人員、帳密、個人 AI 與使用者版更新紀錄",
+    "settings.html": "角色、Admin 年度換屆、帳密、個人 AI 與使用者版更新紀錄",
     "login.html": "原型登入"
   },
   "nonNegotiableRules": [

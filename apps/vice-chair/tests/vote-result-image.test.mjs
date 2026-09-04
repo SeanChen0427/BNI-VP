@@ -48,7 +48,7 @@ test("進行中及結案頁都有 PNG 下載，副主席可看具名票向", () 
   assert.match(workflowSource, /state\.votes\?\.\[name\]/);
   assert.match(workflowSource, /FulianVoteResultImage\.download/);
   assert.match(archiveHtml, /id="downloadVoteResult"/);
-  assert.match(archiveHtml, /具名票向（僅副主席可查閱）/);
+  assert.match(archiveHtml, /具名票向（僅副主席與 Admin 可查閱）/);
 });
 
 test("後端只向副主席與 Admin 回傳完整逐人票向", () => {

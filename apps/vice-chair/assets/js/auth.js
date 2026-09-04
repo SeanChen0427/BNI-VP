@@ -84,6 +84,13 @@
     return account;
   }
   async function loadCommitteeRoster(accessToken){
+    try{
+      await jsonRequest("/rest/v1/rpc/edge_apply_due_committee_handoffs",{
+        method:"POST",
+        headers:apiHeaders(accessToken),
+        body:"{}"
+      });
+    }catch(error){console.error("年度換屆自動生效失敗，由 Admin 修正排程後可重試",error)}
     const today=taipeiDay();
     const rows=await jsonRequest(`/rest/v1/committee_terms?status=eq.active&starts_on=lte.${today}&or=(ends_on.is.null,ends_on.gte.${today})&people.status=eq.active&select=role,people!inner(display_name,status)&order=created_at.asc`,{
       headers:apiHeaders(accessToken)
@@ -147,10 +154,11 @@
     if(!session||!session.accessToken||!session.refreshToken||!session.userId)return false;
     const now=Date.now(),lastActive=Number(session.lastActiveAt||0);
     if(!lastActive||now-lastActive>INACTIVITY_MS)return false;
-    const name=sessionName(session.role,session.name);
-    if(!name)return false;
-    if(name!==session.name){session.name=name;setSession(session);}
-    return["admin","vp","committee"].includes(session.role);
+    const config=getConfig();
+    if(session.role==="admin")return session.name==="系統開發人員 Admin";
+    if(session.role==="vp")return Boolean(session.name)&&config.vpName===session.name;
+    if(session.role==="committee")return Boolean(session.name)&&config.committee.includes(session.name);
+    return false;
   }
   function can(permission,session=getSession()){
     if(!validate(session))return false;

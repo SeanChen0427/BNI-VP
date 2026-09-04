@@ -32,6 +32,20 @@
       : date.toLocaleString("zh-TW", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
+  function assignmentLabel(assignments) {
+    return (Array.isArray(assignments) ? assignments : []).map(item => `${item.name || "未記錄"}${item.role === "lead" ? "（主責）" : "（陪訪）"}`).join("、") || "未記錄";
+  }
+
+  function assignmentEvent(item) {
+    const previous = assignmentLabel(item.previousAssignments);
+    const next = assignmentLabel(item.newAssignments);
+    const actor = item.actor ? `・操作人：${item.actor}` : "";
+    if (item.eventType === "created") return `建立工作指派：${next}${actor}`;
+    if (item.eventType === "handover_pending") return `年度換屆列入待交接；原指派：${previous}${actor}`;
+    if (item.eventType === "handover_reassigned") return `年度換屆完成接手：${previous} → ${next}${actor}`;
+    return `工作指派異動：${previous} → ${next}${actor}`;
+  }
+
   function fact(label, value) {
     return `<div><dt>${esc(label)}</dt><dd>${esc(value || "未記錄")}</dd></div>`;
   }
@@ -155,9 +169,9 @@
   async function init() {
     await window.FulianTaskStore.ready;
     await window.FulianCaseStateStore.ready;
-    if (session?.role !== "vp") {
+    if (!["vp", "admin"].includes(session?.role)) {
       $("#accessNotice").hidden = false;
-      $("#accessNotice").innerHTML = "<b>只有副主席可以查閱結案資料</b><span>會員委員的工作範圍為訪談、回饋與投票。</span>";
+      $("#accessNotice").innerHTML = "<b>只有副主席與 Admin 可以查閱結案資料</b><span>會員委員的工作範圍為訪談、回饋與投票。</span>";
       $("#archiveStatus").textContent = "無查閱權限";
       return;
     }
@@ -190,11 +204,14 @@
       fact("陪訪委員", (task.companions || []).join("、") || "無"),
       fact("訪談完成", dateLabel(state.interviewCompletedAt || stateForm.interviewDate)),
       fact("結案時間", dateLabel(task.completedAt || state.interviewCompletedAt)),
+      fact("結案確認人", task.completedBy),
       fact("保存檔名", state.wordName)
     ].join("");
     renderRecordOnlySummary(task, draft);
     renderDecision(task, state);
-    const log = Array.isArray(state.log) ? state.log : [];
+    const workflowLog = (Array.isArray(state.log) ? state.log : []).map((item, index) => ({ text: item.text, time: item.time || "", sortTime: Date.parse(item.time || "") || 0, index }));
+    const assignmentLog = (Array.isArray(task.assignmentHistory) ? task.assignmentHistory : []).map((item, index) => ({ text: assignmentEvent(item), time: dateLabel(item.occurredAt), sortTime: Date.parse(item.occurredAt || "") || 0, index: workflowLog.length + index }));
+    const log = [...workflowLog, ...assignmentLog].sort((a, b) => b.sortTime - a.sortTime || b.index - a.index);
     $("#activityLog").innerHTML = log.length
       ? log.map(item => `<li><i></i><div><b>${esc(item.text)}</b><span>${esc(item.time || "")}</span></div></li>`).join("")
       : '<li class="empty-record">沒有保存案件歷程</li>';

@@ -70,6 +70,6 @@ assert.match(settingsScript, /action:"assign"/);
 assert.match(settingsScript, /item\.availableForAssignment&&item\.status!=="active"/);
 assert.match(settingsScript, /已停用，可直接重新指定/);
 assert.match(settingsHtml, /已停用群組可直接重新啟用/);
-assert.match(settingsHtml, /assets\/js\/settings\.js\?v=17/);
+assert.match(settingsHtml, /assets\/js\/settings\.js\?v=18/);
 
 console.log("LINE attendance delivery tests passed");

@@ -7,7 +7,7 @@
   const authConfig = FulianAuth.getConfig();
   const committee = [authConfig.vpName, ...authConfig.committee];
   const canDelete = session.role === "vp" || session.role === "admin";
-  const canViewArchive = session.role === "vp";
+  const canViewArchive = session.role === "vp" || session.role === "admin";
   const canManageDecision = session.role === "vp";
   window.addEventListener("fulian:storage-cleanup-warning",event=>{
     alert(`案件資料已刪除，但有 ${event.detail?.count||1} 個伺服器 Word 檔暫時清理失敗。系統已保留待處理紀錄，不會靜默忽略。`);
@@ -73,6 +73,7 @@
 
   function stageText(task, state, stage) {
     if (stage === "closed") return "已結案存檔";
+    if (task.handoverPending) return "換屆待新任指派";
     if (stage === "advisor") {
       if (state?.resultAnnouncementSent) return "公告已發布・待結案";
       if (state?.advisorStatus === "confirmed") return "董顧已確認・待公告或結案";
@@ -85,6 +86,10 @@
   }
 
   function stageDetail(task, stage) {
+    if (task.handoverPending) {
+      const original = (task.handoverOriginalAssignments || []).map(item => item.name).filter(Boolean);
+      return `保留原指派：${original.join("、") || [task.lead, ...(task.companions || [])].filter(Boolean).join("、") || "未記錄"}`;
+    }
     return stage === "closed" ? "案件流程已完成" : task.stage || "尚未設定階段";
   }
 
@@ -159,7 +164,7 @@
               : "待你回饋"
         }</span>`
       : "";
-    const formAction = stage !== "closed"
+    const formAction = stage !== "closed" && !task.handoverPending
       ? `<a href="${form}">${stage === "waiting" || stage === "interview" ? (hasDraft(task) ? "繼續填寫" : "開啟訪談") : "查看訪談表"}</a>`
       : "";
     const archiveAction = stage === "closed" && canViewArchive
@@ -189,9 +194,13 @@
             ? "處理公告與結案"
             : "處理董顧確認";
     const decisionAction = decisionStage
+      && !task.handoverPending
       && feedbackStarted
       && (stage !== "advisor" || canManageDecision)
       ? `<a class="main" href="${flow}${decisionAnchor}">${decisionLabel}</a>`
+      : "";
+    const handoverAction = task.handoverPending && canDelete
+      ? '<a class="main" href="index.html#cases">前往集中指派</a>'
       : "";
     return `<article class="case-card">
       <div class="case-main"><span class="type-icon">${type.icon}</span><div><strong>${esc(task.member)}</strong><small>${type.label}・${esc(task.profession || "專業類別待補")}</small></div></div>
@@ -202,7 +211,8 @@
         ${formAction}
         ${decisionAction}
         ${archiveAction}
-        ${canDelete ? `<button type="button" data-delete="${esc(task.id)}">刪除</button>` : ""}
+        ${handoverAction}
+        ${canDelete && stage !== "closed" ? `<button type="button" data-delete="${esc(task.id)}">刪除</button>` : ""}
       </div>
     </article>`;
   }

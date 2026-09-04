@@ -155,12 +155,36 @@ async function committeeMeetings(req,url,res){
     const body=await requestBody(req),identity=body.identity;if(!validIdentity(identity))return json(res,400,{message:"登入身份格式不正確"});
     const store=await readMeetingStore(),role=identityRole(identity);
     if(!["admin","vp"].includes(role))return json(res,403,{message:"會員委員只能查閱已結案的歷史會議紀錄"});
+    if(body.action==="amend-renewal-decision"){
+      const meetingId=String(body.meetingId||""),careItemId=String(body.careItemId||"");
+      if(!/^meeting-\d{4}-\d{2}$/.test(meetingId)||!careItemId)return json(res,400,{message:"更正的月會或續約項目不正確"});
+      const recordIndex=store.records.findIndex(item=>item.id===meetingId),existing=store.records[recordIndex];
+      if(!existing||existing.status!=="final")return json(res,409,{message:"續約決議更正只適用於已結案月會，不會修改月會草稿"});
+      const items=Array.isArray(existing.care?.items)?existing.care.items:[],matches=items.map((item,index)=>({item,index})).filter(entry=>entry.item.id===careItemId);
+      if(matches.length!==1)return json(res,matches.length?409:404,{message:matches.length?"續約項目識別重複，請重新整理後再試":"找不到要更正的續約項目"});
+      const{item,index:itemIndex}=matches[0];
+      const correctionId=String(body.correction?.id||"").trim();
+      if(item.decisionAmendments?.some(amendment=>amendment.id===correctionId))return json(res,200,{record:existing,alreadyApplied:true});
+      let corrected;
+      try{corrected=monthlyMeetingDomain.applyRenewalDecisionCorrection(item,{...(body.correction||{}),id:correctionId,correctedAt:new Date().toISOString(),correctedBy:identity})}
+      catch(error){return json(res,409,{message:String(error?.message||"續約決議無法更正").slice(0,180)})}
+      const nextItems=items.map((entry,index)=>index===itemIndex?corrected:entry),now=new Date().toISOString();
+      const saved={...existing,care:{...(existing.care||{}),items:nextItems},updatedAt:now,updatedBy:identity};
+      if(JSON.stringify(saved).length>60000)return json(res,400,{message:"會議紀錄內容過大"});
+      store.records[recordIndex]=saved;await writeMeetingStore(store);return json(res,200,{record:saved,taskSyncRequired:true});
+    }
     if(body.action==="settings"){
       const target=Math.round(Number(body.chapterSizeTarget));if(!Number.isFinite(target)||target<1||target>500)return json(res,400,{message:"分會目標人數不正確"});
       store.settings.chapterSizeTarget=target;store.settings.updatedAt=new Date().toISOString();store.settings.updatedBy=identity;await writeMeetingStore(store);return json(res,200,{settings:store.settings});
     }
-    const record=body.record;if(!record||!/^meeting-\d{4}-\d{2}$/.test(String(record.id||"")))return json(res,400,{message:"會議紀錄編號不正確"});
-    if(record.status==="final"&&monthlyMeetingDomain.missingCareAssignments(record.care?.items||[]).length)return json(res,400,{message:"續約及輔導項目都必須完成追蹤委員與排定日期後才能結案"});
+    let record=body.record;if(!record||!/^meeting-\d{4}-\d{2}$/.test(String(record.id||""))||record.meetingMonth!==String(record.id).slice("meeting-".length))return json(res,400,{message:"會議紀錄編號不正確"});
+    const storedRecord=store.records.find(item=>item.id===record.id);
+    if(storedRecord?.status==="final")return record.status==="final"?json(res,200,{record:storedRecord,alreadyFinal:true}):json(res,409,{message:"已結案月會不能改回草稿；續約變更請使用專用更正"});
+    const careItems=Array.isArray(record.care?.items)?record.care.items:[];
+    if(careItems.some(item=>monthlyMeetingDomain.decisionAmendments(item).length))return json(res,409,{message:"結案後續約更正只能使用專用操作，不能隨整份月會覆寫"});
+    if(careItems.some(item=>!monthlyMeetingDomain.isValidCareDisposition(item)))return json(res,400,{message:"確認不續約只能用於續約項目"});
+    record={...record,care:{...(record.care||{}),items:careItems.map(monthlyMeetingDomain.normalizeCareItem)}};
+    if(record.status==="final"&&monthlyMeetingDomain.missingCareAssignments(record.care?.items||[]).length)return json(res,400,{message:"需要後續行動的續約及輔導項目，都必須完成追蹤委員與排定日期後才能結案"});
     if(monthlyMeetingDomain.hasCareAssignmentConflict(record.care?.items||[]))return json(res,400,{message:"負責委員與陪訪委員不能是同一人"});
     const serialized=JSON.stringify(record);if(serialized.length>60000)return json(res,400,{message:"會議紀錄內容過大"});
     const existing=store.records.find(item=>item.id===record.id),now=new Date().toISOString();

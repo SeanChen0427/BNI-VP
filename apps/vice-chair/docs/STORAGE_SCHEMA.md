@@ -42,7 +42,7 @@
 
 - `ai_credentials`：個人 AI Key 的 AES-GCM 密文；解密 secret 只存在 Edge Function 環境。
 - `ai_profiles`：個人預設 AI 平台。
-- `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。
+- `committee_meetings`／`app_settings`：月會草稿、正式紀錄與分會目標。已結案月會的續約決議反轉以 `care_summary.items[].decisionAmendments` 追加保存原決議、原因、操作者、伺服器時間與新排程，不將整筆正式紀錄改回草稿；一般整份保存 API 不接受瀏覽器自行寫入更正陣列。
 - `app_settings.common_message_templates`：僅系統開發人員 Admin 可維護的跨裝置常用文稿公版，包含各範本目前文字、最近 30 次前一版本、操作者與時間；副主席只能讀取與複製，不保存會員私訊回覆或身分證字號。新會員協助群文案中的當屆副主席姓名與行業別在前端複製時由當期名單及 `members` 主檔套用，不另寫入此設定值。
 - `announcements`：首頁會員委員會留言的跨裝置正式來源；作者、角色、發布時間與軟刪除紀錄只經 `app-api` 寫入，`localStorage` 不再是唯一來源。
 - `report_imports`＋Private Storage `raw-reports`：每月 BNI 原始報表與期間／雜湊。
@@ -62,6 +62,9 @@
 - `provisional_members`：已正式結案、但尚未由下一份半年 PALMS 唯一確認的新會員。只加入點名與 LINE 公告總人數；不供分析、續約、期中或關懷儀表板使用。升格與撤銷皆保留操作者及時間。
 - `departure_interview_preferences`：歷史離會會員的選擇性補訪設定，只記錄「可安排／不安排」及操作者；不得修改 `members.status`、`departed_on` 或 PALMS 對帳結果。
 - `tasks`／`task_assignments`／`task_private_details`：跨裝置工作排定、受派人與敏感備註；以 revision 做並行衝突保護，只經 Edge API 寫入。
+- `committee_handover_plans`／`committee_handover_members`／`committee_handover_events`：Admin 預排的年度換屆、生效日、下一屆完整名單與排定／修改／取消／執行稽核。排程生效前不更新 `committee_terms`；執行後前後任期均保留。
+- `task_assignment_history`：任務建立、一般改派、換屆待交接及完成換屆接手的前後完整指派快照、原因、操作者與時間。換屆不從此表刪除卸任者姓名。
+- `tasks.handover_pending`／`handover_plan_id`／`handover_pending_since`／`handover_original_assignments`：只標記含卸任或轉任人員的未完成工作；原指派保留到新任副主席／Admin 明確完成集中改派。
 - `deleted_task_references`：副主席／Admin 明確刪除案件後的識別碼封存標記；只保存來源、案件編號、原任務 UUID 與刪除時間，阻止舊裝置把 localStorage 殘影再次匯回，不保存會員內容或訪談資料。
 - `task_case_states`：案件的副主席流程旗標及五種訪談草稿跨裝置狀態；回饋、投票資格與票不得再寫入此 JSON 作正式來源。投票通知的人工複製通道只在 `workflow` 保存 `voteNoticeCopiedAt`、`voteNoticeCopiedBy` 與對應截止版本，作為開放送票與稽核旗標；不代表 LINE OA 送達。三長群與正式公告另保存 `leadersCompletionMethod`／`leadersCompletedAt`／`leadersCompletedBy` 及 `resultAnnouncementMethod`／`resultAnnouncementRecordedBy`，用來辨識人工複製貼上與 LINE OA 發送；兩者可完成同一階段，但不得把人工路徑顯示成 LINE 已送達。
 - `task_case_files`＋Private Storage `case-files`：訪談 Word 索引與實體檔案。
@@ -74,7 +77,7 @@
 
 ## 本機測試資料重置
 
-設定頁的「測試資料重置」只提供 Admin 使用，範圍固定為：
+設定頁的「測試資料重置」只提供本機開發環境的 Admin 使用，且伺服器必須明確設定 `ALLOW_DESTRUCTIVE_TEST_RESET=true`；正式網站固定停用。範圍固定為：
 
 - `fulian-work-plan-v1`
 - `fulian-case-workflow-v2-*`

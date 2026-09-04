@@ -29,7 +29,18 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
-test("最新版本說明交流群回覆驅動，並保留月末切換歷史", () => {
+test("最新版本說明 Admin 年度換屆與歷史保護，並保留前版續約修正", () => {
+  assert.match(releaseScript, /version: "1\.0\.22"/);
+  assert.match(releaseScript, /Admin/);
+  assert.match(releaseScript, /提前排好/);
+  assert.match(releaseScript, /原指派/);
+  assert.match(releaseScript, /結案確認人/);
+  assert.match(releaseScript, /換屆待指派/);
+  assert.match(releaseScript, /version: "1\.0\.21"/);
+  assert.match(releaseScript, /會中已確認不續約/);
+  assert.match(releaseScript, /不需填追蹤委員或排定日期/);
+  assert.match(releaseScript, /結案後會員改為續約/);
+  assert.match(releaseScript, /不會解鎖或覆寫任何月會草稿/);
   assert.match(releaseScript, /version: "1\.0\.20"/);
   assert.match(releaseScript, /12 小時等待交流群新訊息/);
   assert.match(releaseScript, /不保存好友 LINE ID、群組聊天內容或 replyToken/);

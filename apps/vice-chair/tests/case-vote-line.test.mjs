@@ -198,5 +198,5 @@ test("LINE 群組管理每個用途只顯示一列並以下拉查看測試或正
   assert.match(renderSection, /data-line-route-view/);
   assert.match(renderSection, /每項用途可用下拉選擇查看測試群／正式群/);
   assert.match(html, /line-group-route select/);
-  assert.match(html, /settings\.js\?v=17/);
+  assert.match(html, /settings\.js\?v=18/);
 });

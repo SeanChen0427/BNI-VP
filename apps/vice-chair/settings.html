@@ -6,7 +6,7 @@
   <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
   <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/settings.css?v=5"><link rel="stylesheet" href="assets/css/ai-api-settings.css?v=1"><link rel="stylesheet" href="assets/css/test-data-reset.css?v=1"><link rel="stylesheet" href="assets/css/workspace-nav.css?v=6"><link rel="stylesheet" href="assets/css/release-notes.css?v=1"><script src="assets/js/supabase-config.js?v=1"></script><script src="assets/js/auth.js?v=7"></script><script src="assets/js/supabase-data.js?v=3"></script><script src="assets/js/member-directory.js?v=2"></script>
+  <link rel="stylesheet" href="assets/css/settings.css?v=6"><link rel="stylesheet" href="assets/css/annual-handover.css?v=1"><link rel="stylesheet" href="assets/css/ai-api-settings.css?v=1"><link rel="stylesheet" href="assets/css/test-data-reset.css?v=1"><link rel="stylesheet" href="assets/css/workspace-nav.css?v=6"><link rel="stylesheet" href="assets/css/release-notes.css?v=1"><script src="assets/js/supabase-config.js?v=1"></script><script src="assets/js/auth.js?v=8"></script><script src="assets/js/supabase-data.js?v=3"></script><script src="assets/js/member-directory.js?v=2"></script><script src="core/annual-handover-domain.js?v=1"></script>
   <style>input[list]{padding-right:36px;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23a5151b' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-4-4'/%3E%3C/svg%3E") right 12px center/14px no-repeat}.picker-note{margin-top:7px;color:var(--muted);font-size:9px}.searchable-field input:focus{border-color:#b75d62;box-shadow:0 0 0 3px #a5151b12}
 .departure-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-bottom:12px}
 .departure-form label{display:flex;flex-direction:column;gap:6px;font-size:13px;color:#6b7280}
@@ -46,12 +46,30 @@
   <main>
     <section class="hero"><div><span>ACCESS, COMMITTEE & PERSONAL AI</span><h1>系統權限與個人 AI</h1><p>人員權限集中管理；每位副主席與委員使用自己的 AI API 額度。</p></div><div class="role-summary"><div><strong>3</strong><span>AI 平台</span></div><div><strong id="committeeTotal">6</strong><span>會員委員</span></div></div></section>
     <div class="grid">
-      <section class="card roles-card"><div class="section-title"><span>01</span><div><h2>三層權限</h2><p>權限固定，不追加更細角色</p></div></div><div class="role-list"><article><b>AD</b><div><strong>系統開發人員 Admin</strong><p>管理帳密、指定副主席、增減委員與系統維護。</p></div></article><article><b>VP</b><div><strong>副主席</strong><p>完整副主席功能，並可增減會員委員名單。</p></div></article><article><b>MC</b><div><strong>會員委員</strong><p>共用委員帳密；登入選姓名後填寫回饋、投票與執行任務。</p></div></article></div></section>
-      <section class="card vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>只有 Admin 可以變更</p></div></div><label>從現有會員選擇副主席<div class="inline searchable-field"><input id="vpName" list="vpMemberOptions" autocomplete="off" placeholder="搜尋或點選會員姓名"><datalist id="vpMemberOptions"></datalist><button id="saveVp">儲存副主席</button></div></label><div class="picker-note">可直接點選欄位查看名單，也可以輸入姓名快速篩選。</div><div class="hint">更換後，副主席共用帳號登入會自動顯示新任姓名；舊副主席工作階段會失效。</div></section>
-      <section class="card committee-card"><div class="section-title"><span>03</span><div><h2>會員委員名單</h2><p>Admin 與副主席皆可增減</p></div></div><div class="add-member searchable-field"><input id="newMember" list="committeeMemberOptions" autocomplete="off" placeholder="搜尋或點選現有會員"><datalist id="committeeMemberOptions"></datalist><button id="addMember">新增委員</button></div><div class="picker-note">只顯示尚未擔任副主席或會員委員的現有會員。</div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>共用帳號提醒</b><span>移除委員後，該姓名無法再以委員帳號登入；既有案件紀錄仍保留。</span></div></section>
-      <section class="card credentials-card" id="credentialsCard" hidden><div class="section-title"><span>04</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
+      <section class="card roles-card"><div class="section-title"><span>01</span><div><h2>三層權限</h2><p>權限固定，不追加更細角色</p></div></div><div class="role-list"><article><b>AD</b><div><strong>系統開發人員 Admin</strong><p>管理帳密、年度換屆與系統維護。</p></div></article><article><b>VP</b><div><strong>副主席</strong><p>完整日常副主席功能，並處理換屆後待指派工作。</p></div></article><article><b>MC</b><div><strong>會員委員</strong><p>共用委員帳密；登入選姓名後填寫回饋、投票與執行任務。</p></div></article></div></section>
+      <section class="card vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>依正式有效任期顯示</p></div></div><div class="current-role-person"><i>VP</i><div><small>目前副主席</small><strong id="vpName">正在讀取…</strong></div></div><div class="hint">名單不在日常工作中逐筆修改；Admin 可在下方一次排定下一屆完整名單與生效日。</div></section>
+      <section class="card committee-card"><div class="section-title"><span>03</span><div><h2>現任會員委員名單</h2><p>依正式有效任期顯示</p></div></div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>歷史不隨名單改寫</b><span>完成換屆後，已結案案件仍保留當時主責、陪訪與結案確認人；只有卸任或轉任人員的未完成工作會進入待指派。</span></div></section>
+      <section class="card annual-handover-card" id="annualHandoverCard" hidden>
+        <div class="section-title"><span>04</span><div><h2>年度換屆</h2><p>僅系統開發人員 Admin 可見與排定</p></div></div>
+        <div class="handover-status" id="handoverStatus"><b>正在讀取正式名單…</b><span>名單尚未變更。</span></div>
+        <div class="handover-form-grid">
+          <label>自動生效日<input id="handoverEffectiveOn" type="date"></label>
+          <label>下一屆任期結束<input id="handoverTermEndsOn" readonly></label>
+          <label class="full">下一屆副主席<input id="handoverVpName" list="handoverVpOptions" autocomplete="off" placeholder="搜尋現任會員"><datalist id="handoverVpOptions"></datalist></label>
+        </div>
+        <div class="handover-committee-editor">
+          <div><b>下一屆會員委員</b><span>完整列出下一屆名單；留任者的未完成工作不會被更動。</span></div>
+          <div class="handover-add"><input id="handoverCommitteeName" list="handoverCommitteeOptions" autocomplete="off" placeholder="搜尋會員姓名"><datalist id="handoverCommitteeOptions"></datalist><button type="button" id="addHandoverCommittee">加入委員</button></div>
+          <div class="handover-roster" id="handoverRoster"></div>
+        </div>
+        <div class="handover-actions"><button type="button" class="secondary" id="copyCurrentRoster">沿用目前委員名單</button><span></span><button type="button" class="secondary" id="previewHandover">預覽影響</button><button type="button" id="saveHandover">排定自動換屆</button></div>
+        <div class="handover-impact" id="handoverImpact" hidden></div>
+        <div class="handover-scheduled" id="handoverScheduled" hidden><div></div><button type="button" id="cancelHandover">取消排程</button></div>
+        <div class="handover-safety"><b>生效前不動正式資料</b><span>排定後仍可修改或取消。生效時系統一次建立新任期、結束舊任期，並只把含卸任或轉任人員的未完成工作列為待指派；投票資格快照與所有已結案紀錄維持原樣。</span></div>
+      </section>
+      <section class="card credentials-card" id="credentialsCard" hidden><div class="section-title"><span>05</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
       <section class="card ai-card" id="personalAiSettings">
-        <div class="section-title"><span>05</span><div><h2>我的 AI API 綁定</h2><p>只屬於目前登入的 <b data-auth-name></b>，不與其他委員共用</p></div></div>
+        <div class="section-title"><span>06</span><div><h2>我的 AI API 綁定</h2><p>只屬於目前登入的 <b data-auth-name></b>，不與其他委員共用</p></div></div>
         <div class="ai-overview">
           <label>預設回答平台<select id="defaultAiProvider"><option value="openai">GPT（OpenAI）</option><option value="gemini">Gemini（Google）</option><option value="anthropic">Claude（Anthropic）</option></select></label>
           <div class="ai-owner"><small>目前綁定身份</small><strong id="aiOwnerName">—</strong><span id="aiStorageStatus">正在讀取個人設定…</span></div>
@@ -65,7 +83,7 @@
         <div class="ai-next-step"><b>本階段不會消耗 token</b><span>目前只建立個人綁定。後續接上制度查詢對話框後，才會在使用者送出問題時呼叫所選平台。</span></div>
       </section>
       <section class="card ai-guide-card">
-        <div class="section-title"><span>06</span><div><h2>三家 API Key 申請教學</h2><p>依官方頁面操作；Key 建立後只貼回上方對應欄位</p></div></div>
+        <div class="section-title"><span>07</span><div><h2>三家 API Key 申請教學</h2><p>依官方頁面操作；Key 建立後只貼回上方對應欄位</p></div></div>
         <div class="guide-grid">
           <details open><summary><b>GPT／OpenAI</b><span>約 3–5 分鐘</span></summary><ol><li>登入 OpenAI Platform。</li><li>進入 API Keys，建立新的 Secret Key。</li><li>如尚未啟用 API 計費，依頁面設定 Billing／Credits。</li><li>複製 Key，貼到上方 OpenAI 欄位並儲存。</li></ol><a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">開啟 OpenAI API Keys 官方頁面 →</a></details>
           <details><summary><b>Gemini／Google</b><span>約 3–5 分鐘</span></summary><ol><li>登入 Google AI Studio。</li><li>開啟 API Keys，選擇或建立 Google Cloud 專案。</li><li>建立 Gemini API Key；新 Key 建議使用官方目前提供的受限／授權金鑰。</li><li>複製 Key，貼到上方 Gemini 欄位並儲存。</li></ol><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">開啟 Google AI Studio API Keys →</a></details>
@@ -144,6 +162,6 @@
       </section>
     </div>
   </main>
-  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=17"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/release-notes.js?v=20"></script><script src="assets/js/workspace-nav.js?v=8"></script>
+  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=18"></script><script src="assets/js/annual-handover.js?v=1"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/release-notes.js?v=22"></script><script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

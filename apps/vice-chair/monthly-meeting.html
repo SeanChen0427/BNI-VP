@@ -8,17 +8,17 @@
   <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
   <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
   <script src="assets/js/supabase-config.js?v=1"></script>
-  <script src="assets/js/auth.js?v=7"></script>
+  <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
   <script src="assets/js/member-directory.js?v=2"></script>
   <script src="core/case-domain.js?v=8"></script>
-<script src="assets/js/task-store.js?v=7"></script>
+<script src="assets/js/task-store.js?v=8"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/monthly-meeting.css?v=1">
   <link rel="stylesheet" href="assets/css/monthly-meeting-access.css?v=2">
-  <link rel="stylesheet" href="assets/css/monthly-meeting-care.css?v=1">
+  <link rel="stylesheet" href="assets/css/monthly-meeting-care.css?v=3">
   <link rel="stylesheet" href="assets/css/monthly-meeting-recovery.css?v=1">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
 </head>
@@ -94,11 +94,11 @@
         </section>
 
         <section class="meeting-card">
-          <div class="section-title"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">只列出需要決定追蹤人員的項目；細節請另開會員關懷儀表板討論。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
-          <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
+          <div class="section-title"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">需要後續行動的項目須排定追蹤人員與日期；續約項目若會中確認不續約，可直接保留決議而不建立工作，結案後若改為續約則追加更正。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
+          <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成／不續約</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
           <div id="careVisualBoard" class="care-visual-board"></div>
           <textarea id="careMembers" hidden readonly></textarea>
-          <label class="wide">討論結論、負責人與期限<textarea id="careActions" rows="5" placeholder="例如：由○○主責，於7/20前完成關懷"></textarea></label>
+          <label class="wide">討論結論、負責人與期限（如適用）<textarea id="careActions" rows="5" placeholder="例如：由○○主責，於 7/20 前完成關懷"></textarea></label>
         </section>
 
         <section class="meeting-card">
@@ -126,10 +126,25 @@
       </form>
     </div>
   </main>
+  <dialog id="renewalCorrectionDialog" class="renewal-correction-dialog">
+    <form id="renewalCorrectionForm">
+      <header><div><small>FINAL RECORD AMENDMENT</small><h2>更正續約決議</h2></div><button type="button" id="cancelRenewalCorrection" aria-label="關閉">×</button></header>
+      <p class="correction-scope">只會在已結案月會追加這一筆更正；原本的「確認不續約」、月會內容及其他草稿都不會被覆蓋。</p>
+      <div class="correction-member"><small>更正對象</small><strong id="renewalCorrectionMember"></strong></div>
+      <div class="correction-fields">
+        <label>追蹤委員（必填）<select id="renewalCorrectionOwner" required></select></label>
+        <label>陪訪委員（選填）<select id="renewalCorrectionCompanion"></select></label>
+        <label class="full">排定日期（必填）<input id="renewalCorrectionDueDate" type="date" required></label>
+        <label class="full">更正原因（必填）<textarea id="renewalCorrectionReason" rows="4" minlength="2" maxlength="500" required placeholder="例如：會員於結案後重新確認希望續約"></textarea></label>
+      </div>
+      <p id="renewalCorrectionError" class="correction-error" role="alert"></p>
+      <footer><button type="button" class="ghost" id="cancelRenewalCorrectionFooter">取消</button><button type="submit" class="primary" id="submitRenewalCorrection">保留原決議並新增更正</button></footer>
+    </form>
+  </dialog>
   <div id="toast"></div>
   <script src="vendor/docx.iife.js"></script>
-  <script src="core/monthly-meeting-domain.js?v=1"></script>
-  <script src="assets/js/monthly-meeting.js?v=13"></script>
+  <script src="core/monthly-meeting-domain.js?v=3"></script>
+  <script src="assets/js/monthly-meeting.js?v=16"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

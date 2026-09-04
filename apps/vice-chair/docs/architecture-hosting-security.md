@@ -47,6 +47,8 @@ BNI 分析工具
 | 訪談確認截圖 | 私人 bucket：`case-confirmations` | 副主席及受指派案件人員 |
 | 委員回饋 | PostgreSQL：`case_feedback`；LINE 呼喚與名單快照：`case_feedback_calls`、`case_feedback_call_responders` | 當期有效委員；持有效一次性連結者免登入選名填寫並可查看該案全體回饋，結案後鎖定；原始 Token 不落庫 |
 | 投票資格、票向及時間 | PostgreSQL：`vote_snapshots`、`votes` | 依投票制度與查閱規則限制 |
+| 年度換屆排程與名單 | PostgreSQL：`committee_handover_plans`、`committee_handover_members`、`committee_handover_events` | 只由 Admin 經 Edge API 預排／修改／取消；生效由固定資料庫函式原子執行；一般登入者不可直寫 |
+| 工作指派沿革 | PostgreSQL：`task_assignment_history`＋`tasks.handover_*` | 追加式保存原指派與接手指派；已結案工作及其附件索引不得改寫 |
 | 董事顧問確認 | PostgreSQL：`advisor_confirmations`＋必要附件 | 副主席、Admin；其他角色依案件顯示結果 |
 | 出席與紀律紀錄 | PostgreSQL：`attendance_sessions`、`attendance_records` | 委員可保存草稿，副主席／Admin 最終確認；正式與待 PALMS 會員均用內部 ID 記錄，只作 LINE 公告暫時增量 |
 | BNI 分析結果 | PostgreSQL：`analysis_snapshots` | 登入且有權限者 |
@@ -133,7 +135,7 @@ BNI 分析工具
 - GitHub、Supabase、LINE 官方帳號及網域不應只綁 Sean 個人帳號。
 - 優先使用富聯共用管理 Email 或分會正式持有的組織帳號。
 - Admin 保留緊急復原權；副主席負責日常管理；會員委員依任期授權。
-- 換屆時完成候任者加權、卸任者撤權、未結案件移交及備份確認。
+- 換屆由 Admin 提前預排下一屆完整名單與生效日；生效前不動正式權限。到期後同角色留任者維持工作指派，卸任或轉任者的未完成工作保留原指派快照並集中移交；已結案紀錄不參與換屆。
 - 付款人、帳號復原人、第二管理者及緊急聯絡方式仍待確認。
 
 ## 八、建議實作順序

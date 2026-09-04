@@ -8,7 +8,7 @@ const source = readFileSync(
 
 assert.match(
   source,
-  /canComplete=domain\.canDirectComplete\(task\)/,
+  /canComplete=!task\.handoverPending&&domain\.canDirectComplete\(task\)/,
   "首頁完成按鈕必須先通過共用的直接完成規則"
 );
 assert.match(
