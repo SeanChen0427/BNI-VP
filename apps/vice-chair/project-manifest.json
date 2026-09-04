@@ -39,6 +39,8 @@
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
     "lineOfficialAccountRouting": "supabase/functions/_shared/line-channel-domain.mjs",
     "lineCommitteeWorkDigest": "supabase/functions/_shared/committee-work-digest.mjs",
+    "productVersionPolicy": "core/version-domain.mjs",
+    "productReleaseVersionState": "release-version.json",
     "userFacingReleaseNotes": "assets/js/release-notes.js",
     "lineCaseVoteNotice": "supabase/functions/app-api/line-message.mjs",
     "lineCaseFeedbackCall": "supabase/functions/_shared/case-feedback-call-domain.mjs",

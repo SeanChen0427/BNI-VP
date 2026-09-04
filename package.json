@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "start": "node apps/vice-chair/preview-server.mjs 4173",
+    "version:next": "node scripts/next-release-version.mjs",
     "test": "node --test apps/vice-chair/tests/*.test.mjs",
     "audit": "node scripts/unified-audit.mjs",
     "regression": "node apps/bni-analysis/engine/regression.mjs",
