@@ -1,4 +1,5 @@
 import {
+  collectCommitteeWorkDigestRequestEvents,
   collectGroupEvents,
   collectReplyOpportunityEvents,
   collectVoteCallEvents,
@@ -19,6 +20,12 @@ import {
   feedbackCallFingerprintSource,
   normalizeFeedbackCallText,
 } from "../_shared/case-feedback-call-domain.mjs";
+import {
+  buildCommitteeWorkDigest,
+  committeeWorkDigestTasksFromRows,
+  COMMITTEE_WORK_DIGEST_TASK_SOURCE,
+} from "../_shared/committee-work-digest.mjs";
+import { buildLineMentionAllMessage } from "../app-api/line-message.mjs";
 
 const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
 const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
@@ -92,6 +99,119 @@ function hex(bytes: ArrayBuffer) {
 
 async function sha256Text(value: string) {
   return hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)));
+}
+
+function committeeWorkDigestEventKey(event: { webhookEventId: string; lineMessageId: string }) {
+  if (event.webhookEventId) return `webhook:${event.webhookEventId}`;
+  if (event.lineMessageId) return `message:${event.lineMessageId}`;
+  return "";
+}
+
+async function buildLatestCommitteeWorkDigest() {
+  const [taskRows, assignments, stateRows, people] = await Promise.all([
+    db(`tasks?source=eq.${encodeURIComponent(COMMITTEE_WORK_DIGEST_TASK_SOURCE)}&status=in.(pending,in_progress)&select=id,source_reference,category,title,due_at,lead_person_id,revision,result_summary&order=due_at.asc.nullslast`),
+    db("task_assignments?select=task_id,person_id,role&order=assigned_at.asc"),
+    db("task_case_states?select=task_id,workflow,revision"),
+    db("people?select=id,display_name"),
+  ]);
+  const tasks = committeeWorkDigestTasksFromRows({ taskRows, assignments, stateRows, people });
+  return buildCommitteeWorkDigest(tasks);
+}
+
+async function finishCommitteeWorkDigestReply(id: string, patch: Record<string, unknown>) {
+  await db(`committee_work_digest_reply_deliveries?id=eq.${id}&status=eq.processing`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+    body: JSON.stringify(patch),
+  });
+}
+
+async function processCommitteeWorkDigestRequestEvent(event: {
+  groupId: string;
+  replyToken: string;
+  webhookEventId: string;
+  lineMessageId: string;
+  occurredAt: string;
+}) {
+  if (!committeeAccessToken) return false;
+  const triggerEventKey = committeeWorkDigestEventKey(event);
+  if (!triggerEventKey) return false;
+  const targets = await db(
+    `line_group_targets?oa_channel=eq.committee&line_group_id=eq.${encodeURIComponent(event.groupId)}`
+      + "&status=eq.active&route_key=eq.committee&purpose=eq.production&select=id&limit=1",
+  );
+  const target = targets?.[0];
+  if (!target) return false;
+  const existing = await db(
+    `committee_work_digest_reply_deliveries?trigger_event_key=eq.${encodeURIComponent(triggerEventKey)}&select=id&limit=1`,
+  );
+  if (existing?.[0]) return true;
+
+  const digest = await buildLatestCommitteeWorkDigest();
+  const message = buildLineMentionAllMessage(digest.content);
+  const [sourceHash, messageHash] = await Promise.all([
+    sha256Text(digest.source),
+    sha256Text(`committee-work-digest-reply-text-v2-v1\n${digest.content}`),
+  ]);
+  let delivery;
+  try {
+    const rows = await db("committee_work_digest_reply_deliveries", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+      body: JSON.stringify({
+        group_target_id: target.id,
+        source_sha256: sourceHash,
+        message_sha256: messageHash,
+        trigger_event_key: triggerEventKey,
+        trigger_line_message_id: event.lineMessageId || null,
+        triggered_at: event.occurredAt,
+      }),
+    });
+    delivery = rows?.[0];
+  } catch (error) {
+    if (Number((error as any)?.status) === 409 || /duplicate key/i.test(String((error as Error)?.message))) return true;
+    throw error;
+  }
+  if (!delivery) return true;
+
+  let response: Response;
+  try {
+    response = await fetch("https://api.line.me/v2/bot/message/reply", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${committeeAccessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ replyToken: event.replyToken, messages: [message] }),
+      signal: AbortSignal.timeout(3_000),
+    });
+  } catch (error) {
+    await finishCommitteeWorkDigestReply(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      error_code: "NETWORK",
+      error_message: String((error as Error)?.message || error).slice(0, 1000),
+    });
+    return true;
+  }
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    await finishCommitteeWorkDigestReply(delivery.id, {
+      status: "failed",
+      failed_at: new Date().toISOString(),
+      line_request_id: response.headers.get("x-line-request-id") || null,
+      error_code: `HTTP_${response.status}`,
+      error_message: String(payload?.message || `LINE HTTP ${response.status}`).slice(0, 1000),
+    });
+    return true;
+  }
+  await finishCommitteeWorkDigestReply(delivery.id, {
+    status: "sent",
+    sent_at: new Date().toISOString(),
+    line_request_id: response.headers.get("x-line-request-id") || null,
+    reply_line_message_id: payload?.sentMessages?.[0]?.id || null,
+  });
+  return true;
 }
 
 async function finishPendingAnnouncement(id: string, webhookEventId: string, patch: Record<string, unknown>) {
@@ -402,7 +522,8 @@ Deno.serve(async (request) => {
   catch { return json(400, { message: "Invalid JSON" }); }
   try {
     // 普通聊天內容不落地。副主席秘書Bot只使用當次 message 事件的
-    // replyToken 投遞已排程公告；會員委員秘書Bot只解析精準命中的案件呼喚。
+    // replyToken 投遞已排程公告；會員委員秘書Bot只解析精準命中的案件呼喚
+    // 與完整等於「委員會進度」的單一指令。
     await Promise.all(collectGroupEvents(payload).map(event => recordGroupEvent(event, oaChannel)));
     if (oaChannel === LINE_OA_CHANNELS.VICE_CHAIR) {
       // 同一 webhook request 最多投遞一則待發公告，避免多事件或多待發項造成洗版。
@@ -410,12 +531,16 @@ Deno.serve(async (request) => {
         if (await processReplyOpportunityEvent(opportunity)) break;
       }
     } else if (oaChannel === LINE_OA_CHANNELS.COMMITTEE) {
-      // 委員會的回饋／投票呼喚只有 Token 與完整雜湊相符才會回覆。
+      // 委員會的回饋／投票呼喚只有 Token 與完整雜湊相符才會回覆；
+      // 工作進度只接受正式委員群內的精確指令。
       const callEvents = collectVoteCallEvents(payload);
       await Promise.all(callEvents.flatMap(event => [
         processFeedbackCallEvent(event),
         processVoteCallEvent(event),
       ]));
+      for (const digestRequest of collectCommitteeWorkDigestRequestEvents(payload)) {
+        await processCommitteeWorkDigestRequestEvent(digestRequest);
+      }
     }
     return json(200, { ok: true });
   } catch (error) {

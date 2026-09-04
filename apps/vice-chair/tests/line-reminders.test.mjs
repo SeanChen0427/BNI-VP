@@ -166,7 +166,7 @@ assert.match(html, /id="weeklyNextReminder"/);
 assert.match(html, /id="committeeNextReminder"/);
 assert.match(html, /id="deliveryList"/);
 assert.match(html, /routine-reminders-mobile\.css\?v=4/);
-assert.match(html, /work-digest\.css\?v=1/);
+assert.match(html, /work-digest\.css\?v=2/);
 assert.match(mobileCss, /\.reminder-card \.toggle-row input\[type="checkbox"\]/);
 assert.match(mobileCss, /flex: 0 0 46px/);
 assert.match(mobileCss, /\.topbar > label[\s\S]*?display: none !important/);

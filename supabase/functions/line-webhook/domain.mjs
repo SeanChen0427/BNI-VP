@@ -1,3 +1,5 @@
+import { isCommitteeWorkDigestReplyTrigger } from "../_shared/committee-work-digest.mjs";
+
 const encoder = new TextEncoder();
 
 export function validLineGroupId(value) {
@@ -51,6 +53,28 @@ export function collectVoteCallEvents(payload) {
     events.push({
       groupId,
       text,
+      replyToken,
+      webhookEventId: String(event?.webhookEventId || "").slice(0, 200),
+      lineMessageId: String(event?.message?.id || "").slice(0, 200),
+      occurredAt: Number.isFinite(Number(event.timestamp))
+        ? new Date(Number(event.timestamp)).toISOString()
+        : new Date().toISOString(),
+    });
+  }
+  return events;
+}
+
+export function collectCommitteeWorkDigestRequestEvents(payload) {
+  const events = [];
+  for (const event of Array.isArray(payload?.events) ? payload.events : []) {
+    const groupId = event?.source?.type === "group" ? event.source.groupId : "";
+    const text = event?.type === "message" && event?.message?.type === "text"
+      ? String(event.message.text || "")
+      : "";
+    const replyToken = String(event?.replyToken || "");
+    if (!validLineGroupId(groupId) || !replyToken || !isCommitteeWorkDigestReplyTrigger(text)) continue;
+    events.push({
+      groupId,
       replyToken,
       webhookEventId: String(event?.webhookEventId || "").slice(0, 200),
       lineMessageId: String(event?.message?.id || "").slice(0, 200),

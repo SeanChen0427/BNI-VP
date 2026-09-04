@@ -15,7 +15,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/css/terminal-form.css">
   <link rel="stylesheet" href="assets/css/routine-reminders.css?v=3">
-  <link rel="stylesheet" href="assets/css/work-digest.css?v=1">
+  <link rel="stylesheet" href="assets/css/work-digest.css?v=2">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
   <link rel="stylesheet" href="assets/css/routine-reminders-mobile.css?v=4">
 </head>
@@ -69,7 +69,11 @@
     <section class="form-card action-card"><div><b>啟用前請先測試</b><span>交流群測試會等待下一則新訊息，15 分鐘未命中即結束且不通知好友；委員會測試仍會立即推播。保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
 
     <section class="form-card work-digest-card">
-      <div class="section-head"><span>05</span><div><h2>每週會員委員會工作進度</h2><p>即時讀取正式案件、主責、陪訪及期限；副主席先確認排版與內容，系統不會自動發送</p></div></div>
+      <div class="section-head"><span>05</span><div><h2>會員委員會工作進度</h2><p>在正式委員群輸入指定文字，會員委員秘書Bot會即時整理最新工作並免費 Reply</p></div></div>
+      <div class="digest-command">
+        <div><small>免額度群組指令</small><code>委員會進度</code></div>
+        <p>只接受完整相同文字；由已綁定的正式會員委員會群觸發，回覆會真正 @所有人。一般聊天不會觸發，也不保存指令全文、LINE 使用者 ID 或 replyToken。</p>
+      </div>
       <div class="digest-meta">
         <div><small>發送群組</small><strong id="workDigestTarget">正在確認…</strong></div>
         <div><small>本次資料狀態</small><strong id="workDigestCounts">正在讀取案件…</strong></div>
@@ -77,11 +81,11 @@
       </div>
       <label class="digest-editor">可編輯 LINE 文案<textarea id="workDigestMessage" rows="18" maxlength="4500" spellcheck="false"></textarea></label>
       <div class="message-preview digest-preview"><small>會員委員會群 LINE 預覽</small><pre id="workDigestPreview">正在產生預覽…</pre></div>
-      <p class="digest-safety">按下發送前會再次顯示正式群組名稱並要求確認；若案件或分工在預覽後更新，系統會阻擋舊版本發送。</p>
+      <p class="digest-safety"><b>建議優先使用群組指令：</b>下方按鈕保留為備援 Push，會計入 LINE 月訊息額度。按下前仍會再次顯示正式群組名稱並要求確認；若案件或分工在預覽後更新，系統會阻擋舊版本發送。</p>
       <div class="digest-actions">
         <button type="button" class="secondary-button" id="refreshWorkDigest">重新抓取最新工作</button>
         <button type="button" class="secondary-button" id="copyWorkDigest">複製預覽</button>
-        <button type="button" class="primary-button" id="sendWorkDigest">確認發送至委員會群</button>
+        <button type="button" class="primary-button" id="sendWorkDigest">備援：使用 Push 發送</button>
       </div>
       <div class="digest-delivery" id="workDigestDelivery">尚未從本頁發送</div>
     </section>
@@ -92,7 +96,7 @@
     </section>
   </main>
   <div id="toast"></div>
-  <script src="assets/js/routine-reminders.js?v=8"></script>
+  <script src="assets/js/routine-reminders.js?v=9"></script>
   <script src="assets/js/workspace-nav.js?v=8"></script>
 </body>
 </html>

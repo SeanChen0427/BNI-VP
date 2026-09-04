@@ -55,6 +55,7 @@
 - `line_group_targets`：Webhook 發現且由副主席／Admin 確認的 LINE 群組，只保存群組 ID、顯示名稱、所屬 OA（`vice_chair`／`committee`）、測試／正式環境與四種用途路由，不保存聊天內容。`committee` 只能由會員委員秘書Bot擁有，其餘路由只能由副主席秘書Bot擁有；相同 LINE 群組在 Bot 換接期間依 OA 分開保留歷史目標。
 - `line_reminder_rules`：交流群兩種常態提醒的開關、Asia/Taipei 發送時間、例會星期、提前天數及文案；僅 service role 可讀寫，初始一律關閉。
 - `line_reminder_deliveries`：常態通知的排程／人工測試發送稽核，以 delivery key 與 LINE retry key 防重複；不保存 Channel Access Token。
+- `committee_work_digest_reply_deliveries`：正式委員群精確輸入「委員會進度」後的 Reply 稽核；以 webhook 事件鍵防止平台重送造成重複回覆，只保存群組目標、來源／文案 SHA-256、LINE 事件／訊息識別、時間及成敗，不保存指令全文、完整進度文案、`replyToken` 或 LINE 使用者 ID。
 - `case_feedback_line_deliveries`：2026-08-28 前訪談後委員回饋 Push 通知的歷史發送稽核；保留既有紀錄，但新版案件不再新增此類 Push。
 - `case_feedback_calls`／`case_feedback_call_responders`：新版 LINE 回饋呼喚、指定測試／正式群、當期有效委員快照、Bot Reply 狀態及稽核；只保存原始 Token 與完整文案的 SHA-256，不保存完整群組聊天文字。測試／正式群都連回同一正式案件。
 - `case_vote_line_deliveries`：開票通知的正式會員委員會群發送稽核與防重送紀錄。

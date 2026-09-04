@@ -168,7 +168,8 @@ test("正式上線後 LINE 投票測試器已完整退場", () => {
   assert.doesNotMatch(callDomain, /isTest|測試投票圖卡/);
   assert.doesNotMatch(publicVote, /case_vote_test_votes|edge_cast_test_case_vote/);
   assert.match(publicVote, /is_test=eq\.false&environment=in\.\(test,production\)/);
-  assert.doesNotMatch(webhook, /purpose=eq\.production/);
+  const voteWebhookHandler = webhook.match(/async function processVoteCallEvent[\s\S]*?\n}\n\nDeno\.serve/)[0];
+  assert.doesNotMatch(voteWebhookHandler, /purpose=eq\.production/);
   assert.match(webhook, /is_test=eq\.false&environment=eq\.\$\{target\.purpose\}/);
   assert.match(settings, /測試群與正式群可同時保留/);
 });

@@ -55,7 +55,7 @@ BNI 分析工具
 | 完整分析交換檔 | 私人 Storage 或登入後即時 API | 不得部署為公開 JSON |
 | LINE Bot Token | Supabase Edge Function Secrets | 前端與資料庫不可讀取 |
 | LINE 群組目標、點名公告與交流群待發提醒 | PostgreSQL：`line_group_targets`、`attendance_line_deliveries`、`pending_announcements` | 只由 Edge Function/service role 讀寫；前端只取得去識別狀態、群組顯示名稱及可人工處理的提醒。待發表不保存好友 `userId`、觸發群訊息內容或 `replyToken` |
-| 每週委員工作進度發送稽核 | PostgreSQL：`committee_work_digest_deliveries` | 只由 Edge Function/service role 讀寫；不保存完整文案，只保存來源／文案雜湊與發送結果 |
+| 委員工作進度發送稽核 | PostgreSQL：Push `committee_work_digest_deliveries`、指令 Reply `committee_work_digest_reply_deliveries` | 只由 Edge Function/service role 讀寫；不保存完整文案、指令、`replyToken` 或 LINE 使用者 ID，只保存來源／文案雜湊、事件識別與發送結果 |
 | 案件委員回饋通知稽核 | PostgreSQL：`case_feedback_calls`、`case_feedback_call_responders`；舊 Push 歷史：`case_feedback_line_deliveries` | 只由 Edge Function/service role 讀寫；綁定該次測試／正式群，只保存 Token／文案雜湊、名單快照與 Reply 結果，不保存群聊全文 |
 | 個人 AI API Key | 後端加密欄位／Vault（按使用者隔離） | 前端只讀取綁定狀態與末四碼；完整 Key 不可讀回 |
 | 富聯共用系統 Secret（若未來需要） | Supabase Edge Function Secrets | 前端與資料庫一般角色不可讀取 |

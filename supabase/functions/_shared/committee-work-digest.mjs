@@ -9,6 +9,14 @@ const TYPE_LABELS = {
 
 const TYPE_ORDER = ["renewal", "new", "midterm", "industry", "special", "departure"];
 
+export const COMMITTEE_WORK_DIGEST_TASK_SOURCE = "vice-chair-work-plan";
+export const COMMITTEE_WORK_DIGEST_REPLY_TRIGGER = "委員會進度";
+
+export function isCommitteeWorkDigestReplyTrigger(value) {
+  return typeof value === "string"
+    && value.normalize("NFKC").trim() === COMMITTEE_WORK_DIGEST_REPLY_TRIGGER;
+}
+
 function taipeiParts(value = new Date()) {
   return Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Taipei",
@@ -74,6 +82,51 @@ function normalizeTask(task) {
     workflowRevision: Number(task?.workflowRevision || 0),
     workflow: task?.workflow && typeof task.workflow === "object" ? task.workflow : {},
   };
+}
+
+function parseTaskMetadata(value) {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+export function committeeWorkDigestTasksFromRows({
+  taskRows = [],
+  assignments = [],
+  stateRows = [],
+  people = [],
+} = {}) {
+  const names = new Map(people.map(person => [person.id, person.display_name]));
+  const assignmentsByTask = new Map();
+  for (const assignment of assignments) {
+    if (!assignmentsByTask.has(assignment.task_id)) assignmentsByTask.set(assignment.task_id, []);
+    assignmentsByTask.get(assignment.task_id).push(assignment);
+  }
+  const stateByTask = new Map(stateRows.map(row => [row.task_id, row]));
+  return taskRows.map(row => {
+    const metadata = parseTaskMetadata(row.result_summary);
+    const assigned = assignmentsByTask.get(row.id) || [];
+    const state = stateByTask.get(row.id) || {};
+    return {
+      id: row.source_reference,
+      type: row.category,
+      member: row.title,
+      dueAt: metadata.scheduledAt || row.due_at || "",
+      lead: names.get(row.lead_person_id) || "",
+      companions: assigned
+        .filter(item => item.role === "companion")
+        .map(item => names.get(item.person_id))
+        .filter(Boolean),
+      revision: Number(row.revision || 0),
+      workflowRevision: Number(state.revision || 0),
+      workflow: state.workflow || {},
+    };
+  });
 }
 
 function taskLine(task) {

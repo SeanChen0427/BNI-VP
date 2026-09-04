@@ -1,6 +1,19 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.23",
+      publishedAt: "2026-09-04",
+      title: "委員群可隨時呼叫最新工作進度",
+      level: "important",
+      changes: Object.freeze([
+        "在正式會員委員會群完整輸入「委員會進度」，會員委員秘書Bot會即時整理所有未完成工作並 @所有人。",
+        "回覆使用 LINE Reply，不計入月訊息額度；每次呼叫都重新讀取最新案件、主責、陪訪、期限與流程階段。",
+        "只有已核對的正式委員群及完整相同指令會觸發；一般聊天、其他群組與部分關鍵字不會自動回覆。",
+        "常態通知頁原 Push 按鈕保留為備援，並明確標示會計入 LINE 額度。"
+      ]),
+      impact: "正式委員群內任何成員都可使用此固定指令；系統不保存指令全文、LINE 使用者 ID 或 replyToken。"
+    }),
+    Object.freeze({
       version: "1.0.22",
       publishedAt: "2026-09-04",
       title: "年度換屆預排與歷史保護",
