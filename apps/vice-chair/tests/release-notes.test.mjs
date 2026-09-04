@@ -29,7 +29,13 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
-test("最新版本說明台北時間統一，並保留委員群、換屆與續約修正", () => {
+test("最新版本說明委員任期收權，並保留台北時間、換屆與續約修正", () => {
+  assert.match(releaseScript, /version: "1\.0\.25"/);
+  assert.match(releaseScript, /一般登入工作階段仍可讀取現任名單，但不能再直接新增、修改或刪除委員任期/);
+  assert.match(releaseScript, /由受保護的後端函式一次切換/);
+  assert.match(releaseScript, /不增加日常按鈕/);
+  assert.match(releaseScript, /不修改任何現任或歷史任期、案件、工作及交接紀錄/);
+  assert.ok(releaseScript.indexOf('version: "1.0.25"') < releaseScript.indexOf('version: "1.0.24"'));
   assert.match(releaseScript, /version: "1\.0\.24"/);
   assert.match(releaseScript, /任期、權限、換屆、截止日、排程與每月切換統一使用台北日期/);
   assert.match(releaseScript, /精確時間仍安全保留為 UTC/);

@@ -67,6 +67,7 @@ BNI 分析工具
 - `auth.js` 不含預設密碼，也不從 `localStorage` 讀寫密碼；舊 V2 認證設定載入時會自動清除既有密碼欄位。
 - 登入後以 `app_accounts` RLS 資料再次驗證 Admin／副主席／會員委員角色；停用或角色不一致即拒絕登入。
 - 現任角色姓名由登入後的 `committee_terms` 查詢載入，不嵌入 GitHub Pages。
+- `committee_terms` 對 Admin／副主席／會員委員的一般登入 JWT 均只開放讀取；新增與更新僅由 Admin-only 年度換屆 Edge API 使用 `service_role` 執行，避免繞過預覽、原子生效與交接歷程。
 - token 只保存於分頁 `sessionStorage`，接近到期時自動更新；關閉分頁即移除，8 小時未操作要求重新登入。
 - 登出固定使用 Supabase Auth `scope=local`，只撤銷目前裝置的 refresh token；首次登入尚未選姓名時亦不得讓共用帳號的其他裝置失效。
 - 同分頁的並行請求共用一次 token refresh，並在後端驗證人員狀態與任期起訖。

@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.25",
+      publishedAt: "2026-09-04",
+      title: "委員任期只由 Admin 換屆工具寫入",
+      level: "normal",
+      changes: Object.freeze([
+        "副主席、會員委員與 Admin 的一般登入工作階段仍可讀取現任名單，但不能再直接新增、修改或刪除委員任期。",
+        "下一屆名單仍由 Admin 在年度換屆頁預覽、排定或取消，生效日到達後由受保護的後端函式一次切換。",
+        "正常登入、姓名選擇、投票資格與換屆待指派流程均維持原操作，不增加日常按鈕。"
+      ]),
+      impact: "本次只收回未被正常畫面使用的資料庫直寫權限，不修改任何現任或歷史任期、案件、工作及交接紀錄。"
+    }),
+    Object.freeze({
       version: "1.0.24",
       publishedAt: "2026-09-04",
       title: "全系統日期時間統一為台北時間",
