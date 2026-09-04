@@ -131,9 +131,7 @@
   }
 
   function timeText(value) {
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+    return window.FulianCalendarDomain.formatTaipeiTimestamp(value);
   }
 
   function accountabilityItems() {

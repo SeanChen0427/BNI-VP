@@ -18,6 +18,9 @@ assert.equal(calendar.dateInput(now),"2026-07-17");
 assert.equal(calendar.monthKey(now),"2026-07");
 assert.equal(calendar.shiftMonthKey("2026-01",-1),"2025-12");
 assert.equal(calendar.monthEndDate("2026-02"),"2026-02-28");
+assert.equal(calendar.formatTaipeiTimestamp("2026-07-21T01:11:32.000Z",{seconds:true}),"7/21 09:11:32");
+assert.equal(calendar.formatTaipeiTimestamp("2026-07-20T16:09:07.000Z",{seconds:true,year:true}),"2026/7/21 00:09:07");
+assert.equal(calendar.formatTaipeiTimestamp("not-a-time",{seconds:true}),"");
 assert.equal(calendar.analysisEffectiveOn("2026-08-31"),"2026-09-01");
 assert.deepEqual(calendar.monthlyAnalysisCycle(new Date(2026,7,30)),{
   today:"2026-08-30",

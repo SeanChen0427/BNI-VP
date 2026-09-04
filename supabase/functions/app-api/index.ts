@@ -6089,6 +6089,7 @@ async function committeeBoardApi(request: Request, context: Context) {
 
   if (body.action === "create") {
     const reference = boardClientReference(body.clientReference);
+    const publishedAt = new Date().toISOString();
     await insertCommitteeBoardRows([{
       kind: COMMITTEE_BOARD_KIND,
       body: boardContent(body.content),
@@ -6097,8 +6098,9 @@ async function committeeBoardApi(request: Request, context: Context) {
       author_name: context.name,
       author_role: context.role,
       source_reference: `web:${reference}`,
+      created_at: publishedAt,
     }]);
-    return { posts: await committeeBoardPosts(context) };
+    return { publishedAt, posts: await committeeBoardPosts(context) };
   }
 
   if (body.action === "import-legacy") {

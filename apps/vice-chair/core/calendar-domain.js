@@ -7,6 +7,21 @@
     const date=value instanceof Date?new Date(value):new Date(value);
     return Number.isNaN(date.getTime())?null:date;
   }
+  function formatTaipeiTimestamp(value,{seconds=false,year=false}={}){
+    const date=validDate(value);
+    if(!date)return"";
+    const options={
+      timeZone:"Asia/Taipei",
+      month:"numeric",
+      day:"numeric",
+      hour:"2-digit",
+      minute:"2-digit",
+      hourCycle:"h23"
+    };
+    if(seconds)options.second="2-digit";
+    if(year)options.year="numeric";
+    return new Intl.DateTimeFormat("zh-TW",options).format(date).replace(/\s+/gu," ");
+  }
   function dateOnly(value){
     const match=String(value||"").match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
     if(match)return new Date(Number(match[1]),Number(match[2])-1,Number(match[3]));
@@ -89,5 +104,5 @@
     const monthCount=(endMonth.getFullYear()-startMonth.getFullYear())*12+endMonth.getMonth()-startMonth.getMonth()+1;
     return{start:dateInput(startMonth),end:dateInput(endDate),monthCount,first:count==="1"};
   }
-  return{daysUntil,countdownLabel,sameMonth,dateInput,monthKey,shiftMonthKey,monthEndDate,analysisEffectiveOn,monthlyAnalysisCycle,defaultVoteDeadline,monthHeading,renewalPalmsPeriod};
+  return{daysUntil,countdownLabel,sameMonth,dateInput,monthKey,shiftMonthKey,monthEndDate,analysisEffectiveOn,monthlyAnalysisCycle,defaultVoteDeadline,monthHeading,renewalPalmsPeriod,formatTaipeiTimestamp};
 });

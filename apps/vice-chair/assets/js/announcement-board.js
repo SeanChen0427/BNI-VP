@@ -55,14 +55,14 @@
   }
 
   function timeText(value) {
+    return window.FulianCalendarDomain.formatTaipeiTimestamp(value, { seconds: true }) || "時間未記錄";
+  }
+
+  function timeMarkup(value) {
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "時間未記錄";
-    return date.toLocaleString("zh-TW", {
-      month: "numeric",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    });
+    if (Number.isNaN(date.getTime())) return "<time>時間未記錄</time>";
+    const exact = window.FulianCalendarDomain.formatTaipeiTimestamp(date, { seconds: true, year: true });
+    return `<time datetime="${esc(date.toISOString())}" title="台北時間 ${esc(exact)}">${esc(timeText(date))}</time>`;
   }
 
   function render(posts = cached()) {
@@ -71,7 +71,7 @@
       <article class="announcement-item">
         <span class="announcement-avatar">${esc(post.authorName?.slice(-1) || "人")}</span>
         <div>
-          <div class="announcement-meta"><strong>${esc(post.authorName)}</strong><span>${esc(roleLabels[post.authorRole] || "使用者")}</span><time>${timeText(post.createdAt)}</time></div>
+          <div class="announcement-meta"><strong>${esc(post.authorName)}</strong><span>${esc(roleLabels[post.authorRole] || "使用者")}</span>${timeMarkup(post.createdAt)}</div>
           <p>${esc(post.content)}</p>
         </div>
         ${post.canDelete ? `<button type="button" class="announcement-delete" data-delete-post="${esc(post.id)}">刪除</button>` : ""}
@@ -111,7 +111,13 @@
       input.value = "";
       updateCount();
       render(data.posts);
-      setSyncState("留言已保存，其他裝置重新整理後即可看到。", "success");
+      const publishedAt = timeText(data.publishedAt);
+      setSyncState(
+        publishedAt === "時間未記錄"
+          ? "留言已保存，其他裝置重新整理後即可看到。"
+          : `留言已於 ${publishedAt}（台北時間）保存，其他裝置重新整理後即可看到。`,
+        "success"
+      );
     } catch (error) {
       setSyncState(`Supabase 保存失敗：${error.message}。內容仍在輸入框，請勿重複送出。`, "error");
       input.focus();

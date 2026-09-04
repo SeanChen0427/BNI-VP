@@ -28,6 +28,9 @@ test('Edge API 以登入身份建立、匯入與刪除留言', async () => {
   assert.match(edge, /post\?\.authorName === context\.name && post\?\.authorRole === context\.role/);
   assert.match(edge, /created_by: context\.personId/);
   assert.match(edge, /author_name: context\.name/);
+  assert.match(edge, /const publishedAt = new Date\(\)\.toISOString\(\)/);
+  assert.match(edge, /created_at: publishedAt/);
+  assert.doesNotMatch(edge, /created_at: body\.(?:createdAt|publishedAt)/);
   assert.match(edge, /只能刪除自己發布的留言/);
   assert.match(edge, /status: "cancelled"/);
 });
@@ -42,9 +45,14 @@ test('前台先搬移舊留言再以 Supabase 結果取代快取', async () => {
   assert.match(board, /fetch\("\/api\/announcements"/);
   assert.match(board, /action: "import-legacy"/);
   assert.match(board, /replaceCache\(data\.posts\)/);
+  assert.match(board, /formatTaipeiTimestamp\(value, \{ seconds: true \}\)/);
+  assert.match(board, /data\.publishedAt/);
+  assert.match(notifications, /FulianCalendarDomain\.formatTaipeiTimestamp\(value\)/);
   assert.match(board, /內容仍在輸入框，請勿重複送出/);
   assert.match(board, /目前顯示此裝置的安全備援/);
   assert.match(notifications, /await window\.FulianAnnouncementBoard\?\.ready/);
   assert.match(html, /announcementSyncState/);
-  assert.match(html, /announcement-board\.js\?v=2/);
+  assert.match(html, /calendar-domain\.js\?v=3/);
+  assert.match(html, /announcement-board\.js\?v=3/);
+  assert.ok(html.indexOf("calendar-domain.js?v=3") < html.indexOf("announcement-board.js?v=3"));
 });
