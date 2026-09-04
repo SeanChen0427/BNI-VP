@@ -105,7 +105,7 @@
 | 例會副主席介紹與提詞 | `docs/meeting-scripts.md` |
 | 訪談表單欄位 | `docs/forms/interview-forms.md` |
 | 中心區會員守則 | `docs/policies/member-rules-v9.1.md` |
-| 變更歷史 | `CHANGELOG.md` |
+| 變更歷史 | 依 `docs/AI_START_HERE.md` 的分層規則，以總專案 `scripts/changelog-context.mjs` 讀取 `CHANGELOG.md` |
 
 不要為單一問題載入所有文件。先用 `rg` 找相關章節，再閱讀完整相關小節。
 

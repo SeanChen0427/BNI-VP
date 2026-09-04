@@ -10,6 +10,18 @@
 
 不要一開始載入全部 `docs/`、所有表單或完整課程內容。
 
+## CHANGELOG 分層讀取
+
+`CHANGELOG.md` 永久保留完整歷史，但一般任務不得預設整份載入。從總專案根目錄執行：
+
+```bash
+node scripts/changelog-context.mjs --app vice-chair --headings --recent 8 --search LINE --search Reply
+```
+
+- `--search` 可重複，表示所有文字都必須命中；同義詞用可重複的 `--any`。先查業務名稱，再查實際檔名、函式、資料表或 API 名稱。
+- 工具只讀本機檔案，回傳命中的完整 `##` 條目，不會只截取單行。零命中時會列出完整標題索引並要求改用其他關鍵字。
+- 權限、migration、投票、正式資料、PALMS／計分、跨模組、回滾或仍無法確認影響鏈時，才使用 `--all` 完整讀取。
+
 ## 修改路由
 
 | 要修改的功能 | 先讀 |
@@ -50,7 +62,7 @@ node --test tests/*.test.mjs
 - 現行需求只寫 `docs/requirements-draft.md`。
 - 現行決策只寫 `docs/decision-log.md`。
 - 未決問題只寫 `docs/OPEN_QUESTIONS.md`。
-- 歷次程式變更寫 `CHANGELOG.md`。
+- 歷次程式變更完整寫入 `CHANGELOG.md`；讀取時遵守上方分層規則，不摘要或刪除原始歷史。
 - 外部模型審查報告放 `docs/reviews/`，只作歷史證據，不得當作現行規格。
 - 根目錄不得再建立第二份 `requirements-draft.md` 或 `decision-log.md`。
 - `AGENTS.md`、`CLAUDE.md` 改動後必須保持完全相同。
