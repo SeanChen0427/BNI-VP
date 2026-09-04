@@ -24,7 +24,7 @@
     "storage": "docs/STORAGE_SCHEMA.md",
     "roadmap": "docs/REFACTOR_ROADMAP.md",
     "changeHistory": "CHANGELOG.md",
-    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_LINE_REPLY_DRIVEN_REMINDERS.md"
+    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_ANNUAL_HANDOVER.md"
   },
   "domainOwners": {
     "caseStageAndStorageKeys": "core/case-domain.js",
