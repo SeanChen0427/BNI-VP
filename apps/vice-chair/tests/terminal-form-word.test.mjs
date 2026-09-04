@@ -58,7 +58,7 @@ assert.match(form, /snapshotMatches\(renewalMetricsSnapshot\)[\s\S]*?renderMetri
   "重新開啟已保存的 PALMS 快照後不得遺失訪談答案");
 assert.match(html, /<option value="">請選擇<\/option>/,
   "續約次數不得再默認成第一次");
-assert.match(html, /terminal-form\.js\?v=10/);
+assert.match(html, /terminal-form\.js\?v=11/);
 assert.match(live, /fetch\("\/api\/analysis-snapshot"/);
 assert.match(live, /正式分析快照缺少完整續約資料，系統已停止顯示 0 值/);
 assert.match(live, /正式分析快照缺少分會平均，系統已停止顯示 0 值/);

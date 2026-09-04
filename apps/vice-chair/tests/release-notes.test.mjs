@@ -29,7 +29,12 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
-test("最新版本說明委員群進度指令，並保留換屆與續約修正", () => {
+test("最新版本說明台北時間統一，並保留委員群、換屆與續約修正", () => {
+  assert.match(releaseScript, /version: "1\.0\.24"/);
+  assert.match(releaseScript, /任期、權限、換屆、截止日、排程與每月切換統一使用台北日期/);
+  assert.match(releaseScript, /精確時間仍安全保留為 UTC/);
+  assert.match(releaseScript, /不改寫任何舊案件、任期、指派、投票、Word 或分析快照/);
+  assert.ok(releaseScript.indexOf('version: "1.0.24"') < releaseScript.indexOf('version: "1.0.23"'));
   assert.match(releaseScript, /version: "1\.0\.23"/);
   assert.match(releaseScript, /完整輸入「委員會進度」/);
   assert.match(releaseScript, /Reply，不計入月訊息額度/);

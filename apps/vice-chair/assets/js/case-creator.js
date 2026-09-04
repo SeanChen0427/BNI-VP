@@ -2,6 +2,7 @@
   const KEY = window.FulianCaseDomain.TASK_STORAGE_KEY;
   const config = FulianAuth.getConfig();
   const session = FulianAuth.getSession();
+  const calendar = window.FulianCalendarDomain;
   const committee = [config.vpName, ...config.committee];
   const types = {
     renewal: { label: "終期輔導（續約）", stage: "待進行終期輔導", form: "terminal-form.html", existing: true },
@@ -21,9 +22,8 @@
     "'": "&#39;",
   })[character]);
   const local = () => {
-    const date = new Date(Date.now() + 864e5);
-    date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-    return date.toISOString().slice(0, 16);
+    const now = new Date(), parts = calendar.taipeiParts(now);
+    return calendar.dateTimeAfterDays(now, 1, { hour: parts.hour, minute: parts.minute });
   };
 
   function html() {

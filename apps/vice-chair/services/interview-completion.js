@@ -17,7 +17,7 @@
       fileName,
       memberName,
       completedAt:now.toISOString(),
-      completedAtLabel:now.toLocaleString("zh-TW"),
+      completedAtLabel:now.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}),
       feedbackUrl:feedbackUrl(caseId)
     };
   }

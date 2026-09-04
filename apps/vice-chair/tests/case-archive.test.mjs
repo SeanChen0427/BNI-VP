@@ -13,7 +13,7 @@ assert.match(html, /id="advisorFacts"/);
 assert.match(html, /id="activityLog"/);
 assert.match(html, /id="departureInsightsSection"/);
 assert.match(html, /vote-result-image\.js\?v=1/);
-assert.match(html, /case-archive\.js\?v=5/);
+assert.match(html, /case-archive\.js\?v=6/);
 assert.match(source, /\["vp", "admin"\]\.includes\(session\?\.role\)/, "結案資料只能由副主席與 Admin 查閱");
 assert.match(source, /files\.getCaseFile/, "結案頁必須能讀取保存的 Word");
 assert.match(source, /domain\.requiresDecisionWorkflow\(task\)/, "非投票案件也必須有結案摘要");

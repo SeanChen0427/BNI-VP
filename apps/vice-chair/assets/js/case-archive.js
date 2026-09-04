@@ -29,7 +29,7 @@
     const date = new Date(value);
     return Number.isNaN(date.getTime())
       ? String(value)
-      : date.toLocaleString("zh-TW", { year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+      : date.toLocaleString("zh-TW", { timeZone: "Asia/Taipei", year: "numeric", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
 
   function assignmentLabel(assignments) {

@@ -1,10 +1,10 @@
 (async function(){
 await window.FulianMemberDirectory.ready;
-const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1";let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s);
-const taipeiDay=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Taipei",year:"numeric",month:"2-digit",day:"2-digit"}).format(new Date());
+const session=FulianAuth.getSession();let config=FulianAuth.getConfig();const AUDIT_KEY="fulian-auth-audit-v1";let audit=JSON.parse(localStorage.getItem(AUDIT_KEY)||"[]");const $=s=>document.querySelector(s),calendar=window.FulianCalendarDomain;
+const taipeiDay=()=>calendar.dateInput(),taipeiTime=value=>calendar.formatTaipeiTimestamp(value,{year:true});
 const escapeHtml=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
 function toast(message){const t=$("#toast");t.textContent=message;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),1800)}
-function log(text){audit.unshift({text,time:new Date().toLocaleString("zh-TW")});audit=audit.slice(0,20);localStorage.setItem(AUDIT_KEY,JSON.stringify(audit));}
+function log(text){audit.unshift({text,time:taipeiTime(new Date())});audit=audit.slice(0,20);localStorage.setItem(AUDIT_KEY,JSON.stringify(audit));}
 function render(){
   const admin=session.role==="admin";
   $("#credentialsCard").hidden=!admin;$("#auditCard").hidden=!admin;
@@ -206,7 +206,7 @@ function renderDepartureState(){
           :status==="scheduled"
             ?`<a href="case-board.html#active">查看排程</a>`
             :`<a href="case-archive.html?case=${encodeURIComponent(d.interviewTaskId||"")}">查看訪談紀錄</a>`;
-      const timing=status==="scheduled"&&d.interviewScheduledAt?`・${new Date(d.interviewScheduledAt).toLocaleString("zh-TW")}`:status==="completed"&&d.interviewCompletedAt?`・${new Date(d.interviewCompletedAt).toLocaleString("zh-TW")}`:"";
+      const timing=status==="scheduled"&&d.interviewScheduledAt?`・${taipeiTime(d.interviewScheduledAt)}`:status==="completed"&&d.interviewCompletedAt?`・${taipeiTime(d.interviewCompletedAt)}`:"";
       return`<article><div class="departure-record-copy"><b>${escapeHtml(d.name)}</b><span>離會確認日 ${escapeHtml(d.confirmedAt||"—")}・${escapeHtml(d.profession||"未設定專業別")}</span><span>${escapeHtml(d.note||"—")}</span><em data-status="${escapeHtml(status)}">${escapeHtml(interviewLabels[status]||status)}${escapeHtml(timing)}</em></div><div class="departure-record-actions">${action}<button type="button" data-undo-departure="${escapeHtml(d.name)}">撤銷離會</button></div></article>`;
     }).join("")
     :`<article><span>目前離會名單沒有紀錄。</span></article>`;
@@ -315,7 +315,7 @@ function renderLineGroups(){
   }).join("");
   $("#lineGroupDiscovered").innerHTML=candidates.length?candidates.map(item=>{
     const routeOptions=Object.entries(LINE_ROUTE_LABELS).filter(([routeKey])=>LINE_ROUTE_CHANNELS[routeKey]===item.oaChannel).map(([routeKey,label])=>`<option value="${escapeHtml(routeKey)}">${escapeHtml(label)}</option>`).join("");
-    return`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${escapeHtml(item.oaName||LINE_CHANNEL_LABELS[item.oaChannel]||"LINE 助理")}・${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?new Date(item.lastEventAt).toLocaleString("zh-TW"):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途">${routeOptions}</select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`
+    return`<article class="line-group-candidate"><div><b>${escapeHtml(item.displayName)}</b><small>${escapeHtml(item.oaName||LINE_CHANNEL_LABELS[item.oaChannel]||"LINE 助理")}・${item.status==="disabled"?"已停用，可直接重新指定":`最近收到群組事件 ${item.lastEventAt?taipeiTime(item.lastEventAt):"—"}`}</small></div><select data-line-route="${escapeHtml(item.id)}" aria-label="群組用途">${routeOptions}</select><select data-line-environment="${escapeHtml(item.id)}" aria-label="群組環境"><option value="test">測試群</option><option value="production">正式群</option></select><button type="button" data-assign-line-group="${escapeHtml(item.id)}" data-name="${escapeHtml(item.displayName)}">${item.status==="disabled"?"重新啟用":"確認加入"}</button></article>`
   }).join(""):`<div class="line-group-empty">目前沒有可指定群組。邀請對應的 LINE 助理後，請在群內傳一則普通訊息。</div>`;
   document.querySelectorAll("[data-assign-line-group]").forEach(button=>button.onclick=()=>assignLineGroup(button.dataset.assignLineGroup,button.dataset.name));
   document.querySelectorAll("[data-disable-line-group]").forEach(button=>button.onclick=()=>disableLineGroup(button.dataset.disableLineGroup,button.dataset.name));

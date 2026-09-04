@@ -9,6 +9,7 @@ import { scoreMember, reportTotalWeeks } from "./score.mjs";
 import { reconcile } from "./reconcile.mjs";
 import { behaviorDiagnostics, greenIdle, renewalRadar, yellowBreakthrough, lifecycleLists, memberTenure } from "./diagnostics.mjs";
 import { loadAuditMonth, runAuditFamilies } from "./audit.mjs";
+import { taipeiDay } from "./time.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 
@@ -35,7 +36,7 @@ function latestAuditDir() {
   return months.length > 0 ? path.join(dir, months[months.length - 1]) : null;
 }
 
-export function buildAnalysis({ asOf = new Date().toISOString().slice(0, 10) } = {}) {
+export function buildAnalysis({ asOf = taipeiDay() } = {}) {
   const paths = {
     palms: path.join(ROOT, "data/baseline/palms.xls"),
     expiry: path.join(ROOT, "data/baseline/membership-expiry.xls"),
@@ -81,7 +82,7 @@ export function buildAnalysisFromParsed({
   midtermCompletions = [],
   midtermTasks = [],
   officialSyncPending = [],
-  asOf = new Date().toISOString().slice(0, 10),
+  asOf = taipeiDay(),
   sources = [],
 } = {}) {
   // 先對帳：blocking 異常存在時直接回傳，不做任何分析。

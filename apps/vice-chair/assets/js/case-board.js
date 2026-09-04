@@ -2,6 +2,7 @@
   await window.FulianTaskStore.ready;
   await window.FulianCaseStateStore.ready;
   const domain = window.FulianCaseDomain;
+  const calendar = window.FulianCalendarDomain;
   const TASK_KEY = domain.TASK_STORAGE_KEY;
   const session = FulianAuth.getSession();
   const authConfig = FulianAuth.getConfig();
@@ -58,6 +59,10 @@
     return domain.readWorkflow(localStorage, id);
   }
 
+  function scheduledTime(value) {
+    return calendar.toInstant(value)?.getTime() ?? Date.UTC(2999, 0, 1);
+  }
+
   function draftKey(task) {
     return domain.draftStorageKey(task);
   }
@@ -95,10 +100,12 @@
 
   function due(task) {
     if (!task.scheduledAt) return { label: "未排日期", overdue: false };
-    const date = new Date(task.scheduledAt);
+    const date = calendar.toInstant(task.scheduledAt);
+    const parts = calendar.taipeiParts(task.scheduledAt);
+    if (!date || !parts) return { label: "排定時間格式錯誤", overdue: false };
     const overdue = date < new Date() && !domain.isClosed(task, workflow(task.id));
     return {
-      label: `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`,
+      label: `${parts.month}/${parts.day} ${String(parts.hour).padStart(2, "0")}:${String(parts.minute).padStart(2, "0")}`,
       overdue
     };
   }
@@ -295,7 +302,7 @@
     renderSummary(all);
     renderTabs(all);
     $("#caseList").innerHTML = visible.length
-      ? visible.sort((a, b) => new Date(a.task.scheduledAt || "2999") - new Date(b.task.scheduledAt || "2999")).map(card).join("")
+      ? visible.sort((a, b) => scheduledTime(a.task.scheduledAt) - scheduledTime(b.task.scheduledAt)).map(card).join("")
       : `<div class="empty"><b>這個階段目前沒有案件</b><span>從首頁排定工作後，每一案會自動出現在這裡。</span></div>`;
     $("#caseList").querySelectorAll("[data-delete]").forEach(button => {
       button.onclick = () => openDeleteDialog(button.dataset.delete);

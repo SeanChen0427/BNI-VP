@@ -6,6 +6,7 @@
   const HISTORY_MIGRATION_KEY="fulian-attendance-history-supabase-v1";
   const authSession=FulianAuth.getSession();
   const AttendanceDomain=window.FulianAttendanceDomain;
+  const calendar=window.FulianCalendarDomain;
   let members=[];
   let rows=[];
   let timer=null;
@@ -70,8 +71,8 @@
   function dateLabel(){
     const value=$("#meetingDate").value;
     if(!value)return"____/__/__";
-    const date=new Date(`${value}T00:00:00`);
-    return`${date.getFullYear()}/${date.getMonth()+1}/${date.getDate()}`;
+    const parts=calendar.taipeiParts(value);
+    return parts?`${parts.year}/${parts.month}/${parts.day}`:"____/__/__";
   }
   function buildAnnouncement(){
     if(confirmed&&storedAnnouncement)return storedAnnouncement;
@@ -167,7 +168,7 @@ ${groupedLines("缺席",absenceTotal)}
   }
 
   function lineTime(value){
-    return value?new Date(value).toLocaleString("zh-TW"):"";
+    return value?calendar.formatTaipeiTimestamp(value,{year:true}):"";
   }
   function renderLineState(){
     const button=$("#sendLineAnnouncement"),state=$("#lineConnectionState");
@@ -238,9 +239,8 @@ ${groupedLines("缺席",absenceTotal)}
     $("#saveState").textContent="正在保存至 Supabase…";
     try{
       await api("POST",{action:"save-draft",...snapshot});
-      const now=new Date();
       $("#saveState").textContent="草稿與日期紀錄已保存";
-      $("#saveTime").textContent=`Supabase 最後保存 ${now.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
+      $("#saveTime").textContent=`Supabase 最後保存 ${calendar.formatTaipeiTime(new Date())}`;
     }catch(error){
       $("#saveState").textContent="Supabase 保存失敗";
       $("#saveTime").textContent=`本機草稿已保留・${error.message}`;
@@ -294,7 +294,7 @@ ${groupedLines("缺席",absenceTotal)}
       renderHistory();
       $("#saveState").textContent=confirmed?"已載入確認紀錄":session?"已載入 Supabase 草稿":"新週次尚未保存";
       $("#saveTime").textContent=confirmed&&session.confirmedAt
-        ?`${session.confirmedBy||"副主席"}・${new Date(session.confirmedAt).toLocaleString("zh-TW")}`
+        ?`${session.confirmedBy||"副主席"}・${calendar.formatTaipeiTimestamp(session.confirmedAt,{year:true})}`
         :`${state.palms.source}`;
     }catch(error){
       palmsReady=false;
@@ -336,7 +336,7 @@ ${groupedLines("缺席",absenceTotal)}
       confirmed=true;
       storedAnnouncement=buildAnnouncement();
       $("#saveState").textContent="本週紀錄已確認";
-      $("#saveTime").textContent=new Date(result.session.confirmed_at).toLocaleString("zh-TW");
+      $("#saveTime").textContent=calendar.formatTaipeiTimestamp(result.session.confirmed_at,{year:true});
       toast(result.message);
       await loadDate($("#meetingDate").value);
     }catch(error){
@@ -406,9 +406,8 @@ ${groupedLines("缺席",absenceTotal)}
     }
   }
   async function init(){
-    const now=new Date(),pad=value=>String(value).padStart(2,"0");
     configureIdentity();
-    $("#meetingDate").value=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+    $("#meetingDate").value=calendar.dateInput();
     await migrateConfirmedLocalHistory();
     await loadDate($("#meetingDate").value);
     $$("[data-save]").forEach(element=>{

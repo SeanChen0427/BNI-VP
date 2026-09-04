@@ -2,6 +2,7 @@
   await window.FulianTaskStore.ready;
   await window.FulianAnnouncementBoard?.ready;
   const domain = window.FulianCaseDomain;
+  const calendar = window.FulianCalendarDomain;
   const TASK_KEY = domain.TASK_STORAGE_KEY;
   const ANNOUNCEMENT_KEY = "fulian-announcement-board-v1";
   const session = FulianAuth.getSession();
@@ -50,7 +51,7 @@
     const state = workflow(task.id);
     const draft = domain.readDraft(localStorage, task);
     const stage = domain.stageOf(task, state, Boolean(draft));
-    const date = task.scheduledAt ? new Date(task.scheduledAt) : null;
+    const date = task.scheduledAt ? calendar.toInstant(task.scheduledAt) : null;
     const hours = date && !Number.isNaN(date.getTime()) ? (date - new Date()) / 36e5 : null;
     const label = typeLabels[task.type] || "會員案件";
     let kind = "draft";
@@ -88,14 +89,14 @@
     if (hours !== null && hours < 0) {
       kind = `${kind}-overdue`;
       title = `${label}已逾期`;
-      detail = `${task.member}・原排定 ${date.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+      detail = `${task.member}・原排定 ${calendar.formatTaipeiTimestamp(date)}`;
       tone = "urgent";
       icon = "急";
       priority = 0;
     } else if (hours !== null && hours <= 72 && priority > 1) {
       kind = `${kind}-due`;
       title = `${label}將在 3 日內到期`;
-      detail = `${task.member}・${date.toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}`;
+      detail = `${task.member}・${calendar.formatTaipeiTimestamp(date)}`;
       tone = "urgent";
       icon = "期";
       priority = 1;

@@ -52,8 +52,8 @@
 
   function formatDate(value) {
     if (!value) return "—";
-    const date = new Date(`${String(value).slice(0, 10)}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("zh-TW");
+    const match = String(value).slice(0, 10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return match ? `${Number(match[1])}/${Number(match[2])}/${Number(match[3])}` : value;
   }
 
   function sourceLabel(task) {
@@ -123,7 +123,7 @@
     $("#notApplicable").hidden = ["sent", "not_applicable"].includes(task.status);
     $("#restoreTask").hidden = !["held", "not_applicable"].includes(task.status);
     const note = task.status === "sent"
-      ? `已於 ${new Date(task.sentAt).toLocaleString("zh-TW")} 由使用者標記為人工寄送。`
+      ? `已於 ${new Date(task.sentAt).toLocaleString("zh-TW",{timeZone:"Asia/Taipei"})} 由使用者標記為人工寄送。`
       : task.status === "held" ? `暫緩原因：${task.holdReason || "未填寫"}`
         : task.status === "not_applicable" ? `不適用原因：${task.outcomeReason || "未填寫"}` : "";
     $("#outcomeNote").hidden = !note;

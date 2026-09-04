@@ -82,7 +82,7 @@ test("正式案件可選發布群組，但只建立呼喚且不使用 Push 額�
   assert.match(workflow, /這只改變投票圖卡的發布位置/);
   assert.match(workflow, /仍會直接寫入/);
   assert.match(html, /case-state-store\.js\?v=16/);
-  assert.match(html, /case-workflow\.js\?v=30/);
+  assert.match(html, /case-workflow\.js\?v=31/);
 });
 
 test("測試群投票圖卡可單向改發正式群，並保留既有正式票", () => {
@@ -199,5 +199,5 @@ test("LINE 群組管理每個用途只顯示一列並以下拉查看測試或正
   assert.match(renderSection, /data-line-route-view/);
   assert.match(renderSection, /每項用途可用下拉選擇查看測試群／正式群/);
   assert.match(html, /line-group-route select/);
-  assert.match(html, /settings\.js\?v=18/);
+  assert.match(html, /settings\.js\?v=19/);
 });

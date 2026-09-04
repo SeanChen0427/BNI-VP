@@ -345,15 +345,24 @@
     return Math.floor(Math.max(Number(base) || 0, 0) / 2) + 1;
   }
 
+  function taipeiTimestamp(value) {
+    if (value instanceof Date || typeof value === "number") return new Date(value).getTime();
+    const raw = String(value || "").trim();
+    const normalized = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?$/.test(raw)
+      ? `${raw}+08:00`
+      : raw;
+    return new Date(normalized).getTime();
+  }
+
   function voteDeadlineStatus(value, nowValue = Date.now()) {
     if (!value) {
       return { valid: false, expired: false, timestamp: null };
     }
-    const timestamp = new Date(value).getTime();
+    const timestamp = taipeiTimestamp(value);
     if (!Number.isFinite(timestamp)) {
       return { valid: false, expired: false, timestamp: null };
     }
-    const now = new Date(nowValue).getTime();
+    const now = taipeiTimestamp(nowValue);
     return {
       valid: true,
       expired: Number.isFinite(now) ? timestamp <= now : false,

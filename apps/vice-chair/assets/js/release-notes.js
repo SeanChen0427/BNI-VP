@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.0.24",
+      publishedAt: "2026-09-04",
+      title: "全系統日期時間統一為台北時間",
+      level: "important",
+      changes: Object.freeze([
+        "任期、權限、換屆、截止日、排程與每月切換統一使用台北日期，不再受裝置或伺服器時區影響。",
+        "表單預設時間、到期倒數、投票截止、歷程顯示與下載檔名日期，統一依台北時間產生。",
+        "10/1 換屆會在台北午夜切換；資料庫中的精確時間仍安全保留為 UTC，再於畫面轉成台北時間。"
+      ]),
+      impact: "不改寫任何舊案件、任期、指派、投票、Word 或分析快照，也不變更 BNI 計分與燈號規則。"
+    }),
+    Object.freeze({
       version: "1.0.23",
       publishedAt: "2026-09-04",
       title: "委員群可隨時呼叫最新工作進度",

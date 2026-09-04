@@ -112,6 +112,14 @@ assert.equal(
   domain.voteDeadlineStatus("2026-07-20T18:00", "2026-07-20T18:00").expired,
   true
 );
+assert.equal(
+  domain.voteDeadlineStatus("2026-10-01T00:00", "2026-09-30T15:59:59.999Z").expired,
+  false
+);
+assert.deepEqual(
+  domain.voteDeadlineStatus("2026-10-01T00:00", "2026-09-30T16:00:00.000Z"),
+  { valid: true, expired: true, timestamp: Date.parse("2026-10-01T00:00:00+08:00") }
+);
 assert.deepEqual(
   domain.annualRenewalMetrics({
     annualMetrics: { education: 21, visitors: 7 },

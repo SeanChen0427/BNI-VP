@@ -124,7 +124,7 @@
       existing,
       fileName,
       sourceLabel,
-      now.toLocaleString("zh-TW"),
+      now.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}),
       now.toISOString(),
       { closeWithoutDecision }
     );

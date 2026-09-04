@@ -4,25 +4,35 @@
 
 const MS_DAY = 24 * 60 * 60 * 1000;
 
+function utcDate(iso) {
+  const match = String(iso || "").match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])));
+  return date.getUTCFullYear() === Number(match[1]) && date.getUTCMonth() === Number(match[2]) - 1 && date.getUTCDate() === Number(match[3]) ? date : null;
+}
+
 export function monthsBetween(startISO, endISO) {
-  const s = new Date(`${startISO}T00:00:00`);
-  const e = new Date(`${endISO}T00:00:00`);
-  let months = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
-  if (e.getDate() < s.getDate()) months -= 1;
+  const s = utcDate(startISO);
+  const e = utcDate(endISO);
+  if (!s || !e) return NaN;
+  let months = (e.getUTCFullYear() - s.getUTCFullYear()) * 12 + (e.getUTCMonth() - s.getUTCMonth());
+  if (e.getUTCDate() < s.getUTCDate()) months -= 1;
   return months;
 }
 
 // 續約截止日 = 到期日往前 2 個月的 15 號。
 export function renewalDeadline(expiryISO) {
-  const d = new Date(`${expiryISO}T00:00:00`);
-  const target = new Date(d.getFullYear(), d.getMonth() - 2, 15);
-  const y = target.getFullYear();
-  const m = String(target.getMonth() + 1).padStart(2, "0");
+  const d = utcDate(expiryISO);
+  if (!d) return "";
+  const target = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 2, 15));
+  const y = target.getUTCFullYear();
+  const m = String(target.getUTCMonth() + 1).padStart(2, "0");
   return `${y}-${m}-15`;
 }
 
 function daysBetween(fromISO, toISO) {
-  return Math.round((new Date(`${toISO}T00:00:00`) - new Date(`${fromISO}T00:00:00`)) / MS_DAY);
+  const from=utcDate(fromISO),to=utcDate(toISO);
+  return from&&to?Math.round((to-from)/MS_DAY):NaN;
 }
 
 // 會齡與身份判定。復會會員（最近開始日期晚於累計開始日期）以最近開始日期判定期中／新會員。

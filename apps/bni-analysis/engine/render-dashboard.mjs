@@ -4,6 +4,8 @@
 //   <div class="sub">現任 N 人…、stats 的 n/l 結構與關鍵字（綠燈率／本週續約截止／續約審查預警／審計觀察／紅燈會員／行業別開放警示）、
 //   <section><h2> 區段、card 的 t/d/action 結構、黃燈突圍表 row[0]=姓名 row[2]=需求文字。
 
+import { taipeiDay } from "./time.mjs";
+
 const esc = (v) => String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 const DOT = { green: "g", yellow: "y", red: "r", black: "r" };
@@ -188,7 +190,7 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
   const aiSection = aiReview ? `
 <section>
   <div class="sec-h"><h2>本月 AI 審視報告</h2><span class="badge gray">${esc(aiReview.provider)}・${esc(aiReview.model)}</span><span class="badge green">副主席已確認發佈</span></div>
-  <details><summary style="cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0">展開完整審視報告（產出於 ${esc(new Date(aiReview.generatedAt).toISOString().slice(0, 10))}）</summary>
+  <details><summary style="cursor:pointer;font-size:13px;color:var(--muted);padding:6px 0">展開完整審視報告（產出於 ${esc(taipeiDay(aiReview.generatedAt))}）</summary>
   <div class="banner" style="white-space:pre-wrap;margin-top:10px;font-size:13.5px">${esc(aiReview.text)}</div></details>
 </section>` : "";
 

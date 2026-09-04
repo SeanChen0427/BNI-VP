@@ -10,10 +10,10 @@ const edgeSource = await readFile(new URL("../../../supabase/functions/app-api/i
 const dashboardSource = await readFile(new URL("../../bni-analysis/engine/render-dashboard.mjs", import.meta.url), "utf8");
 
 test("月度分析頁先載入正式 Supabase API 橋接再執行頁面程式", () => {
-  const calendarIndex = html.indexOf("core/calendar-domain.js?v=3");
+  const calendarIndex = html.indexOf("core/calendar-domain.js?v=4");
   const authIndex = html.indexOf("assets/js/auth.js?v=8");
   const bridgeIndex = html.indexOf("assets/js/supabase-data.js?v=3");
-  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=10");
+  const pageIndex = html.indexOf("assets/js/analysis-review.js?v=11");
   assert.ok(calendarIndex >= 0 && authIndex > calendarIndex && bridgeIndex > authIndex && pageIndex > bridgeIndex);
   assert.match(html, /assets\/css\/analysis-review\.css\?v=6/);
 });

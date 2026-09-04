@@ -1,5 +1,6 @@
 const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)],departureTaskId=new URLSearchParams(location.search).get("task");if(!departureTaskId)location.replace("case-board.html?new=departure");const KEY=window.FulianCaseDomain.draftStorageKey({id:departureTaskId,type:"departure"});
 const departureCompletion=window.FulianInterviewCompletion.setup({formLabel:"離會訪談",requiresDecision:false});
+const departureCalendar=window.FulianCalendarDomain;
 let members=[{name:"正式資料載入中",profession:""}];
 let member=members[0],timer;
 const questions=[
@@ -13,19 +14,19 @@ const questions=[
   [8,"你有做過什麼事來改變它嗎？如果有，那是什麼？","improvementAttempts","text"],
   [9,"提醒您，根據 BNI 總政策，離開分會後，亦即 BNI 公司取消會員對於名片、網站、標誌、名牌等商標使用之權利，敬請遵守以免觸犯刑法。","trademarkUnderstood","check"]
 ];
-function localDate(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
-function localDateTime(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,16)}
+function localDate(){return departureCalendar.dateInput()}
+function localDateTime(){return departureCalendar.dateTimeInput()}
 function answer(id){return $(`#${id}`)?.value.trim()||""}
 function radio(name){return document.querySelector(`input[name="${name}"]:checked`)?.value||""}
 function mark(value,target){return value===target?"■":"□"}
 function safe(text){return String(text||"").replace(/[\\/:*?"<>|]/g,"-").trim()}
-function stamp(){const d=new Date();return`${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`}
+function stamp(){return departureCalendar.dateStamp()}
 function toast(message){const t=$("#toast");t.textContent=message;t.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>t.classList.remove("show"),2200)}
 function selectMember(name,preserve=false){member=members.find(x=>x.name===name)||members[0];$("#memberSearch").value=member.name;$("#profession").value=member.profession;if(!preserve)$("#departureDate").value=answer("departureDate")||localDate()}
 function serialize(){const out={member:member.name,login:$("#loginUser").value};$$('[data-save]').forEach(el=>{if(el.type==="radio"){if(el.checked)out[`radio:${el.name}`]=el.value}else if(el.type==="checkbox")out[el.id]=el.checked;else out[el.id]=el.value});return out}
 function restore(data){if(!data)return;if(data.login)$("#loginUser").value=data.login;selectMember(data.member||members[0].name,true);$$('[data-save]').forEach(el=>{if(el.type==="radio")el.checked=data[`radio:${el.name}`]===el.value;else if(el.type==="checkbox"&&data[el.id]!==undefined)el.checked=data[el.id];else if(data[el.id]!==undefined)el.value=data[el.id]})}
 function progress(){const fields=$$('textarea[data-save],input[data-save]:not([type="radio"]):not([type="checkbox"]),select[data-save]'),filled=fields.filter(x=>x.value.trim()).length,groups=[...new Set($$('input[type="radio"][data-save]').map(x=>x.name))],chosen=groups.filter(n=>radio(n)).length,checks=$$('input[type="checkbox"][data-save]'),checked=checks.filter(x=>x.checked).length,total=fields.length+groups.length+checks.length,p=Math.round((filled+chosen+checked)/Math.max(total,1)*100);$("#progressBar").style.width=`${p}%`;$("#progressText").textContent=`${p}%`}
-function save(){localStorage.setItem(KEY,JSON.stringify(serialize()));$("#saveState").textContent="正在同步 Supabase…";window.FulianCaseStateStore.flush().then(()=>{const d=new Date();$("#saveState").textContent="草稿已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${d.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`}).catch(error=>{$("#saveState").textContent=`同步失敗：${error.message}`});progress()}
+function save(){localStorage.setItem(KEY,JSON.stringify(serialize()));$("#saveState").textContent="正在同步 Supabase…";window.FulianCaseStateStore.flush().then(()=>{$("#saveState").textContent="草稿已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${departureCalendar.formatTaipeiTime(new Date())}`}).catch(error=>{$("#saveState").textContent=`同步失敗：${error.message}`});progress()}
 function bind(){$$('[data-save]').forEach(el=>{const handler=()=>{$("#saveState").textContent="儲存中…";clearTimeout(timer);timer=setTimeout(save,300)};el.addEventListener("input",handler);el.addEventListener("change",handler)})}
 function questionResult(q){const[, ,id,type,extra]=q;if(type==="text")return answer(id)||"（未填寫）";if(type==="check")return`${$("#trademarkUnderstood").checked?"■":"□"} 會員已了解`;const value=radio(id),suffix=extra?`\n補充：${answer(extra)||"未填寫"}`:"";return`${mark(value,"是")} 是　${mark(value,"否")} 否${suffix}`}
 async function downloadWord(){

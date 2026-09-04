@@ -107,18 +107,17 @@ function selectedFeedbackAuthor(){
   if(!isVp())return currentUser();
   return eligibleMembers().includes(feedbackEditorTarget)?feedbackEditorTarget:currentUser();
 }
-function nowLabel(){return new Date().toLocaleString("zh-TW",{year:"numeric",month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit",hour12:false});}
-function dateLabel(value){if(!value)return"未設定";const d=new Date(value);return`${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;}
+function nowLabel(){return calendarDomain.formatTaipeiTimestamp(new Date(),{year:true});}
+function dateLabel(value){return value?calendarDomain.formatTaipeiTimestamp(value,{year:true})||"未設定":"未設定";}
 function voteDeadlineLineLabel(value,now=new Date()){
-  const deadline=new Date(value);
-  if(!Number.isFinite(deadline.getTime()))return"截止時間尚未設定";
-  const dateKey=date=>`${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}`;
-  const tomorrow=new Date(now);tomorrow.setDate(tomorrow.getDate()+1);
-  const hour=deadline.getHours(),minute=deadline.getMinutes(),period=hour<12?"上午":hour===12?"中午":hour<18?"下午":"晚上",displayHour=hour===0?12:hour>12?hour-12:hour;
+  const deadline=calendarDomain.toInstant(value),parts=calendarDomain.taipeiParts(value);
+  if(!deadline||!parts)return"截止時間尚未設定";
+  const today=calendarDomain.dateInput(now),tomorrow=calendarDomain.shiftDayKey(today,1),deadlineDay=calendarDomain.dateInput(value);
+  const hour=parts.hour,minute=parts.minute,period=hour<12?"上午":hour===12?"中午":hour<18?"下午":"晚上",displayHour=hour===0?12:hour>12?hour-12:hour;
   const time=`${period}${displayHour}${minute?`:${String(minute).padStart(2,"0")}`:"點"}`;
-  if(dateKey(deadline)===dateKey(tomorrow))return`明天${time}`;
-  if(dateKey(deadline)===dateKey(now))return`今天${time}`;
-  return`${deadline.getFullYear()}/${deadline.getMonth()+1}/${deadline.getDate()} ${time}`;
+  if(deadlineDay===tomorrow)return`明天${time}`;
+  if(deadlineDay===today)return`今天${time}`;
+  return`${parts.year}/${parts.month}/${parts.day} ${time}`;
 }
 function config(){return typeConfig[$("#caseType").value];}
 function caseDraft(){
@@ -127,9 +126,8 @@ function caseDraft(){
   catch{return{};}
 }
 function announcementDate(value=new Date()){
-  const parts=new Intl.DateTimeFormat("zh-TW",{timeZone:"Asia/Taipei",year:"numeric",month:"numeric",day:"numeric"}).formatToParts(value);
-  const get=type=>Number(parts.find(part=>part.type===type)?.value||0);
-  return`${get("year")}.${get("month")}.${get("day")}`;
+  const parts=calendarDomain.taipeiParts(value);
+  return parts?`${parts.year}.${parts.month}.${parts.day}`:"";
 }
 function resultAnnouncementText(){
   const type=$("#caseType").value,name=$("#applicant").value.trim(),profession=$("#profession").value.trim(),date=announcementDate();
@@ -220,8 +218,7 @@ function feedbackEnvironmentLabel(environment=selectedFeedbackEnvironment){retur
 function leadersMessage(){
   const decision=voteDecision();
   const result=decision.status==="pass"?"通過":"不通過";
-  const d=new Date();
-  const date=`${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}`;
+  const date=announcementDate();
   let extra="";
   if($("#caseType").value==="renewal")extra=`\n\n過去一年培訓：${$("#annualTraining").value||"尚待填寫"}\n過去一年來賓：${$("#annualVisitors").value||"尚待填寫"}`;
   return `【${date}${config().label}會員投票結果】\n\n申請者: ${$("#applicant").value}\n專業別: ${$("#profession").value}\n\n商業訪談專業投票結果：${result}\n\n感謝委員們的付出，此結果須待董事顧問最終確認，才會正式公佈，請委員們維護團隊共識，不得外傳，感謝。\n@BNI / CC 董事顧問${extra}`;
@@ -597,7 +594,7 @@ function restoreForm(){
   }
 }
 
-function persistNow(){state.form=collectForm();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));$("#saveState").textContent="正在同步 Supabase…";render();lastPersist=window.FulianCaseStateStore.flush().then(()=>{$("#saveState").textContent="案件資料已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`}).catch(error=>{$("#saveState").textContent="Supabase 保存失敗";throw error});return lastPersist;}
+function persistNow(){state.form=collectForm();localStorage.setItem(STORAGE_KEY,JSON.stringify(state));$("#saveState").textContent="正在同步 Supabase…";render();lastPersist=window.FulianCaseStateStore.flush().then(()=>{$("#saveState").textContent="案件資料已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${calendarDomain.formatTaipeiTime(new Date())}`}).catch(error=>{$("#saveState").textContent="Supabase 保存失敗";throw error});return lastPersist;}
 function scheduleSave(){$("#saveState").textContent="儲存中…";clearTimeout(saveTimer);saveTimer=setTimeout(persistNow,180);render();}
 
 async function storeWord(file){await window.FulianCaseFiles.saveGeneratedWord({caseId:CASE_ID,caseType:sourceTask?.type||"",blob:file,fileName:file.name,sourceLabel:"案件流程頁",domain:caseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});state=loadState();}
@@ -778,7 +775,7 @@ function bindEvents(){
     catch(error){advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="案件欄位同步失敗";const failure=$("#advisorSaveState");failure.classList.add("warning");failure.textContent=`董事顧問確認尚未保存：${error.message||"案件同步失敗"}`;return toast(error.message||"案件同步失敗")}
     $("#saveState").textContent="正在保存董事顧問確認…";
     lastPersist=window.FulianCaseStateStore.saveAdvisorConfirmation(CASE_ID,advisorStatus,advisorNote);
-    try{await lastPersist;advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="董事顧問確認已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;toast("董顧確認狀態已保存")}
+    try{await lastPersist;advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="董事顧問確認已保存至 Supabase";$("#saveTime").textContent=`最後同步 ${calendarDomain.formatTaipeiTime(new Date())}`;toast("董顧確認狀態已保存")}
     catch(error){advisorSaving=false;advisorDirty=false;state=loadState();render();$("#saveState").textContent="董事顧問確認保存失敗";const failure=$("#advisorSaveState");failure.classList.add("warning");failure.textContent=`董事顧問確認尚未保存：${error.message||"請重新整理後再試"}`;toast(error.message||"董事顧問確認保存失敗")}
   });
   $("#copyResultAnnouncement").addEventListener("click",async()=>{
@@ -854,7 +851,7 @@ async function init(){
         state.form=collectForm();
         localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
         $("#saveState").textContent="年度 PALMS 已自動帶入";
-        $("#saveTime").textContent=`最後儲存 ${new Date().toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
+        $("#saveTime").textContent=`最後儲存 ${calendarDomain.formatTaipeiTime(new Date())}`;
       }
     }catch{if($("#caseType").value==="renewal"){$("#annualDataSource").hidden=false;$("#annualDataSource").textContent="年度 PALMS 載入失敗，請重新整理或人工確認。";}else if($("#caseType").value==="new"){$("#resultAnnouncementState").textContent="正式會員名單載入失敗，請重新整理後再選擇引薦人。";}}
   }

@@ -1,27 +1,27 @@
 (function(){
   const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
-  const session=FulianAuth.getSession(),identity=`${session.role}:${session.name}`,canManage=["vp","admin"].includes(session.role),TASK_KEY=FulianCaseDomain.TASK_STORAGE_KEY;
+  const session=FulianAuth.getSession(),identity=`${session.role}:${session.name}`,canManage=["vp","admin"].includes(session.role),TASK_KEY=FulianCaseDomain.TASK_STORAGE_KEY,calendar=window.FulianCalendarDomain;
   const {isNewMemberReview,latestRenewalDecisionAmendment,effectiveCareDisposition,isConfirmedNonRenewal,hasRenewalDecisionCorrection,requiresCareAssignment,missingCareAssignments}=FulianMonthlyMeetingDomain;
   const editableIds=["meetingMonth","meetingDate","reportMonth","recorder","attendanceMemberCount","absenceActual","absenceList","lateActual","lateList","proxyActual","proxyList","attendanceNotes","chapterTarget","lostCount","applicationCount","growthCount","approvedCount","conditionalCount","pendingReviewCount","growthNotes","careActions","memberAssistance","motions","conclusion","followUps"];
   let store={settings:{chapterSizeTarget:51},records:[]},record=null,saveTimer=null,snapshot=null,renewalCorrectionRequest=null;
-  const pad=value=>String(value).padStart(2,"0"),isoDate=date=>`${date.getFullYear()}-${pad(date.getMonth()+1)}-${pad(date.getDate())}`;
+  const pad=value=>String(value).padStart(2,"0"),isoDate=date=>`${date.getUTCFullYear()}-${pad(date.getUTCMonth()+1)}-${pad(date.getUTCDate())}`;
   function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]))}
   function toast(message){const node=$("#toast");node.textContent=message;node.classList.add("show");clearTimeout(toast.timer);toast.timer=setTimeout(()=>node.classList.remove("show"),2200)}
-  function currentMonth(){const now=new Date();return`${now.getFullYear()}-${pad(now.getMonth()+1)}`}
-  function previousMonth(value){const [year,month]=String(value||currentMonth()).split("-").map(Number),date=new Date(year,month-2,1);return`${date.getFullYear()}-${pad(date.getMonth()+1)}`}
-  function defaultMeetingDate(month){const [year,m]=month.split("-").map(Number),date=new Date(year,m-1,1),offset=(2-date.getDay()+7)%7;date.setDate(1+offset);return isoDate(date)}
+  function currentMonth(){return calendar.monthKey()}
+  function previousMonth(value){return calendar.shiftMonthKey(value||currentMonth(),-1)}
+  function defaultMeetingDate(month){const [year,m]=month.split("-").map(Number),date=new Date(Date.UTC(year,m-1,1)),offset=(2-date.getUTCDay()+7)%7;date.setUTCDate(1+offset);return isoDate(date)}
   function meetingId(month){return`meeting-${month}`}
   function emptyRecord(month=currentMonth()){return{id:meetingId(month),meetingMonth:month,meetingDate:defaultMeetingDate(month),reportMonth:previousMonth(month),recorder:session.name,attendees:[session.name],status:"draft",attendance:{memberCount:0,absenceActual:0,absenceList:"",lateActual:0,lateList:"",proxyActual:0,proxyList:"",notes:"",source:"正在讀取上月單月 PALMS",periodStart:"",periodEnd:""},growth:{chapterTarget:store.settings.chapterSizeTarget||51,chapterActual:0,lostCount:0,applicationCount:0,growthCount:0,approvedCount:0,conditionalCount:0,pendingReviewCount:0,notes:""},care:{members:"",actions:""},memberAssistance:"",motions:"",conclusion:"",followUps:""}}
   async function api(method="GET",body=null){const options={method,headers:{"Content-Type":"application/json"},cache:"no-store"};if(body)options.body=JSON.stringify(body);const url=`/api/committee-meetings${method==="GET"?`?identity=${encodeURIComponent(identity)}`:""}`,response=await fetch(url,options),data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.message||"月會紀錄服務無法使用");return data}
   async function attendanceContext(month){
     const response=await fetch(`/api/bni-monthly-attendance?month=${encodeURIComponent(month)}`,{cache:"no-store"}),data=await response.json();
     if(!response.ok)throw new Error(data.message||"BNI Connect 單月 PALMS 無法讀取");
-    return{...data,source:`${data.source}・${new Date(data.fetchedAt).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})} 更新`};
+    return{...data,source:`${data.source}・${calendar.formatTaipeiTimestamp(data.fetchedAt)} 更新`};
   }
   function loadTasks(){try{const list=JSON.parse(localStorage.getItem(TASK_KEY)||"[]");return Array.isArray(list)?list:[]}catch{return[]}}
   function workflow(task){return FulianCaseDomain.readWorkflow(localStorage,task.id)||{}}
   function isClosedTask(task){return FulianCaseDomain.isClosed(task,workflow(task))}
-  function inMonth(value,month){return String(value||"").slice(0,7)===month}
+  function inMonth(value,month){return calendar.monthKey(value)===month}
   function caseContext(month){
     const tasks=loadTasks(),applications=tasks.filter(task=>task.type==="new"&&inMonth(task.createdAt,month)),departures=tasks.filter(task=>task.type==="departure"&&isClosedTask(task)&&inMonth(task.completedAt,month));
     const newCases=tasks.filter(task=>task.type==="new"),approved=newCases.filter(task=>{const state=workflow(task),result=FulianCaseDomain.voteSummary(state);return isClosedTask(task)&&inMonth(task.completedAt,month)&&result.status==="pass"});
@@ -33,10 +33,10 @@
   const careStates={pending:"待討論",scheduled:"已排定",active:"追蹤中",done:"已完成"},careDispositions={follow_up:"排定後續工作",non_renewal:"確認不續約"};
   function careStateLabel(item){return isConfirmedNonRenewal(item)?"確認不續約":careStates[item.state]||"待討論"}
   function identityName(value){const parts=String(value||"").split(":");return parts.length>1?parts.slice(1).join(":"):String(value||"")}
-  function correctionTime(value){const date=new Date(value);return Number.isNaN(date.getTime())?String(value||""):date.toLocaleString("zh-TW")}
+  function correctionTime(value){return calendar.formatTaipeiTimestamp(value,{year:true})||String(value||"")}
   function careId(category,title){return`${category}-${title}`.replace(/\s+/g,"").replace(/[^\p{Letter}\p{Number}\-↔／]/gu,"").slice(0,100)}
   function memberFromCard(card){return String(card?.title||"").trim().split(/[｜|\s]/)[0]}
-  function daysUntil(value){const target=new Date(`${value}T00:00:00`),now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());return Number.isNaN(target.getTime())?null:Math.ceil((target-today)/86400000)}
+  function daysUntil(value){return calendar.daysUntil(value)}
   function dashboardCareItems(context=caseContext($("#reportMonth")?.value||previousMonth(currentMonth())),existing=[]){
     const items=[],section=title=>snapshot?.sections?.find(item=>item.title.includes(title)),push=(category,title,detail,action,defaults={})=>items.push({id:careId(category,title),category,title,detail,action,state:"pending",owner:"",companion:"",dueDate:"",note:"",assignmentRequired:true,...defaults});
     const renewal=section("續約雷達")?.tables?.[0];
@@ -162,7 +162,7 @@
     try{
       const result=await api("POST",{identity,action:"amend-renewal-decision",meetingId:request.meetingId,careItemId:request.itemId,correction:{id:request.id,reason,owner,companion,dueDate}});record=result.record;const index=store.records.findIndex(value=>value.id===record.id);if(index>=0)store.records[index]=record;else store.records.push(record);
       let taskWarning=false;if(result.taskSyncRequired){const corrected=record.care?.items?.find(value=>value.id===request.itemId);try{if(corrected)await syncCareTask(corrected)}catch(error){taskWarning=true;console.error("更正後工作同步失敗",error)}}else await window.FulianTaskStore.refresh().catch(error=>console.error("更正後工作重新整理失敗",error));
-      closeRenewalCorrection();renderRecord();renderHistory();$("#saveState").textContent="正式紀錄已追加更正";$("#saveMeta").textContent=`${session.name}・${new Date(record.updatedAt).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`;toast(taskWarning?"更正已保存；工作同步待重新整理確認":"已保留原決議並追加續約更正與工作排程");
+      closeRenewalCorrection();renderRecord();renderHistory();$("#saveState").textContent="正式紀錄已追加更正";$("#saveMeta").textContent=`${session.name}・${calendar.formatTaipeiTimestamp(record.updatedAt)}`;toast(taskWarning?"更正已保存；工作同步待重新整理確認":"已保留原決議並追加續約更正與工作排程");
     }catch(error){$("#renewalCorrectionError").textContent=error.message||"續約決議更正失敗"}
     finally{submit.disabled=false}
   }
@@ -173,7 +173,7 @@
   async function save(status=record.status||"draft",silent=false){
     if(!canManage)return toast("會員委員只能查閱歷史會議紀錄");
     record={...collect(),status};$("#saveState").textContent="正在儲存…";
-    try{const result=await api("POST",{identity,record});record=result.record;const index=store.records.findIndex(item=>item.id===record.id);if(index>=0)store.records[index]=record;else store.records.push(record);$("#saveState").textContent=record.status==="final"?"正式紀錄已保存":"草稿已保存";$("#saveMeta").textContent=`${record.updatedBy?.split(":").slice(1).join(":")||session.name}・${new Date(record.updatedAt).toLocaleString("zh-TW",{month:"numeric",day:"numeric",hour:"2-digit",minute:"2-digit"})}`;renderHistory();renderStatus();if(!silent)toast(record.status==="final"?"會議已結案並保存":"月會草稿已保存")}catch(error){$("#saveState").textContent="儲存失敗";$("#saveMeta").textContent=error.message;if(!silent)toast(error.message)}
+    try{const result=await api("POST",{identity,record});record=result.record;const index=store.records.findIndex(item=>item.id===record.id);if(index>=0)store.records[index]=record;else store.records.push(record);$("#saveState").textContent=record.status==="final"?"正式紀錄已保存":"草稿已保存";$("#saveMeta").textContent=`${record.updatedBy?.split(":").slice(1).join(":")||session.name}・${calendar.formatTaipeiTimestamp(record.updatedAt)}`;renderHistory();renderStatus();if(!silent)toast(record.status==="final"?"會議已結案並保存":"月會草稿已保存")}catch(error){$("#saveState").textContent="儲存失敗";$("#saveMeta").textContent=error.message;if(!silent)toast(error.message)}
   }
   function scheduleSave(){if(!canManage||record.status==="final")return;$("#saveState").textContent="編輯中…";clearTimeout(saveTimer);saveTimer=setTimeout(()=>save("draft",true),900);updateGap()}
   function renderAttendees(selected=[]){const config=FulianAuth.getConfig(),current=[config.vpName,...config.committee].filter(Boolean),currentSet=new Set(current),people=[...new Set([...current,...selected.filter(Boolean)])];$("#attendeeOptions").innerHTML=people.map(name=>`<label><input type="checkbox" value="${escapeHtml(name)}" ${selected.includes(name)?"checked":""}>${escapeHtml(name)}${currentSet.has(name)?"":"（歷史出席）"}</label>`).join("")}
@@ -241,7 +241,7 @@
         document.body.classList.add("committee-history-mode");$("#accessNotice").hidden=false;
         record=store.records.length?structuredClone(store.records[0]):null;renderHistory();bind();
         if(!record){$("#meetingForm").hidden=true;$("#saveState").textContent="目前沒有歷史會議紀錄";$("#saveMeta").textContent="副主席完成月會結案後，紀錄會顯示在這裡";return}
-        renderRecord();$("#saveState").textContent="歷史紀錄已載入";$("#saveMeta").textContent=record.updatedAt?new Date(record.updatedAt).toLocaleString("zh-TW"):"已結案";return;
+        renderRecord();$("#saveState").textContent="歷史紀錄已載入";$("#saveMeta").textContent=record.updatedAt?calendar.formatTaipeiTimestamp(record.updatedAt,{year:true}):"已結案";return;
       }
       const month=currentMonth(),existing=store.records.find(item=>item.id===meetingId(month));record=existing?structuredClone(existing):emptyRecord(month);
       const oldSource=String(record.attendance?.source||""),legacyCleared=record.status!=="final"&&/Google 點名表|例會點名|點名歷史|半年 PALMS|data\/baseline\/palms\.xls/.test(oldSource);if(legacyCleared)record.attendance={...emptyRecord(month).attendance,notes:record.attendance?.notes||""};
@@ -249,7 +249,7 @@
       if(!existing){record.growth.chapterActual=snapshot?.summary?.totalMembers||0;record.growth={...record.growth,...context,chapterActual:snapshot?.summary?.totalMembers||0}}
       if(record.status!=="final")record.care={...record.care,items:careItems,members:careMembers};
       if(record.status!=="final")try{record.attendance={...record.attendance,...await attendanceContext(record.reportMonth)}}catch(error){record.attendance.source=error.message}
-      renderRecord();renderHistory();bind();$("#saveState").textContent=existing?(record.status==="final"?"正式紀錄已保存":"草稿已載入"):"新月份草稿";$("#saveMeta").textContent=reconciliationError?"月會紀錄已載入；部分工作排程同步待檢查":existing&&record.updatedAt?new Date(record.updatedAt).toLocaleString("zh-TW"):"開始填寫後自動保存";if(reconciliationError)toast("月會紀錄已載入，部分工作排程同步待檢查");if(existing&&(legacyCleared||careChanged))await save("draft",true);
+      renderRecord();renderHistory();bind();$("#saveState").textContent=existing?(record.status==="final"?"正式紀錄已保存":"草稿已載入"):"新月份草稿";$("#saveMeta").textContent=reconciliationError?"月會紀錄已載入；部分工作排程同步待檢查":existing&&record.updatedAt?calendar.formatTaipeiTimestamp(record.updatedAt,{year:true}):"開始填寫後自動保存";if(reconciliationError)toast("月會紀錄已載入，部分工作排程同步待檢查");if(existing&&(legacyCleared||careChanged))await save("draft",true);
     }catch(error){$("#saveState").textContent="月會功能無法載入";$("#saveMeta").textContent=error.message;toast(error.message)}
   }
   init();

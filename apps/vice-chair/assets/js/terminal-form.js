@@ -5,6 +5,7 @@ if(!terminalTaskId) location.replace("case-board.html?new=renewal");
 const terminalCaseDomain = window.FulianCaseDomain;
 const terminalCaseFiles = window.FulianCaseFiles;
 const terminalCompletion = window.FulianInterviewCompletion.setup({formLabel:"終期輔導"});
+const terminalCalendar = window.FulianCalendarDomain;
 const STORE_KEY = terminalTaskId ? terminalCaseDomain.draftStorageKey({id:terminalTaskId,type:"renewal"}) : "fulian-terminal-counseling-draft-v3";
 window.FulianTerminalFormStoreKey=STORE_KEY;
 const DEFAULT_CHAPTER_NOTES = `1. 3次遲到及早退轉為一次缺席
@@ -90,7 +91,7 @@ const experienceDefs = [
 ];
 
 function money(n) { return `${Math.round(n).toLocaleString("zh-TW")} 元`; }
-function fileDateStamp(d = new Date()) { return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
+function fileDateStamp(d = new Date()) { return terminalCalendar.dateStamp(d); }
 function safeFileName(text) { return text.replace(/[\\/:*?"<>|]/g, "-").trim(); }
 async function saveWordToCase(blob,fileName){
   return terminalCaseFiles.saveGeneratedWord({
@@ -130,11 +131,11 @@ function renderExperienceQuestions() {
   $("#experienceQuestions").innerHTML = experienceDefs.map(([no,id,title,hints]) => `<article class="question"><div class="question-head"><span>${no}.</span><h3>${title}</h3></div>${hintBox(hints)}${id === "businessSatisfaction" ? `<label>滿意度（1～10分）<input id="satisfactionScore" type="number" min="1" max="10" data-save></label>` : ""}<label class="long-field">委員填寫內容<textarea id="${id}Answer" rows="4" data-save></textarea></label></article>`).join("");
 }
 
-function monthLabel(d) { return `${d.getFullYear()} 年 ${d.getMonth()+1} 月`; }
-function lastCompleteMonth() { const n = new Date(); return new Date(n.getFullYear(), n.getMonth()-1, 1); }
-function monthsBack(end, count) { return new Date(end.getFullYear(), end.getMonth()-(count-1), 1); }
+function monthLabel(d) { const parts=terminalCalendar.taipeiParts(d);return parts?`${parts.year} 年 ${parts.month} 月`:""; }
+function lastCompleteMonth() { return parseLocalDate(`${terminalCalendar.shiftMonthKey(terminalCalendar.monthKey(),-1)}-01`); }
+function monthsBack(end, count) { return parseLocalDate(`${terminalCalendar.shiftMonthKey(terminalCalendar.monthKey(end),-(count-1))}-01`); }
 function periodLabel(start, end) { return `${monthLabel(start)}至${monthLabel(end)}`; }
-function parseLocalDate(s) { const [y,m,d] = s.split("-").map(Number); return new Date(y,m-1,d || 1); }
+function parseLocalDate(s) { return terminalCalendar.toInstant(String(s).slice(0,10)); }
 function trafficLight(score) { if(score >= 70) return ["綠燈","綠","#198754"]; if(score >= 50) return ["黃燈","黃","#d0a12d"]; if(score >= 30) return ["紅燈","紅","#c92b32"]; return ["黑燈","黑","#25282b"]; }
 
 function expectedRenewalPeriod(member=currentMember){
@@ -279,7 +280,7 @@ function saveDraft() {
   window.FulianCaseStateStore.flush().then(() => {
     const t = new Date();
     $("#saveState").textContent = "草稿已保存至 Supabase";
-    $("#saveTime").textContent = `最後同步 ${t.toLocaleTimeString("zh-TW",{hour:"2-digit",minute:"2-digit"})}`;
+    $("#saveTime").textContent = `最後同步 ${terminalCalendar.formatTaipeiTime(t)}`;
   }).catch(error => {
     $("#saveState").textContent = `同步失敗：${error.message}`;
   });
@@ -293,7 +294,7 @@ function updateProgress() {
   const filled = fields.filter(x => x.value.trim()).length;
   const p = Math.round(filled / Math.max(fields.length,1) * 100); $("#progressBar").style.width = `${p}%`; $("#progressText").textContent = `${p}%`;
 }
-function defaultDateTime() { const d = new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,16); }
+function defaultDateTime() { return terminalCalendar.dateTimeInput(); }
 function toast(msg) { const t=$("#toast"); t.textContent=msg; t.classList.add("show"); clearTimeout(toast.t); toast.t=setTimeout(()=>t.classList.remove("show"),2200); }
 function radioValue(name) { return document.querySelector(`input[name="${name}"]:checked`)?.value || ""; }
 function mark(selected, value) { return selected === value ? "■" : "□"; }
@@ -354,7 +355,7 @@ async function downloadWord() {
   const noBorders = {top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
   const cell = (label,value,width) => new TableCell({width:{size:width,type:WidthType.PERCENTAGE},margins:{top:100,bottom:100,left:120,right:120},children:[new Paragraph({children:[run(label,{bold:true}),run(value)]})]});
   const meta = new Table({width:{size:100,type:WidthType.PERCENTAGE},borders:noBorders,rows:[
-    new TableRow({children:[cell("會談日期：",new Date($("#meetingDate").value).toLocaleString("zh-TW"),50),cell("分會：","富聯",50)]}),
+    new TableRow({children:[cell("會談日期：",terminalCalendar.formatTaipeiTimestamp($("#meetingDate").value,{year:true}),50),cell("分會：","富聯",50)]}),
     new TableRow({children:[cell("會員姓名：",currentMember.name,50),cell("專業別：",currentMember.profession+"（需與續約申請表相符）",50)]}),
     new TableRow({children:[cell("輔導專員：",$("#counselor").value,50),cell("陪訪專員：",answer("#companionCounselor"),50)]})
   ]});

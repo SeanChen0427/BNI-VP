@@ -82,5 +82,5 @@ test("案件頁等 Supabase 保存成功才套用董顧狀態，失敗時顯示�
   assert.match(html, /id="advisorSaveState"[^>]*role="status"/);
   assert.match(html, /id="closeCaseHint"/);
   assert.match(html, /case-state-store\.js\?v=16/);
-  assert.match(html, /case-workflow\.js\?v=30/);
+  assert.match(html, /case-workflow\.js\?v=31/);
 });

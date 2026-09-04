@@ -52,7 +52,7 @@ test('前台先搬移舊留言再以 Supabase 結果取代快取', async () => {
   assert.match(board, /目前顯示此裝置的安全備援/);
   assert.match(notifications, /await window\.FulianAnnouncementBoard\?\.ready/);
   assert.match(html, /announcementSyncState/);
-  assert.match(html, /calendar-domain\.js\?v=3/);
+  assert.match(html, /calendar-domain\.js\?v=4/);
   assert.match(html, /announcement-board\.js\?v=3/);
-  assert.ok(html.indexOf("calendar-domain.js?v=3") < html.indexOf("announcement-board.js?v=3"));
+  assert.ok(html.indexOf("calendar-domain.js?v=4") < html.indexOf("announcement-board.js?v=3"));
 });

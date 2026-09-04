@@ -4,6 +4,7 @@
   const identity = `${session.role}:${session.name}`;
   const isVp = ["vp", "admin"].includes(session.role);
   const $ = (selector) => document.querySelector(selector);
+  const calendar = window.FulianCalendarDomain;
 
   if (!isVp) {
     $("#forbidden").hidden = false;
@@ -39,11 +40,7 @@
     return data;
   };
 
-  const localDay = () => {
-    const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
-    const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-    return `${values.year}-${values.month}-${values.day}`;
-  };
+  const localDay = () => calendar.dateInput();
 
   function initializePeriodSelect() {
     currentCycle = FulianCalendarDomain.monthlyAnalysisCycle(localDay());
@@ -233,7 +230,7 @@
     const effect = cycle.status === "scheduled"
       ? `預備草稿｜${cycle.effectiveOn} 才生效，目前儀表板不變`
       : "目前正式期";
-    $("#draftMeta").textContent = `${cycle.meetingMonth} 月會｜使用 ${cycle.reportMonth} 資料｜${effect}｜期間 ${e.meta.period.start} ~ ${e.meta.period.end}｜產出於 ${new Date(draft.createdAt).toLocaleString("zh-TW")}`;
+    $("#draftMeta").textContent = `${cycle.meetingMonth} 月會｜使用 ${cycle.reportMonth} 資料｜${effect}｜期間 ${e.meta.period.start} ~ ${e.meta.period.end}｜產出於 ${calendar.formatTaipeiTimestamp(draft.createdAt,{year:true})}`;
     $("#publishEffectNote").textContent = cycle.status === "scheduled"
       ? `這是 ${cycle.meetingMonth} 月會預備快照；發佈後依然不改變目前月份，將於 ${cycle.effectiveOn} 自動生效。快照不可改寫，之後只能發新版本。`
       : "這是目前正式月份；發佈後會立即更新會員關懷儀表板。快照不可改寫，之後只能發新版本。";
@@ -262,13 +259,13 @@
     const feedback = draft.feedback || [];
     $("#feedbackList").hidden = !feedback.length;
     $("#feedbackList").innerHTML = feedback.length
-      ? `<b>退回紀錄（AI 重跑時逐點回應）</b>${feedback.map((f) => `<p>${new Date(f.at).toLocaleString("zh-TW")}｜${f.reason}</p>`).join("")}`
+      ? `<b>退回紀錄（AI 重跑時逐點回應）</b>${feedback.map((f) => `<p>${calendar.formatTaipeiTimestamp(f.at,{year:true})}｜${f.reason}</p>`).join("")}`
       : "";
 
     const review = draft.aiReview;
     $("#reviewOutput").hidden = !review;
     if (review) {
-      $("#reviewOutputMeta").textContent = `${review.provider}｜${review.model}｜${new Date(review.generatedAt).toLocaleString("zh-TW")}｜脈絡 ${Math.round(review.promptChars / 1000)}K 字元｜已帶入回饋 ${review.feedbackCount} 則`;
+      $("#reviewOutputMeta").textContent = `${review.provider}｜${review.model}｜${calendar.formatTaipeiTimestamp(review.generatedAt,{year:true})}｜脈絡 ${Math.round(review.promptChars / 1000)}K 字元｜已帶入回饋 ${review.feedbackCount} 則`;
       $("#reviewText").textContent = review.text;
       if (review.provider === "codex") $("#codexReviewText").value = review.text;
     }
@@ -288,7 +285,7 @@
       const data = await readJson(response);
       if (!response.ok || !data.snapshots?.length) return;
       const statusLabel = { active: "目前正式", scheduled: "已發佈・待生效", history: "歷史版本" };
-      $("#historyList").innerHTML = data.snapshots.slice().reverse().map((s) => `<article><b>第 ${s.version} 版・${statusLabel[s.status] || "歷史版本"}</b><span>${s.meetingMonth || "—"} 月會｜使用 ${s.reportMonth || "—"} 資料｜期間 ${s.period?.start || "—"} ~ ${s.period?.end || "—"}</span><span>${s.status === "scheduled" ? `${s.effectiveOn} 自動生效｜` : ""}發佈 ${new Date(s.publishedAt).toLocaleString("zh-TW")}｜${s.publishedBy.split(":")[1] || s.publishedBy}</span></article>`).join("");
+      $("#historyList").innerHTML = data.snapshots.slice().reverse().map((s) => `<article><b>第 ${s.version} 版・${statusLabel[s.status] || "歷史版本"}</b><span>${s.meetingMonth || "—"} 月會｜使用 ${s.reportMonth || "—"} 資料｜期間 ${s.period?.start || "—"} ~ ${s.period?.end || "—"}</span><span>${s.status === "scheduled" ? `${s.effectiveOn} 自動生效｜` : ""}發佈 ${calendar.formatTaipeiTimestamp(s.publishedAt,{year:true})}｜${s.publishedBy.split(":")[1] || s.publishedBy}</span></article>`).join("");
     } catch { /* 同上 */ }
   }
 

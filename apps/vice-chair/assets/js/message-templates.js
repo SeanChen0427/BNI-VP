@@ -22,7 +22,7 @@
   function formatMeta(template) {
     if (!template.updatedAt) return "目前使用系統原始公版";
     const date = new Date(template.updatedAt);
-    const label = Number.isNaN(date.getTime()) ? template.updatedAt : date.toLocaleString("zh-TW");
+    const label = Number.isNaN(date.getTime()) ? template.updatedAt : date.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"});
     return `正式公版最後更新：${label}${template.updatedBy ? `・${template.updatedBy}` : ""}`;
   }
 

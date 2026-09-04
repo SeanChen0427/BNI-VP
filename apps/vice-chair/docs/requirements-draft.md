@@ -25,6 +25,7 @@
 - 現有 BNI 分析工具保留為計分與診斷的唯一來源，副主席系統以版本化分析快照整合，不重寫規則。
 - GitHub Pages 只承載前端程式，不保存真實會員資料或敏感附件。
 - 正式後端優先採 Supabase：Auth、PostgreSQL、Private Storage 與 Edge Functions 分別負責登入、結構化資料、文件附件及 LINE／AI 敏感操作。
+- 時間戳以 UTC 保存；任期、權限、換屆、期限、排程、月份切換與畫面時間一律以 `Asia/Taipei` 解讀，不能依使用者裝置或伺服器預設時區決定業務日期。
 - 完整架構、資料存放對照、GitHub 邊界及實作順序見 `docs/architecture-hosting-security.md`。
 
 ### 個人 AI API 設定（2026-07-16）

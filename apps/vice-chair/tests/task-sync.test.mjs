@@ -129,7 +129,7 @@ test("刪除案件前先完成草稿同步，成功後才清除該案件本機�
   assert.match(caseStore, /function beforeTaskDelete\(task\)/);
   assert.match(caseStore, /function discardDeletedTask\(task\)/);
   assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
-  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=14/);
+  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=15/);
   const deleteHandler = caseBoard.match(/async function confirmDelete\(\)[\s\S]*?function bindDeleteDialog/)[0];
   assert.match(deleteHandler, /await window\.FulianTaskStore\.remove\(id\)/);
   assert.doesNotMatch(deleteHandler, /localStorage\.removeItem/);

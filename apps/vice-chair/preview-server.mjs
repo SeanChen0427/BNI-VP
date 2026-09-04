@@ -8,6 +8,7 @@ import {createCipheriv,createDecipheriv,randomBytes} from "node:crypto";
 import {buildBniAnalysisSnapshot,parsePalmsReport} from "./bni-bridge.mjs";
 import {analysisDraftApi,analysisSnapshotsApi} from "./services/analysis-draft.mjs";
 import {memberDepartureApi} from "./services/member-departure.mjs";
+import {taipeiDay} from "../bni-analysis/engine/time.mjs";
 
 const require=createRequire(import.meta.url),monthlyMeetingDomain=require("./core/monthly-meeting-domain.js");
 const{splitKnowledgeDocument,selectKnowledge,sanitizeAiAnswer}=require("./core/ai-knowledge-domain.js");
@@ -55,7 +56,7 @@ function identityRole(value=""){return String(value).split(":")[0]}
 function bniRoot(){return path.resolve(process.env.BNI_ANALYSIS_ROOT||ANALYSIS_ROOT)}
 function isoDay(date){return new Date(Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),date.getUTCDate())).toISOString().slice(0,10)}
 function monthWindow(offsetMonths,countMonths){
-  const now=new Date(),end=new Date(Date.UTC(now.getFullYear(),now.getMonth()+offsetMonths+1,0)),start=new Date(Date.UTC(end.getUTCFullYear(),end.getUTCMonth()-countMonths+1,1));
+  const [year,month]=taipeiDay().split("-").map(Number),end=new Date(Date.UTC(year,month-1+offsetMonths+1,0)),start=new Date(Date.UTC(end.getUTCFullYear(),end.getUTCMonth()-countMonths+1,1));
   return{start:isoDay(start),end:isoDay(end),month:isoDay(start).slice(0,7)};
 }
 async function largeRequestBody(req){
