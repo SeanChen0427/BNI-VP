@@ -107,6 +107,14 @@
   function currentPageGuide(){return pageGuideId?catalog.getGuide(pageGuideId,identity.role):null;}
   function globalGuide(){return catalog.getGuide("global-shell",identity.role);}
   function transitionGuide(){return pendingTransition?catalog.getGuide(pendingTransition.guideId,identity.role):null;}
+  function availableGuides(){
+    const guideIds=new Set();
+    return[transitionGuide(),globalGuide(),currentPageGuide()].filter(guide=>{
+      if(!guide||guideIds.has(guide.id))return false;
+      guideIds.add(guide.id);
+      return true;
+    });
+  }
   function isTransitionGuide(guide){return Boolean(guide&&pendingTransition?.guideId===guide.id&&pendingTransition?.toIdentityKey===identity.key);}
   function stateFor(guide){return domain.guideState(progress,guide.id,guide.version);}
   function sessionDismissKey(guide){return`${SESSION_DISMISS_PREFIX}:${identity.key}:${guide.id}:${guide.version}`;}
@@ -137,7 +145,7 @@
   }
 
   function updateHelpState(){
-    const guides=[transitionGuide(),globalGuide(),currentPageGuide()].filter(Boolean);
+    const guides=availableGuides();
     const pending=guides.some(guide=>!["completed","skipped"].includes(stateFor(guide).status));
     helpButton.classList.toggle("has-guide-progress",pending);
     helpButton.setAttribute("aria-label",pending?"開啟操作教學，目前仍有未完成導覽":"開啟操作教學");
@@ -195,7 +203,7 @@
   }
 
   function guideCenterMarkup(){
-    const guides=[transitionGuide(),globalGuide(),currentPageGuide()].filter((guide,index,list)=>guide&&list.findIndex(item=>item.id===guide.id)===index);
+    const guides=availableGuides();
     const rows=guides.map((guide,index)=>{
       const state=stateFor(guide);
       const label=state.status==="in_progress"?"繼續":state.status==="completed"?"重新觀看":"開始";

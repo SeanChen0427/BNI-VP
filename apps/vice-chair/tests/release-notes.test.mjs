@@ -29,7 +29,15 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
-test("最新版本說明 iPhone 登入不再自動縮放", () => {
+test("最新版本說明略過後仍能重新開啟操作教學", () => {
+  assert.match(releaseScript, /version: "1\.1\.3"/);
+  assert.match(releaseScript, /點選頁面的「操作教學」會正常開啟教學中心/);
+  assert.match(releaseScript, /將已略過的導覽從第 1 步重新開始/);
+  assert.match(releaseScript, /不會清除已保存的導覽進度/);
+  assert.ok(releaseScript.indexOf('version: "1.1.3"') < releaseScript.indexOf('version: "1.1.2"'));
+});
+
+test("保留 iPhone 登入欄位縮放修正的更新說明", () => {
   assert.match(releaseScript, /version: "1\.1\.2"/);
   assert.match(releaseScript, /不會再被瀏覽器突然放大或左右偏移/);
   assert.match(releaseScript, /維持使用者需要時可自行縮放頁面/);

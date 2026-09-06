@@ -30,7 +30,7 @@ const catalog=guideContext.window.FulianOnboardingGuides;
 test("首頁載入共用領域、角色教學、專屬樣式與導覽引擎",()=>{
   assert.match(index,/core\/onboarding-domain\.js\?v=3/);
   assert.match(index,/assets\/js\/onboarding-guides\.js\?v=5/);
-  assert.match(index,/assets\/js\/onboarding\.js\?v=8/);
+  assert.match(index,/assets\/js\/onboarding\.js\?v=9/);
   assert.match(index,/assets\/css\/onboarding\.css\?v=7/);
   assert.match(index,/data-guide-page="page:index"/);
 });
@@ -90,7 +90,7 @@ test("所有登入後工作頁都有頁面導覽，並由共用選單載入同�
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=13/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=14/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);
@@ -300,6 +300,14 @@ test("說明模式攔截點擊且不代按任何正式控制",()=>{
   assert.match(engine,/rect\.width>2&&rect\.height>2/);
   assert.match(engine,/innerHeight-card\.offsetHeight-10/);
   assert.match(engine,/guide-card-mobile-top/);
+});
+
+test("略過導覽後操作教學中心仍可開啟",()=>{
+  const availableGuides=engine.slice(engine.indexOf("function availableGuides()"),engine.indexOf("function isTransitionGuide("));
+  assert.match(availableGuides,/if\(!guide\|\|guideIds\.has\(guide\.id\)\)return false/);
+  assert.match(availableGuides,/guideIds\.add\(guide\.id\)/);
+  assert.match(engine,/function guideCenterMarkup\(\)\{\s*const guides=availableGuides\(\)/);
+  assert.doesNotMatch(engine,/findIndex\(item=>item\.id===guide\.id\)/);
 });
 
 test("視覺層沿用富聯品牌並支援手機底部面板與減少動態效果",()=>{

@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.1.3",
+      publishedAt: "2026-09-07",
+      title: "操作教學重新開啟修正",
+      level: "normal",
+      changes: Object.freeze([
+        "略過、中斷或完成導覽後，點選頁面的「操作教學」會正常開啟教學中心。",
+        "教學中心會顯示當前進度，可繼續中斷位置，或將已略過的導覽從第 1 步重新開始。"
+      ]),
+      impact: "只修正操作教學入口，不會清除已保存的導覽進度，也不修改會員資料、案件、權限、投票或 BNI 分析結果。"
+    }),
+    Object.freeze({
       version: "1.1.2",
       publishedAt: "2026-09-06",
       title: "手機登入欄位縮放修正",
