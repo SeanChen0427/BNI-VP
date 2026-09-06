@@ -29,6 +29,14 @@ test("閱讀狀態依角色與姓名隔離，重要更新才自動顯示", () =>
   assert.match(releaseScript, /localStorage\.setItem\(readKey, latest\.version\)/);
 });
 
+test("最新版本說明 iPhone 登入不再自動縮放", () => {
+  assert.match(releaseScript, /version: "1\.1\.2"/);
+  assert.match(releaseScript, /不會再被瀏覽器突然放大或左右偏移/);
+  assert.match(releaseScript, /維持使用者需要時可自行縮放頁面/);
+  assert.match(releaseScript, /不修改帳密、登入驗證、角色權限、會員資料或其他正式資料/);
+  assert.ok(releaseScript.indexOf('version: "1.1.2"') < releaseScript.indexOf('version: "1.1.1"'));
+});
+
 test("最新版本說明首頁聚焦與階段摘要校正，並保留既有更新歷史", () => {
   assert.match(releaseScript, /version: "1\.0\.26"/);
   assert.match(releaseScript, /最新會員狀態移到公告欄正下方/);

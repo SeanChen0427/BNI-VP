@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.1.2",
+      publishedAt: "2026-09-06",
+      title: "手機登入欄位縮放修正",
+      level: "normal",
+      changes: Object.freeze([
+        "iPhone 點選帳號、密碼或委員姓名時，頁面不會再被瀏覽器突然放大或左右偏移。",
+        "登入欄位與按鈕保留舒適的觸控高度，並維持使用者需要時可自行縮放頁面。"
+      ]),
+      impact: "只調整登入頁的手機操作尺寸，不修改帳密、登入驗證、角色權限、會員資料或其他正式資料。"
+    }),
+    Object.freeze({
       version: "1.1.1",
       publishedAt: "2026-09-06",
       title: "操作導覽版面、流程與換屆校正",

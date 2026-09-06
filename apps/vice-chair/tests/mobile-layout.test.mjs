@@ -9,6 +9,11 @@ const navCss = readFileSync(
   new URL("../assets/css/workspace-nav.css", import.meta.url),
   "utf8"
 );
+const loginCss = readFileSync(
+  new URL("../assets/css/login.css", import.meta.url),
+  "utf8"
+);
+const loginHtml = readFileSync(new URL("../login.html", import.meta.url), "utf8");
 const indexHtml = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const boardHtml = readFileSync(
   new URL("../case-board.html", import.meta.url),
@@ -71,6 +76,21 @@ assert.match(
 assert.match(
   navCss,
   /\.workspace-back-button\{width:44px!important;height:44px!important/
+);
+assert.match(
+  loginCss,
+  /input,select\{[^}]*min-height:48px[^}]*font-size:16px[^}]*touch-action:manipulation/,
+  "登入欄位必須維持至少 16px 字級，避免 iPhone 聚焦時自動放大頁面"
+);
+assert.match(
+  loginHtml,
+  /login\.css\?v=3/,
+  "登入頁必須載入已修正 iPhone 聚焦縮放的樣式版本"
+);
+assert.doesNotMatch(
+  loginHtml,
+  /user-scalable\s*=\s*no|maximum-scale\s*=\s*1/,
+  "不得為阻止 iPhone 自動放大而停用使用者手動縮放"
 );
 
 for (const [name, html] of [
