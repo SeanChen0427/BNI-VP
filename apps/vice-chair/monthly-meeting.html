@@ -38,14 +38,14 @@
     <div class="access-notice" id="accessNotice" hidden><b>歷史會議查詢模式</b><span>會員委員可以查閱及下載已結案的月會紀錄；新月份、編輯、重新帶入資料與結案功能由副主席操作。</span></div>
 
     <div class="meeting-layout">
-      <aside class="meeting-history">
+      <aside class="meeting-history" data-guide-id="monthly.history-panel">
         <div class="history-head"><div><small>MEETING ARCHIVE</small><h2>會議紀錄</h2></div><button type="button" id="newMeeting">＋ 新月份</button></div>
         <div id="historyList" class="history-list"></div>
         <p class="privacy-note">紀錄保存在 Supabase 受權限保護的資料庫，不會寫入 GitHub。</p>
       </aside>
 
       <form id="meetingForm" class="meeting-form">
-        <section class="meeting-card setup-card">
+        <section class="meeting-card setup-card" data-guide-id="monthly.profile-card">
           <div class="section-title"><span>00</span><div><small>MEETING PROFILE</small><h2>會議基本資料</h2></div><em id="recordStatus">草稿</em></div>
           <div class="field-grid four">
             <label>會議月份<input id="meetingMonth" type="month" required></label>
@@ -56,10 +56,10 @@
           <label class="wide">出席委員<div id="attendeeOptions" class="attendee-options"></div></label>
         </section>
 
-        <section class="meeting-card">
-          <div class="section-title"><span>01</span><div><small>ATTENDANCE REVIEW</small><h2>上個月會員出席狀況報告</h2><p id="attendanceSource">正在讀取上月單月 PALMS…</p></div><button type="button" class="soft-button" id="refreshAttendance">重新讀取 PALMS</button></div>
+        <section class="meeting-card" data-guide-id="monthly.attendance-card">
+          <div class="section-title" data-guide-id="monthly.attendance-source"><span>01</span><div><small>ATTENDANCE REVIEW</small><h2>上個月會員出席狀況報告</h2><p id="attendanceSource">正在讀取上月單月 PALMS…</p></div><button type="button" class="soft-button" id="refreshAttendance">重新讀取 PALMS</button></div>
           <div class="member-count-strip"><small>上月會員數</small><input id="attendanceMemberCount" type="number" min="0"><span>位</span><em id="attendanceMeetingCount">尚未載入正式 PALMS</em></div>
-          <div class="attendance-review-grid">
+          <div class="attendance-review-grid" data-guide-id="monthly.attendance-breakdown">
             <article>
               <header><span>缺</span><div><small>缺席</small><b>目標 0</b></div><label>實際 <input id="absenceActual" type="number" min="0"></label></header>
               <label>名單及次數<textarea id="absenceList" rows="4" placeholder="例如：王小明（1次）"></textarea></label>
@@ -76,7 +76,7 @@
           <label class="wide">出席狀況討論與後續行動<textarea id="attendanceNotes" rows="4" placeholder="記錄需要關懷、提醒或後續追蹤的事項"></textarea></label>
         </section>
 
-        <section class="meeting-card">
+        <section class="meeting-card" data-guide-id="monthly.growth-card">
           <div class="section-title"><span>02</span><div><small>GROWTH & RETENTION</small><h2>分會成長及留員狀況</h2><p>會員實際人數來自最新 BNI 資料；案件數依系統紀錄帶入，仍可在會議中修正。</p></div></div>
           <div class="growth-hero">
             <label><small>分會規模目標</small><input id="chapterTarget" type="number" min="1"><span>人</span></label>
@@ -94,31 +94,31 @@
           <label class="wide">成長與留員討論紀錄<textarea id="growthNotes" rows="4"></textarea></label>
         </section>
 
-        <section class="meeting-card">
-          <div class="section-title"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">需要後續行動的項目須排定追蹤人員與日期；續約項目若會中確認不續約，可直接保留決議而不建立工作，結案後若改為續約則追加更正。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
+        <section class="meeting-card" data-guide-id="monthly.care-card">
+          <div class="section-title" data-guide-id="monthly.care-source"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">需要後續行動的項目須排定追蹤人員與日期；續約項目若會中確認不續約，可直接保留決議而不建立工作，結案後若改為續約則追加更正。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
           <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成／不續約</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
-          <div id="careVisualBoard" class="care-visual-board"></div>
+          <div id="careVisualBoard" class="care-visual-board" data-guide-id="monthly.care-board"></div>
           <textarea id="careMembers" hidden readonly></textarea>
-          <label class="wide">討論結論、負責人與期限（如適用）<textarea id="careActions" rows="5" placeholder="例如：由○○主責，於 7/20 前完成關懷"></textarea></label>
+          <label class="wide" data-guide-id="monthly.care-actions">討論結論、負責人與期限（如適用）<textarea id="careActions" rows="5" placeholder="例如：由○○主責，於 7/20 前完成關懷"></textarea></label>
         </section>
 
-        <section class="meeting-card">
+        <section class="meeting-card" data-guide-id="monthly.support-card">
           <div class="section-title"><span>04</span><div><small>MEMBER SUPPORT</small><h2>目前是否有聽到任何會員有需要協助的地方呢？</h2></div></div>
           <textarea id="memberAssistance" rows="8" placeholder="記錄會員近況、需要的資源、可協助的人員與後續追蹤方式"></textarea>
         </section>
 
-        <section class="meeting-card">
+        <section class="meeting-card" data-guide-id="monthly.motions-card">
           <div class="section-title"><span>05</span><div><small>OTHER BUSINESS</small><h2>臨時動議</h2></div></div>
           <textarea id="motions" rows="8" placeholder="逐項記錄提案、討論結果、負責人與完成期限"></textarea>
         </section>
 
-        <section class="meeting-card conclusion-card">
+        <section class="meeting-card conclusion-card" data-guide-id="monthly.conclusion-card">
           <div class="section-title"><span>結</span><div><small>MEETING CONCLUSION</small><h2>會議結論與下次追蹤</h2></div></div>
           <label class="wide">本次決議摘要<textarea id="conclusion" rows="6"></textarea></label>
           <label class="wide">下次會議前需完成事項<textarea id="followUps" rows="6"></textarea></label>
         </section>
 
-        <footer class="meeting-actions">
+        <footer class="meeting-actions" data-guide-id="monthly.actions">
           <div><strong id="footerStatus">草稿會自動保存</strong><small>所有委員可查閱；只有副主席能正式結案。</small></div>
           <button type="button" class="ghost" id="saveDraft">立即儲存</button>
           <button type="button" class="ghost" id="downloadWord">下載 Word</button>
@@ -146,6 +146,6 @@
   <script src="vendor/docx.iife.js"></script>
   <script src="core/monthly-meeting-domain.js?v=3"></script>
   <script src="assets/js/monthly-meeting.js?v=17"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

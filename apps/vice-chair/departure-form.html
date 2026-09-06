@@ -24,7 +24,7 @@
   <main>
     <section class="hero departure-hero"><div><span class="eyebrow">離會訪談表 V2.1</span><h1>會員離會訪談</h1><p>記錄會員經驗與離會原因，歸納可供後續分會營運優化的改善觀察。</p></div><div class="save-state"><i></i><span id="saveState">草稿已儲存</span><small id="saveTime">尚未編輯</small></div></section>
     <div class="layout">
-      <aside class="steps"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#experience">會員經驗</a><a href="#departure">離會原因</a><a href="#policy">制度提醒</a><a href="#followup">內部追蹤</a><a href="#signatures">簽名確認</a></nav><div class="privacy"><b>敏感資料提醒</b><p>健康、家庭、工作或衝突等完整內容限案件負責人及授權人員使用；全體委員只看進度與必要摘要。</p></div></aside>
+      <aside class="steps" data-guide-id="form.progress-panel"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#experience">會員經驗</a><a href="#departure">離會原因</a><a href="#policy">制度提醒</a><a href="#followup">內部追蹤</a><a href="#signatures">簽名確認</a></nav><div class="privacy"><b>敏感資料提醒</b><p>健康、家庭、工作或衝突等完整內容限案件負責人及授權人員使用；全體委員只看進度與必要摘要。</p></div></aside>
       <form id="departureForm" hidden>
         <div class="system-hint" id="departureMemberState" hidden></div>
         <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>會員資料由現有名單帶入</p></div></div><div class="fields two"><label>分會<input value="富聯" readonly></label><label>會員姓名<input id="memberSearch" list="memberList" data-save><datalist id="memberList"></datalist></label><label>專業類別<input id="profession" readonly></label><label>離會日期<input id="departureDate" type="date" data-save></label><label>訪談人員<input id="interviewer" readonly></label><label>訪談日期與時間<input id="interviewDate" type="datetime-local" data-save></label><label>陪訪人員（選填）<input id="companion" list="committeeList" data-save><datalist id="committeeList"></datalist></label><label>訪談方式／地點<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label></div></section>
@@ -62,6 +62,6 @@
   <script src="vendor/docx.iife.js"></script>
   <script src="assets/js/departure-form.js?v=6"></script>
   <script src="assets/js/departure-form-live.js?v=5"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

@@ -47,8 +47,8 @@
     <section class="hero"><div><span>ACCESS, COMMITTEE & PERSONAL AI</span><h1>系統權限與個人 AI</h1><p>人員權限集中管理；每位副主席與委員使用自己的 AI API 額度。</p></div><div class="role-summary"><div><strong>3</strong><span>AI 平台</span></div><div><strong id="committeeTotal">6</strong><span>會員委員</span></div></div></section>
     <div class="grid">
       <section class="card roles-card"><div class="section-title"><span>01</span><div><h2>三層權限</h2><p>權限固定，不追加更細角色</p></div></div><div class="role-list"><article><b>AD</b><div><strong>系統開發人員 Admin</strong><p>管理帳密、年度換屆與系統維護。</p></div></article><article><b>VP</b><div><strong>副主席</strong><p>完整日常副主席功能，並處理換屆後待指派工作。</p></div></article><article><b>MC</b><div><strong>會員委員</strong><p>共用委員帳密；登入選姓名後填寫回饋、投票與執行任務。</p></div></article></div></section>
-      <section class="card vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>依正式有效任期顯示</p></div></div><div class="current-role-person"><i>VP</i><div><small>目前副主席</small><strong id="vpName">正在讀取…</strong></div></div><div class="hint">名單不在日常工作中逐筆修改；Admin 可在下方一次排定下一屆完整名單與生效日。</div></section>
-      <section class="card committee-card"><div class="section-title"><span>03</span><div><h2>現任會員委員名單</h2><p>依正式有效任期顯示</p></div></div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>歷史不隨名單改寫</b><span>完成換屆後，已結案案件仍保留當時主責、陪訪與結案確認人；只有卸任或轉任人員的未完成工作會進入待指派。</span></div></section>
+      <section class="card vp-card" data-guide-id="settings.vp-card"><div class="section-title"><span>02</span><div><h2>現任副主席</h2><p>依正式有效任期顯示</p></div></div><div class="current-role-person"><i>VP</i><div><small>目前副主席</small><strong id="vpName">正在讀取…</strong></div></div><div class="hint">名單不在日常工作中逐筆修改；Admin 可在下方一次排定下一屆完整名單與生效日。</div></section>
+      <section class="card committee-card" data-guide-id="settings.committee-card"><div class="section-title"><span>03</span><div><h2>現任會員委員名單</h2><p>依正式有效任期顯示</p></div></div><div class="committee-list" id="committeeList"></div><div class="shared-warning"><b>歷史不隨名單改寫</b><span>完成換屆後，已結案案件仍保留當時主責、陪訪與結案確認人；只有卸任或轉任人員的未完成工作會進入待指派。</span></div></section>
       <section class="card annual-handover-card" id="annualHandoverCard" hidden>
         <div class="section-title"><span>04</span><div><h2>年度換屆</h2><p>僅系統開發人員 Admin 可見與排定</p></div></div>
         <div class="handover-status" id="handoverStatus"><b>正在讀取正式名單…</b><span>名單尚未變更。</span></div>
@@ -70,11 +70,11 @@
       <section class="card credentials-card" id="credentialsCard" hidden><div class="section-title"><span>05</span><div><h2>三組登入帳密</h2><p>只有 Admin 可以更新密碼</p></div></div><div class="credentials" id="credentialFields"></div><button id="saveCredentials" class="save-all">更新三組密碼</button><div class="security-warning"><b>安全登入已啟用</b><span>登入仍使用 admin、vice、Fulian 三個簡單帳號；密碼由 Supabase 安全驗證，系統不會顯示或在瀏覽器保存既有密碼。</span></div></section>
       <section class="card ai-card" id="personalAiSettings">
         <div class="section-title"><span>06</span><div><h2>我的 AI API 綁定</h2><p>只屬於目前登入的 <b data-auth-name></b>，不與其他委員共用</p></div></div>
-        <div class="ai-overview">
-          <label>預設回答平台<select id="defaultAiProvider"><option value="openai">GPT（OpenAI）</option><option value="gemini">Gemini（Google）</option><option value="anthropic">Claude（Anthropic）</option></select></label>
+        <div class="ai-overview" data-guide-id="settings.ai-overview">
+          <label data-guide-id="settings.default-provider">預設回答平台<select id="defaultAiProvider"><option value="openai">GPT（OpenAI）</option><option value="gemini">Gemini（Google）</option><option value="anthropic">Claude（Anthropic）</option></select></label>
           <div class="ai-owner"><small>目前綁定身份</small><strong id="aiOwnerName">—</strong><span id="aiStorageStatus">正在讀取個人設定…</span></div>
         </div>
-        <div class="provider-grid">
+        <div class="provider-grid" data-guide-id="settings.provider-grid">
           <article class="provider-card" data-provider-card="openai"><div class="provider-head"><i>GPT</i><div><strong>OpenAI API</strong><span class="provider-status" id="openaiStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="openaiApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 OpenAI API Key"><button type="button" data-toggle-secret="openaiApiKey">顯示</button></div></label><p>ChatGPT Plus／Pro 訂閱與 API 額度分開計算，需在 OpenAI Platform 建立 API Key。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="openai">移除綁定</button></div></article>
           <article class="provider-card" data-provider-card="gemini"><div class="provider-head"><i>G</i><div><strong>Gemini API</strong><span class="provider-status" id="geminiStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="geminiApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 Gemini API Key"><button type="button" data-toggle-secret="geminiApiKey">顯示</button></div></label><p>請從 Google AI Studio 建立 Gemini 專用金鑰，並留意自己的免費額度或計費設定。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="gemini">移除綁定</button></div></article>
           <article class="provider-card" data-provider-card="anthropic"><div class="provider-head"><i>C</i><div><strong>Claude API</strong><span class="provider-status" id="anthropicStatus">尚未綁定</span></div></div><label>API Key<div class="secret-field"><input id="anthropicApiKey" type="password" autocomplete="new-password" placeholder="貼上新的 Anthropic API Key"><button type="button" data-toggle-secret="anthropicApiKey">顯示</button></div></label><p>Claude 網頁版訂閱與 Anthropic API 額度分開，API Key 由 Anthropic Console 建立。</p><div class="provider-actions"><button type="button" class="remove-key" data-remove-provider="anthropic">移除綁定</button></div></article>
@@ -162,6 +162,6 @@
       </section>
     </div>
   </main>
-  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=19"></script><script src="assets/js/annual-handover.js?v=1"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/release-notes.js?v=25"></script><script src="assets/js/workspace-nav.js?v=8"></script>
+  <div id="toast"></div><script src="services/test-data-reset.js?v=1"></script><script src="assets/js/settings.js?v=19"></script><script src="assets/js/annual-handover.js?v=1"></script><script src="assets/js/ai-api-settings.js?v=1"></script><script src="assets/js/release-notes.js?v=27"></script><script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

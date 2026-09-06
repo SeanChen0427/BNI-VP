@@ -20,11 +20,11 @@
   <link rel="stylesheet" href="assets/css/routine-reminders-mobile.css?v=4">
 </head>
 <body>
-  <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・LINE 常態通知</span></div><label>目前登入身份<input id="loginIdentity" readonly></label></header>
+  <header class="topbar"><a class="back" href="index.html">← 回工作台</a><div><strong>富聯分會</strong><span>會員委員會工作台・LINE 常態通知</span></div><label data-guide-id="reminders.identity">目前登入身份<input id="loginIdentity" readonly></label></header>
   <main>
     <section class="hero reminder-hero"><div><span class="eyebrow">ROUTINE NOTIFICATIONS</span><h1>LINE 常態通知</h1><p>副主席秘書Bot管理交流群；會員委員秘書Bot延續原本的委員會提醒、工作摘要與案件通知做法。</p></div><div class="save-state"><i></i><span id="saveState">正在載入設定</span><small id="saveDetail">提醒預設關閉，不會自行發送</small></div></section>
 
-    <section class="form-card target-card">
+    <section class="form-card target-card" data-guide-id="reminders.target-card">
       <div class="section-head"><span>01</span><div><h2>通知群組連線</h2><p>系統依通知類型固定選擇交流群或會員委員會群，不會讓前台臨時指定其他群組</p></div></div>
       <div class="target-list">
         <div class="target-state" id="exchangeTargetState"><div><small>交流群常態通知</small><strong>正在確認…</strong><span></span></div><a href="settings.html#lineBotGroups">管理交流群</a></div>
@@ -68,7 +68,7 @@
 
     <section class="form-card action-card"><div><b>啟用前請先測試</b><span>交流群測試會等待下一則新訊息，15 分鐘未命中即結束且不通知好友；委員會測試仍會立即推播。保存設定本身不會立即發訊息。</span></div><button type="button" id="saveRules">保存常態通知設定</button></section>
 
-    <section class="form-card work-digest-card">
+    <section class="form-card work-digest-card" data-guide-id="reminders.digest-card">
       <div class="section-head"><span>05</span><div><h2>會員委員會工作進度</h2><p>在正式委員群輸入指定文字，會員委員秘書Bot會即時整理最新工作並免費 Reply</p></div></div>
       <div class="digest-command">
         <div><small>免額度群組指令</small><code>委員會進度</code></div>
@@ -90,13 +90,13 @@
       <div class="digest-delivery" id="workDigestDelivery">尚未從本頁發送</div>
     </section>
 
-    <section class="form-card history-card">
+    <section class="form-card history-card" data-guide-id="reminders.history-card">
       <div class="section-head"><span>06</span><div><h2>最近投遞紀錄</h2><p>可查看 Reply 等待、送達、好友備援與人工貼出狀態；好友備援後可在這裡複製原提醒並完成留痕</p></div></div>
       <div class="delivery-list" id="deliveryList"><article>尚無發送紀錄</article></div>
     </section>
   </main>
   <div id="toast"></div>
   <script src="assets/js/routine-reminders.js?v=9"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

@@ -33,7 +33,7 @@
     <section class="access-notice" id="accessNotice" hidden><b>只有副主席或 Admin 可以使用當責信待寄中心</b><span>會員委員介面不顯示會員收件資訊或正式信件內容。</span></section>
 
     <div id="accountabilityApp">
-      <section class="summary-grid" aria-label="當責信任務摘要">
+      <section class="summary-grid" aria-label="當責信任務摘要" data-guide-id="accountability.summary">
         <article><small>待寄送</small><strong id="pendingCount">—</strong><span>可直接複製</span></article>
         <article><small>待補資料</small><strong id="missingCount">—</strong><span>缺少必要欄位</span></article>
         <article><small>開放行業別</small><strong id="openCategoryCount">—</strong><span>第 4 次缺席／第 9 次代理</span></article>
@@ -72,10 +72,12 @@
             <div class="missing-alert" id="missingAlert" hidden></div>
             <label class="mail-field"><span><b>收件人</b><small>由正式會員資料帶入；空白時請到信箱選擇</small></span><input id="previewRecipient" readonly></label>
             <label class="mail-field"><span><b>副本</b><small>實際對象仍依寄送當下規範選擇</small></span><input id="previewCc" readonly></label>
-            <label class="mail-field"><span><b>主旨</b><button type="button" data-copy="subject">複製主旨</button></span><textarea id="previewSubject" rows="2" readonly></textarea></label>
-            <label class="mail-field body-field"><span><b>內文</b><button type="button" data-copy="body">複製內文</button></span><textarea id="previewBody" rows="17" readonly></textarea></label>
+            <div data-guide-id="accountability.copy-fields">
+              <label class="mail-field"><span><b>主旨</b><button type="button" data-copy="subject">複製主旨</button></span><textarea id="previewSubject" rows="2" readonly></textarea></label>
+              <label class="mail-field body-field"><span><b>內文</b><button type="button" data-copy="body">複製內文</button></span><textarea id="previewBody" rows="17" readonly></textarea></label>
+            </div>
             <p class="template-meta" id="templateMeta"></p>
-            <div class="preview-actions">
+            <div class="preview-actions" data-guide-id="accountability.actions">
               <button type="button" class="primary" id="copyAll">全部複製</button>
               <button type="button" class="sent" id="markSent">標記已人工寄送</button>
               <button type="button" id="holdTask">暫緩</button>
@@ -91,6 +93,6 @@
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="core/accountability-email-domain.js?v=1"></script>
   <script src="assets/js/accountability-emails.js?v=2"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

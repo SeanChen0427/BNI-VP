@@ -62,6 +62,7 @@
   const menuButton = document.createElement("button");
   menuButton.type = "button";
   menuButton.className = "workspace-menu-button";
+  menuButton.dataset.guideId = "workspace.menu";
   menuButton.setAttribute("aria-label", "開啟主選單");
   menuButton.setAttribute("aria-expanded", "false");
   menuButton.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg>';
@@ -71,6 +72,7 @@
   if (backLink) {
     const originalLabel = backLink.textContent.trim();
     backLink.classList.add("workspace-back-button");
+    backLink.dataset.guideId = "workspace.back";
     backLink.setAttribute("aria-label", originalLabel || "上一頁");
     backLink.title = originalLabel || "上一頁";
     backLink.innerHTML = '<span class="workspace-back-arrow" aria-hidden="true">←</span><span class="workspace-back-label">上一頁</span>';
@@ -83,6 +85,7 @@
 
   const drawer = document.createElement("aside");
   drawer.className = "workspace-menu-drawer";
+  drawer.dataset.guideId = "workspace.drawer";
   drawer.setAttribute("aria-label", "主選單");
   drawer.setAttribute("aria-hidden", "true");
   drawer.innerHTML = `
@@ -152,4 +155,39 @@
       menuButton.focus();
     }
   });
+
+  function loadStylesheet(href){
+    if(document.querySelector(`link[href^="${href}"]`))return;
+    const link=document.createElement("link");
+    link.rel="stylesheet";
+    link.href=`${href}?v=8`;
+    document.head.append(link);
+  }
+
+  function loadScript(src){
+    if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
+    return new Promise((resolve,reject)=>{
+      const script=document.createElement("script");
+      script.src=`${src}?v=8`;
+      script.onload=resolve;
+      script.onerror=reject;
+      document.body.append(script);
+    });
+  }
+
+  async function loadSystemGuide(){
+    if(!["vp","committee"].includes(role))return;
+    document.body.dataset.guidePage=`page:${page.replace(/\.html$/i,"")}`;
+    loadStylesheet("assets/css/onboarding.css");
+    try{
+      await loadScript("core/onboarding-domain.js");
+      await loadScript("assets/js/onboarding-guides.js");
+      await loadScript("assets/js/onboarding-page-guides.js");
+      await loadScript("assets/js/onboarding.js");
+    }catch(error){
+      if(["localhost","127.0.0.1"].includes(location.hostname))console.warn("操作導覽載入失敗",error);
+    }
+  }
+
+  loadSystemGuide();
 })();

@@ -40,7 +40,7 @@
       <div class="save-state"><i></i><span id="saveState">案件草稿已保存</span><small id="saveTime">尚未編輯</small></div>
     </section>
 
-    <section class="case-head card">
+    <section class="case-head card" data-guide-id="workflow.case-profile">
       <div class="section-title"><span>01</span><div><h2>案件基本資料</h2><p>依訪談類型接續委員回饋、投票與結案流程</p></div></div>
       <div class="fields four">
         <label>案件類型<select id="caseType" disabled><option value="renewal">續約</option><option value="new">新會員</option><option value="midterm">期中輔導</option><option value="industry">轉換行業別</option><option value="departure">離會訪談</option></select></label>
@@ -69,7 +69,7 @@
           <div class="notice-compose feedback-notice-compose">
             <div><b>委員回饋通知</b><small>選擇群組並複製完整文案；貼到 LINE 後，Bot 會用免費 Reply 回覆免登入回饋圖卡。</small></div>
             <div class="feedback-notice-actions vote-notice-actions">
-              <label class="vote-destination vp-control">回饋圖卡發布群組
+              <label class="vote-destination vp-control" data-guide-id="workflow.feedback-destination">回饋圖卡發布群組
                 <select id="feedbackCallEnvironment" aria-describedby="feedbackCallEnvironmentHint">
                   <option value="production">正式群</option>
                   <option value="test">測試群（仍寫入正式案件）</option>
@@ -85,8 +85,8 @@
 
         <section class="card" id="feedbackSection">
           <div class="section-title"><span>03</span><div><h2>委員回饋</h2><p>委員原則上自行填寫；副主席可依委員提供的 LINE 內容代填，達過半門檻後才能開啟投票</p></div></div>
-          <div class="threshold-banner"><div><small>有效回饋</small><strong><span id="feedbackCount">0</span>／<span id="eligibleCount">7</span></strong></div><div><small>開票門檻</small><strong id="feedbackThreshold">4 人</strong></div><div class="threshold-result" id="feedbackResult">尚未達門檻</div></div>
-          <div class="feedback-editor">
+          <div class="threshold-banner" data-guide-id="workflow.feedback-threshold"><div><small>有效回饋</small><strong><span id="feedbackCount">0</span>／<span id="eligibleCount">7</span></strong></div><div><small>開票門檻</small><strong id="feedbackThreshold">4 人</strong></div><div class="threshold-result" id="feedbackResult">尚未達門檻</div></div>
+          <div class="feedback-editor" data-guide-id="workflow.feedback-editor">
             <div class="feedback-proxy-control" id="feedbackProxyControl" hidden>
               <label>回饋歸屬委員<select id="feedbackAuthor"></select></label>
               <small id="feedbackProxyHint">選擇本人，或選擇提供 LINE 回饋內容的會員委員。代填會保留副主席操作紀錄。</small>
@@ -119,7 +119,7 @@
             <div class="vote-line-state" id="voteLineState">按下後會建立一次性投票網址；請將完整文案原樣貼到所選群組，等待 Bot 回覆圖卡。</div>
             <pre id="voteNoticePreview" class="message-preview vote-notice-preview" tabindex="0"></pre>
             <div class="vote-grid">
-              <div class="my-vote">
+              <div class="my-vote" data-guide-id="workflow.ballot">
                 <b id="voteForName">本人的投票</b>
                 <label><input type="radio" name="vote" value="approve"><span id="approveLabel">同意續約</span></label>
                 <label><input type="radio" name="vote" value="reject"><span id="rejectLabel">不同意續約</span></label>
@@ -150,7 +150,7 @@
           <small id="annualDataSource" class="annual-data-source" hidden></small>
           <pre id="leadersPreview" class="message-preview muted-preview"></pre>
           <div class="action-row"><button id="copyLeaders" class="ghost" disabled>複製三長群文案並完成此步驟</button><button id="sendLeaders" class="primary vp-control" disabled>直接登記三長群已完成</button></div>
-          <div class="advisor-box">
+          <div class="advisor-box" data-guide-id="workflow.advisor-box">
             <div><b>董事顧問確認</b><small>請依董顧實際回覆登記，系統不代替董顧作成決定。</small></div>
             <label>確認狀態<select id="advisorStatus" class="vp-control"><option value="pending">尚未回覆</option><option value="confirmed">同意會員委員會決議</option><option value="returned">退回補充資料</option></select></label>
             <label>確認備註<textarea id="advisorNote" rows="3" placeholder="記錄董顧回覆、日期或需補充事項"></textarea></label>
@@ -173,7 +173,7 @@
       </div>
 
       <aside class="side-column vp-only-section">
-        <section class="card">
+        <section class="card" data-guide-id="workflow.status-card">
           <div class="side-head"><small>CASE STATUS</small><h2>案件狀態</h2></div>
           <div class="case-stage"><span id="stageNumber">3</span><div><small>目前階段</small><strong id="stageTitle">蒐集委員回饋</strong></div></div>
           <div class="progress"><i><em id="progressBar"></em></i><span id="progressText">30%</span></div>
@@ -181,13 +181,13 @@
           <div class="permission-note"><b>副主席權限</b><span id="permissionText">目前可操作開票、通知、送三長群與結案。</span></div>
           <button id="resetCase" class="ghost reset-case">清除並重設案件流程</button>
         </section>
-        <section class="card log-card"><div class="side-head"><small>AUDIT LOG</small><h2>案件歷程</h2></div><ol id="activityLog"></ol></section>
+        <section class="card log-card" data-guide-id="workflow.activity-card"><div class="side-head"><small>AUDIT LOG</small><h2>案件歷程</h2></div><ol id="activityLog"></ol></section>
       </aside>
     </div>
   </main>
   <div id="toast"></div>
   <script src="assets/js/vote-result-image.js?v=1"></script>
   <script src="assets/js/case-workflow.js?v=31"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

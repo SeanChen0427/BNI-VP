@@ -27,13 +27,13 @@
     <section class="loading" id="loading"><span></span><p>正在同步會員關懷資料…</p></section>
     <section class="error-state" id="errorState" hidden><b>目前無法讀取 BNI 分析工具</b><p id="errorMessage"></p><button type="button" id="retryButton">重新讀取</button></section>
     <div id="dashboard" hidden>
-      <section class="overview" aria-label="關懷摘要"><article class="primary"><small>現任會員</small><strong id="totalMembers">—</strong><span>人</span></article><article><small>綠燈率</small><strong id="greenRate">—</strong><span id="greenFraction"></span></article><article><small>本期續約截止</small><strong id="renewalDue">—</strong><span>件</span></article><article><small>續約審查預警</small><strong id="renewalWarnings">—</strong><span>人</span></article><article><small>審計觀察</small><strong id="auditObservations">—</strong><span>項</span></article></section>
-      <section class="traffic-panel"><div class="section-heading"><div><small>MEMBER HEALTH</small><h2>燈號分布</h2></div><p>灰燈與黑燈為同一狀態</p></div><div class="traffic-grid" id="trafficGrid"></div></section>
+      <section class="overview" aria-label="關懷摘要" data-guide-id="care.overview"><article class="primary"><small>現任會員</small><strong id="totalMembers">—</strong><span>人</span></article><article><small>綠燈率</small><strong id="greenRate">—</strong><span id="greenFraction"></span></article><article><small>本期續約截止</small><strong id="renewalDue">—</strong><span>件</span></article><article><small>續約審查預警</small><strong id="renewalWarnings">—</strong><span>人</span></article><article><small>審計觀察</small><strong id="auditObservations">—</strong><span>項</span></article></section>
+      <section class="traffic-panel" data-guide-id="care.traffic-panel"><div class="section-heading"><div><small>MEMBER HEALTH</small><h2>燈號分布</h2></div><p>灰燈與黑燈為同一狀態</p></div><div class="traffic-grid" id="trafficGrid"></div></section>
       <nav class="section-nav" id="sectionNav" aria-label="分析內容"></nav><div class="analysis-sections" id="analysisSections"></div>
-      <footer class="bridge-meta"><div><b>資料來源</b><span id="sourcePath"></span></div><div><b>來源更新時間</b><span id="sourceTime"></span></div><div><b>資料指紋</b><code id="sourceFingerprint"></code></div><p>本頁透過橋接層呈現 BNI 分析工具的結果；燈號、續約與關懷規則仍由原分析工具負責。</p></footer>
+      <footer class="bridge-meta" data-guide-id="care.provenance"><div><b>資料來源</b><span id="sourcePath"></span></div><div><b>來源更新時間</b><span id="sourceTime"></span></div><div><b>資料指紋</b><code id="sourceFingerprint"></code></div><p>本頁透過橋接層呈現 BNI 分析工具的結果；燈號、續約與關懷規則仍由原分析工具負責。</p></footer>
     </div>
   </main>
   <script src="core/member-care-domain.js?v=1"></script>
   <script src="assets/js/member-care.js?v=8"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body></html>

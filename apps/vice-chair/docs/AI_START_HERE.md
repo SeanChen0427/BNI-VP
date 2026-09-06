@@ -36,6 +36,7 @@ node scripts/changelog-context.mjs --app vice-chair --headings --recent 8 --sear
 | 表單欄位與 Word | 對應 `*-form.html`、`assets/js/*-form.js`、`services/case-files.js`、`docs/forms/interview-forms.md` |
 | PALMS、燈號、關懷診斷 | 相鄰 `../bni-analysis` 模組；本工作台只讀 `bni-bridge.mjs` |
 | AI 助手 | `assets/js/ai-assistant.js`、`preview-server.mjs`、`docs/architecture-hosting-security.md` |
+| 全站系統操作導覽 | `docs/system-operation-guide.md`、`core/onboarding-domain.js`、`assets/js/onboarding*.js`、`assets/css/onboarding.css`、`assets/js/workspace-nav.js`；Admin 必須持續完全排除 |
 | 權限與登入 | `assets/js/auth.js`、`assets/js/settings.js` |
 | 制度文字 | 對應 `docs/` 主題文件，不要直接從畫面猜規則 |
 

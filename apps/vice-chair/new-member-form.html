@@ -25,7 +25,7 @@
   <main>
     <section class="hero applicant-hero"><div><span class="eyebrow">高屏區會員訪談表・新會員用途</span><h1>新會員入會訪談</h1><p>依官方題目確認申請者的專業、經營穩定度、投入承諾與制度理解。</p></div><div class="save-state"><i></i><span id="saveState">草稿已儲存</span><small id="saveTime">尚未編輯</small></div></section>
     <div class="layout">
-      <aside class="steps"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#professional">專業與321A</a><a href="#goals">加入目標</a><a href="#commitment">投入與出席</a><a href="#training">培訓與制度</a><a href="#network">組織與宣誓</a><a href="#closing">其他事項</a><a href="#contacts">20人名單</a><a href="#signatures">確認與簽名</a></nav><div class="privacy"><b>正式輸出邊界</b><p>官方題目與填寫內容會輸出；系統追問提示、321A內部判讀及委員內部備註不輸出。</p></div></aside>
+      <aside class="steps" data-guide-id="form.progress-panel"><b>填寫進度</b><div class="progress"><i id="progressBar"></i></div><strong id="progressText">0%</strong><nav><a href="#basic">基本資料</a><a href="#professional">專業與321A</a><a href="#goals">加入目標</a><a href="#commitment">投入與出席</a><a href="#training">培訓與制度</a><a href="#network">組織與宣誓</a><a href="#closing">其他事項</a><a href="#contacts">20人名單</a><a href="#signatures">確認與簽名</a></nav><div class="privacy"><b>正式輸出邊界</b><p>官方題目與填寫內容會輸出；系統追問提示、321A內部判讀及委員內部備註不輸出。</p></div></aside>
       <form id="newMemberForm" hidden>
         <section class="form-card" id="basic"><div class="section-head"><span>01</span><div><h2>基本資料</h2><p>案件須已完成電子簽單與繳費</p></div></div><div class="case-gate"><span>流程前置</span><b>已簽單・已繳費</b><small>富聯完成付款後才安排會員委員訪談</small></div><div class="fields two"><label>會談日期與時間<input id="meetingDate" type="datetime-local" data-save></label><label>訪談方式／地址<input id="meetingPlace" value="ZOOM 線上訪談" data-save></label><label>申請者姓名<input id="applicantSearch" list="applicantList" data-save><datalist id="applicantList"></datalist></label><label>申請專業類別<input id="profession" placeholder="請依申請書手動填寫" data-save></label><label>引薦人<select id="referrerName" data-save required><option value="">載入既有會員中…</option></select><small>請選擇正式會員；供通過後的公告文案使用，不輸出至訪談 Word。</small></label><label>主訪委員<input id="leadInterviewer" readonly></label><label>陪訪委員<input id="companionInterviewer" list="committeeList" data-save></label><label>第二陪訪（選填）<input id="secondCompanion" list="committeeList" data-save></label><label>分會<input value="富聯" readonly></label><datalist id="committeeList"></datalist></div></section>
 
@@ -59,6 +59,6 @@
   <script src="core/interview-word-domain.js?v=1"></script>
   <script src="assets/js/new-member-form.js?v=9"></script>
   <script src="assets/js/new-member-form-live.js?v=5"></script>
-  <script src="assets/js/workspace-nav.js?v=8"></script>
+  <script src="assets/js/workspace-nav.js?v=13"></script>
 </body>
 </html>

@@ -18,6 +18,16 @@ function refreshCommittee(){committeeField.hidden=username.value.trim()!==config
 username.addEventListener("input",refreshCommittee);
 const allowedPages=new Set(["index.html","case-board.html","case-workflow.html","case-archive.html","member-care.html","attendance.html","accountability-emails.html","terminal-form.html","midterm-form.html","new-member-form.html","industry-change-form.html","departure-form.html","course.html","settings.html","analysis-review.html","monthly-meeting.html","useful-links.html"]);
 function safeNext(value){if(!value)return"index.html";try{const target=new URL(value,location.href),page=target.pathname.split("/").pop();return target.origin===location.origin&&allowedPages.has(page)?`${page}${target.search}${target.hash}`:"index.html"}catch{return"index.html"}}
+function needsFirstSystemGuide(session){
+  const domain=window.FulianOnboardingDomain,catalog=window.FulianOnboardingGuides,identity=domain?.identityFromSession(session);
+  if(!domain||!catalog||!identity)return false;
+  const guide=catalog.getGuide("global-shell",identity.role);
+  if(!guide)return false;
+  const experience=domain.prepareRoleExperience?.(localStorage,identity)||{progress:domain.readProgress(localStorage,identity),pending:null};
+  if(experience.pending)return true;
+  const progress=experience.progress;
+  return domain.shouldAutoStart(progress,guide.id,guide.version,false);
+}
 form.addEventListener("submit",async event=>{
   event.preventDefault();
   error.textContent="";
@@ -36,8 +46,13 @@ form.addEventListener("submit",async event=>{
     submitButton.textContent="登入工作台";
     return;
   }
-  const params=new URLSearchParams(location.search);
-  location.href=safeNext(params.get("next"));
+  const params=new URLSearchParams(location.search),next=safeNext(params.get("next"));
+  if(needsFirstSystemGuide(result.session)){
+    sessionStorage.removeItem("fulian-system-guide-return-v1");
+    location.replace("index.html?guide=welcome");
+    return;
+  }
+  location.href=next;
 });
 if(FulianAuth.validate())location.href="index.html";
 else if(new URLSearchParams(location.search).get("reason")==="session-expired")error.textContent="登入已逾時，請重新登入。";
