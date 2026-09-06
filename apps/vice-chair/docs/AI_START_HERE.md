@@ -50,6 +50,14 @@ node scripts/changelog-context.mjs --app vice-chair --headings --recent 8 --sear
 
 ## 固定驗證
 
+開發中的每一輪先跑與修改直接相關的測試；功能完成、跨模組修改或正式部署前，再從總專案根目錄完整執行一次：
+
+```bash
+npm run check
+```
+
+完整檢查的範圍不得縮減，但輸出採分層讀取：全部成功時只讀取測試總數、失敗數、稽核摘要與 BNI 對帳摘要；逐項成功內容使用精簡 reporter 或保留在本機臨時紀錄。只有失敗、新警告或數量異常時才展開完整輸出。精簡顯示不得吞掉非零結束碼，也不得取代下列個別診斷指令：
+
 ```bash
 node scripts/project-audit.mjs
 node tests/case-domain.test.mjs
@@ -57,6 +65,8 @@ node --test tests/*.test.mjs
 ```
 
 再依修改範圍測試對應頁面。不得用真實 API Key、LINE Bot 或正式會員案件做自動測試。
+
+測試案例只在新增行為、修復缺陷、重要權限／資料契約或跨模組風險需要永久保護時增加。可以合併重複案例，但不得為了讓數字變少或節省 token 而刪除仍有意義的回歸測試。
 
 ## 文件規則
 
