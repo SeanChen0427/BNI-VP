@@ -1,14 +1,14 @@
-# Claude Code 快速交接摘要
+# 富聯工作台快速交接摘要
 
-更新日期：2026-09-04
+更新日期：2026-09-06
 
 > Codex、Claude 或其他 AI 要修改程式時，先讀 `docs/AI_START_HERE.md` 與根目錄 `project-manifest.json`；本文件主要提供業務交接脈絡。
 
 ## 30 秒摘要
 
-這是一個已進入本機互動原型階段的 SaaS 專案，目標是建立 BNI 富聯分會的會員委員會工作台。現有紅綠燈系統位於相鄰的 `BNI` 資料夾，必須保持獨立且不可擅自修改，但已確認後續透過橋接層整合。
+這是已正式運作的 BNI 富聯分會會員委員會 SaaS 工作台。正式前台由 GitHub Pages 發布，登入、會員、案件、附件、PALMS、分析、出席與敏感操作由 Supabase 提供；目前仍持續蒐集需求與改善功能。
 
-目前已有登入、權限、人員、首頁、訪談表單、點名、案件回饋及投票等本機原型。新功能仍須依 Sean 授權製作，不得擅自改動既有 BNI 分析規則。
+紅綠燈與會員關懷分析核心已整合於相鄰的 `../bni-analysis/`，工作台只讀取版本化結果，不重寫計分規則。`preview-server.mjs` 與本機私密資料保留作開發、驗證、分析及復原，不是另一套正式資料來源。
 
 ## 2026-09-04 年度換屆操作
 
@@ -19,19 +19,21 @@
 - 同角色留任者的未完成工作保持原指派。含卸任或轉任人員的未完成工作會保留原名單並進入首頁單一「換屆待指派」清單，由新任副主席／Admin 一次完成全部接手指派。
 - 不得為換屆刪除舊人員、舊任期或已結案案件。已結案的主責、陪訪、結案確認人、回饋、投票、Word 與歷程均維持唯讀，以供日後回查。
 
-## 2026-07-14 上線與資料架構方向
+## 歷史里程碑：2026-07-14 上線與資料架構方向
+
+> 本節保留當時決策脈絡；現行正式狀態以 `project-manifest.json`、`docs/ARCHITECTURE_MAP.md` 與上架安全文件為準。
 
 - GitHub 只放程式碼、schema、空白範例及去識別化測試資料。
-- 敏感資料與正式附件不進 GitHub；正式後端優先採 Supabase。
+- 敏感資料與正式附件不進 GitHub；當時決定正式後端優先採 Supabase，並已於 2026-07-20 實際上線。
 - Supabase Auth：登入；PostgreSQL：會員、案件、回饋、投票、出席與分析快照；Private Storage：PALMS、Word、截圖與附件；Edge Function Secrets：LINE 與 AI Key。
 - BNI 分析工具保留為唯一計分與診斷來源，透過版本化分析快照橋接進副主席系統。
 - 詳細規格與資料存放表：`docs/architecture-hosting-security.md`。
 
-## 本輪已完成
+## 歷史建置里程碑
 
 - 建立 BNI 分析工具橋接層：`bni-bridge.mjs` 唯讀相鄰 BNI 儀表板，`preview-server.mjs` 提供 `/api/bni-analysis`。
 - 建立 `member-care.html` 會員關懷儀表板，顯示燈號、續約、審計、黃燈突圍與期中關懷；原 BNI 專案未被修改。
-- 橋接資料格式版本為 `fulian.bni-analysis.v1`，未來 Supabase 快照應維持相容或明確升版。
+- 橋接資料格式版本為 `fulian.bni-analysis.v1`；正式 Supabase 快照已沿用相同契約，相容性變更仍須明確升版。
 
 - 建立獨立專案資料夾。
 - 定義 SaaS、兩種角色、交接與資料安全方向。
@@ -154,21 +156,20 @@
 3. `docs/OPEN_QUESTIONS.md`
 4. 依任務讀對應主題文件
 
-不要把舊表單中的固定門檻直接拿來改紅綠燈計分；現有計分規則仍由獨立 BNI 專案管理。
+不要把舊表單中的固定門檻直接拿來改紅綠燈計分；現有計分規則只由整合版 `../bni-analysis/` 管理，原始 BNI 專案保留不動。
 
 ## 技術狀態
 
-- 原生 HTML／CSS／JavaScript 本機原型，Node `preview-server.mjs` 提供靜態頁面與本機 API。
-- 已有 Node 內建測試的橋接解析器測試；尚未導入 package manager。
-- Supabase 正式專案、Auth、資料表、Private Storage 與 RLS 已建立；前端登入已接上三組共用 Auth 帳號，其餘正式資料層仍分階段遷移。
-- 尚未建立 Git repository；正式敏感資料禁止進 GitHub。
+- 正式前台為原生 HTML／CSS／JavaScript 多頁應用，由 GitHub Pages 自動發布；本機以 Node `preview-server.mjs` 提供相容預覽與受限 API。
+- 總專案已使用 npm scripts 管理啟動、測試、健檢與 BNI 回歸，完整驗證入口為 `npm run check`。
+- Supabase 正式專案、Auth、PostgreSQL、Private Storage、RLS 與 Edge Functions 已建立；案件、表單草稿、Word、出席與主要工作資料均已跨裝置同步，瀏覽器只保留快取、離線備援及課程／導覽等非正式個人進度。
+- Git repository、GitHub Pages workflow 與敏感資料掃描均已建立；正式敏感資料禁止進 GitHub。
+- 本機私密資料必須維持可追溯、可核對、可供重建的復原鏡像；實際備份頻率、完整性證據與還原演練仍列入上線後治理工作。
 
-## 下一個合理工作
+## 目前持續工作
 
-優先繼續蒐集副主席實際工作；若 Sean 改為要求開始規劃，先完成：
-
-1. 關閉 `docs/OPEN_QUESTIONS.md` 中的 P0 問題。
-2. 確認 GitHub 必須是 private 或哪些文件不可進 repository。
-3. 確認 SaaS 帳號、資料所有權、備份與卸任撤權。
-4. 把已確認需求拆成 MVP 與後續版本。
-5. 經 Sean 確認後，才做資料模型與技術選型。
+1. 持續蒐集副主席實際工作與中心區現行制度，已確認內容寫入主題規格及決策紀錄。
+2. `docs/OPEN_QUESTIONS.md` 只保留真正未決的制度、治理、備份、帳號所有權與交接事項。
+3. 依 `docs/REFACTOR_ROADMAP.md` 的狀態逐項降低技術債，不重做已完成的正式後端。
+4. 建立並定期驗證本機復原鏡像的完整性與可還原性；在規格確認前不以未核對副本覆蓋正式環境。
+5. 新功能、正式資料或部署變更均由 Sean 指定範圍後執行，並保留測試、決策及部署證據。

@@ -1,13 +1,22 @@
 {
   "schema": "fulian.unified-project.v1",
-  "updated": "2026-08-31",
+  "updated": "2026-09-06",
   "product": "富聯分會會員委員會整合系統",
   "runtime": {
-    "type": "local multi-page prototype with shared analysis backend",
+    "type": "production multi-page web application with local development and recovery runtime",
     "start": "npm start",
-    "workbenchUrl": "http://127.0.0.1:4173/",
-    "analysisUrl": "http://127.0.0.1:4173/analysis/",
-    "formalBackend": false
+    "localWorkbenchUrl": "http://127.0.0.1:4173/",
+    "localAnalysisUrl": "http://127.0.0.1:4173/analysis/",
+    "productionUrl": "https://seanchen0427.github.io/BNI-VP/",
+    "productionFrontend": "GitHub Pages",
+    "formalBackend": true,
+    "formalBackendProvider": "Supabase"
+  },
+  "dataContinuity": {
+    "formalOperationalSource": "Supabase Auth, PostgreSQL, Private Storage, and Edge Functions",
+    "localDataRole": "required private recovery mirror and analysis working copy stored outside Git",
+    "consistencyRule": "local recovery data must be versioned and verified against the formal source before it is labeled recoverable",
+    "historyRule": "decision logs, changelogs, deployment logs, and dated reviews are retained as immutable trace evidence"
   },
   "applications": {
     "viceChair": "apps/vice-chair",
@@ -27,7 +36,6 @@
     "lineCaseFeedbackCall": "supabase/functions/_shared/case-feedback-call-domain.mjs"
   },
   "verification": [
-    "npm run test",
-    "npm run audit"
+    "npm run check"
   ]
 }
