@@ -2,6 +2,13 @@
 
 本專案將「副主席工作台」與「BNI 會員關懷分析工具」放在同一個總專案中管理。兩個原始專案均保留不動；整合版使用複本建立，後續修改以本專案為主。
 
+## 正式運作狀態
+
+- 正式前台：<https://seanchen0427.github.io/BNI-VP/>。
+- 正式後端：Supabase Auth、PostgreSQL、Private Storage 與 Edge Functions。
+- GitHub Pages 只發布公開前端；正式會員、案件、附件、PALMS、帳密與 Secret 不進 GitHub。
+- 本機執行環境保留作開發、驗證、分析及災難復原，不是尚未上線的替代正式版。
+
 ## 產品分工
 
 - `apps/vice-chair/`：登入、工作總覽、案件、訪談、投票、點名、月會、交接課程與 AI 助手。
@@ -10,7 +17,7 @@
 
 副主席工作台不得自行複製燈號或診斷公式；所有會員數據判斷必須回到 BNI 分析工具。
 
-## 本機啟動
+## 本機開發與復原環境
 
 ```bash
 npm start
@@ -22,6 +29,8 @@ npm start
 - 完整 BNI 分析工具：`http://127.0.0.1:4173/analysis/`
 - 會員關懷整合頁：`http://127.0.0.1:4173/member-care.html`
 
+本機私密資料是正式系統的重要復原資產，必須保存版本、資料期間、來源及核對證據，並在確認與線上正式資料一致後才可標記為可還原。日常正式操作仍以 Supabase 為準；不得同時人工修改線上與本機兩份資料，形成兩套互相競爭的來源。
+
 ## 驗證
 
 ```bash
@@ -30,6 +39,6 @@ npm run check
 
 ## 資料安全
 
-目前整合版仍包含由原 BNI 專案複製的本機資料，只適合在 Sean 的電腦上使用。`apps/bni-analysis/data/`、訪談附件、會員個資、投票明細、LINE Token、AI API Key 與正式帳密不得加入 GitHub。
+整合版的本機工作環境包含由原 BNI 專案複製並持續使用的私密分析資料，只能存放於受控電腦及專案外的加密備份位置。`apps/bni-analysis/data/`、訪談附件、會員個資、投票明細、LINE Token、AI API Key 與正式帳密不得加入 GitHub。
 
-正式上架前必須將私密資料移至 Supabase Private Storage／Database，並把分析程序改為伺服器端工作；GitHub 只保存程式碼、規則骨架與去識別化測試資料。
+正式資料已由 Supabase 保存並由伺服器端分析流程處理；本機副本不得因此刪除。它應持續作為可驗證的復原鏡像、規則回歸資料與重新部署來源。歷史決策、變更及部署證據分別保留於 `decision-log.md`、`CHANGELOG.md` 與日期化部署紀錄，不因更新現行文件而改寫。

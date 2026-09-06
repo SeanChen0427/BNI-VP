@@ -2,6 +2,13 @@
 
 本文件讓 Codex、Claude 或其他 AI 在最少上下文下安全修改專案。
 
+## 先確認現在在哪個階段
+
+- 系統已正式運作：前端為 GitHub Pages，正式登入、資料與敏感操作由 Supabase Auth、PostgreSQL、Private Storage 與 Edge Functions 承擔。
+- 本機環境仍是必要的開發、驗證、分析與災難復原環境；本機私有資料不可刪除或提交 Git，也不可未經線上差異核對就宣稱可還原。
+- 目前狀態先看本文件、`AGENTS.md`、`project-manifest.json`、`ARCHITECTURE_MAP.md` 與 `STORAGE_SCHEMA.md`。日期化部署紀錄、決策、CHANGELOG 和審查報告是歷史證據，只有追溯原因或排查回歸時才依主題展開。
+- 文件出現「上線前」「未來改接」等文字時，先判斷它是否位於明確日期的歷史段落；不得直接用舊里程碑推翻現行架構。
+
 ## 每次作業只讀這些
 
 1. 根目錄 `AGENTS.md`。
@@ -73,7 +80,9 @@ node --test tests/*.test.mjs
 - 現行需求只寫 `docs/requirements-draft.md`。
 - 現行決策只寫 `docs/decision-log.md`。
 - 未決問題只寫 `docs/OPEN_QUESTIONS.md`。
+- 現況架構與資料邊界以 `docs/ARCHITECTURE_MAP.md`、`docs/STORAGE_SCHEMA.md` 與 `docs/architecture-hosting-security.md` 為準；已完成事項不得繼續列為未決或未來式。
 - 歷次程式變更完整寫入 `CHANGELOG.md`；讀取時遵守上方分層規則，不摘要或刪除原始歷史。
+- 日期化部署紀錄與既有決策保持原始時點；若已被取代，新增指向現行文件的註記或新決策，不把歷史改寫成今天的敘述。
 - 外部模型審查報告放 `docs/reviews/`，只作歷史證據，不得當作現行規格。
 - 根目錄不得再建立第二份 `requirements-draft.md` 或 `decision-log.md`。
 - `AGENTS.md`、`CLAUDE.md` 改動後必須保持完全相同。

@@ -5,9 +5,13 @@
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
     "start": "node preview-server.mjs 4173",
-    "url": "http://127.0.0.1:4173/",
+    "localUrl": "http://127.0.0.1:4173/",
+    "productionUrl": "https://seanchen0427.github.io/BNI-VP/",
+    "productionFrontend": "GitHub Pages",
     "buildStep": false,
-    "formalBackend": true
+    "formalBackend": true,
+    "formalBackendProvider": "Supabase",
+    "localRuntimePurpose": "development, verification, analysis, and disaster recovery"
   },
   "entryDocuments": [
     "AGENTS.md",
@@ -58,9 +62,10 @@
       "docs/voting-rules.md"
     ],
     "bniScoresAndDiagnostics": "../bni-analysis",
-    "authenticationPrototype": "assets/js/auth.js",
-    "memberDirectoryPrototype": "assets/js/member-directory.js",
-    "localApiAndAiProxy": "preview-server.mjs"
+    "authenticationRuntime": "assets/js/auth.js",
+    "memberDirectoryLoader": "assets/js/member-directory.js",
+    "productionApiBridge": "assets/js/supabase-data.js",
+    "localPreviewApi": "preview-server.mjs"
   },
   "pages": {
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",
@@ -79,7 +84,31 @@
     "departure-form.html": "離會訪談",
     "course.html": "副主席交接課程",
     "settings.html": "角色、Admin 年度換屆、帳密、個人 AI 與使用者版更新紀錄",
-    "login.html": "原型登入"
+    "login.html": "Supabase Auth 共用帳號登入與姓名選擇"
+  },
+  "dataContinuity": {
+    "formalOperationalSource": "Supabase",
+    "localDataRole": "required private recovery mirror and analysis working copy; browser caches are limited offline fallback only",
+    "consistencyRule": "local recovery data must be versioned and verified against Supabase before it is labeled recoverable",
+    "historyRule": "dated decisions, changelogs, deployment logs, and reviews remain traceable and are not rewritten as current state"
+  },
+  "documentation": {
+    "current": [
+      "README.md",
+      "AGENTS.md",
+      "docs/AI_START_HERE.md",
+      "docs/ARCHITECTURE_MAP.md",
+      "docs/STORAGE_SCHEMA.md",
+      "docs/architecture-hosting-security.md"
+    ],
+    "openItems": "docs/OPEN_QUESTIONS.md",
+    "historicalEvidence": [
+      "docs/decision-log.md",
+      "CHANGELOG.md",
+      "docs/DEPLOYMENT_LOG_*.md",
+      "docs/PROJECT_AUDIT_*.md",
+      "docs/reviews/*.md"
+    ]
   },
   "nonNegotiableRules": [
     "BNI 計分與診斷只由相鄰 bni-analysis 模組提供，不在工作台重寫",
