@@ -19,3 +19,11 @@ Sean 回報已表明不續約的會員仍被強制安排關懷，導致月會無
 ## 發布與相容回復
 
 發布結果於正式部署完成後追加。前端與 app-api 必須一同更新；無資料庫 migration。前版程式參考 `b119882`（v1.3.1）。若已保存新決議，不可直接降回不認識 `no_follow_up` 的舊後端；應保留新決議的讀取、驗證及免分工相容邏輯，再個別回復畫面或教學。
+
+## 正式發布完成
+
+- 產品提交：`91db74b1ee4ce9730f6d98398d3459080033e509`（v1.3.2）。
+- Supabase `app-api` 已成功部署至 `fahrblkukuhgveiptufn`，CLI 回傳 `Deployed Functions.`。
+- GitHub Pages [發布流程 34148788566](https://github.com/SeanChen0427/BNI-VP/actions/runs/34148788566) 成功，提交與上述版本一致。
+- 正式網址唯讀核對 8 個主要 HTML／JS 資產，與本機發布產物逐位元組相符；匿名會員 API 仍回傳 401。
+- 合成測試分頁與本機測試伺服器已關閉。根目錄 AGENTS.md、CLAUDE.md 原有未提交變更完整保留。
