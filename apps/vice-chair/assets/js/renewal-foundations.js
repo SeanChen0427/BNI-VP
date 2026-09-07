@@ -59,6 +59,9 @@
     $("#intervalField").hidden = !flexible || $("#period").value !== "custom";
     $("#intervalMonths").required = !$("#intervalField").hidden;
     $("#leadField").hidden = !flexible || recurring;
+    $("#intervalMonths").disabled = $("#intervalField").hidden || Boolean(editing);
+    $("#metric").disabled = $("#period").disabled = !flexible || Boolean(editing);
+    $("#leadMonths").disabled = $("#leadField").hidden;
     $("#dueOnLabel").firstChild.textContent = flexible ? "地基結束日（含當日）" : "地基期限／下次續約日";
     $("#target").step = flexible && $("#metric").value === "ceu" ? "0.01" : "1";
     $("#target").min = $("#target").step;
@@ -67,8 +70,11 @@
     $("#targetField").hidden = kind === "quarterly_workshop";
     $("#targetField").firstChild.textContent = flexible ? `${recurring ? "每期" : "累計"}目標（${domain.metricInfo({ metric: $("#metric").value }).unit}）` : kind === "visitors" ? "累計來賓目標（位）" : "每月來賓目標（位）";
     $("#target").required = !manual && kind !== "quarterly_workshop";
+    $("#target").disabled = manual || kind === "quarterly_workshop";
+    $("#startOn").disabled = manual;
     $("#manualCheckField").hidden = !manual;
     $("#nextCheckOn").required = manual;
+    $("#nextCheckOn").disabled = !manual;
     $("#criterion").required = manual;
     $("#criterionLabel").firstChild.textContent = manual ? "完成標準（必填）" : "完成標準（選填）";
     $("#extraDefinitionSummary").textContent = manual ? "條件說明（請填完成標準）" : "補充說明（選填）";
