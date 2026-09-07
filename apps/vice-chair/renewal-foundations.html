@@ -5,13 +5,13 @@
   <meta name="theme-color" content="#a91419"><title>續約地基追蹤｜富聯分會</title>
   <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
   <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
-  <link rel="stylesheet" href="assets/css/renewal-foundations.css?v=3">
+  <link rel="stylesheet" href="assets/css/renewal-foundations.css?v=4">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
   <script src="assets/js/supabase-config.js?v=1"></script>
   <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
   <script src="core/calendar-domain.js?v=5"></script>
-  <script src="core/renewal-foundation-domain.js?v=3"></script>
+  <script src="core/renewal-foundation-domain.js?v=4"></script>
 </head>
 <body>
   <header class="topbar"><a href="index.html">← 回工作台</a><strong>富聯分會</strong><div><span data-auth-name>使用者</span>・<span data-auth-role>職務</span> <button data-auth-logout>登出</button></div></header>
@@ -30,7 +30,8 @@
     <label id="sourceTaskField">來源續約案件<select id="sourceTaskId" required></select></label>
     <label id="legacyMemberField" hidden>補登會員<select id="memberId"></select></label>
     <p id="legacyHint" hidden>請填原本約定的起算日與期限，系統會接續檢視先前各期。補登不代表已達成；已參加的工作坊請再逐期確認。</p>
-    <label>地基類型<select id="kind"><option value="monthly_visitors">每月來賓（各月分開計算）</option><option value="quarterly_workshop">每 3 個月工作坊（副主席逐期確認）</option><option value="visitors">下次續約前累計來賓（提前半年追蹤）</option><option value="manual">其他人工追蹤條件</option></select></label>
+    <label>地基類型<select id="kind"><option value="flexible">指標與期間目標</option><option value="manual">其他人工追蹤條件</option><option value="monthly_visitors" hidden>原有每月來賓</option><option value="quarterly_workshop" hidden>原有每 3 個月工作坊</option><option value="visitors" hidden>原有續約前累計來賓</option></select></label>
+    <div id="flexibleFields"><div class="fields"><label>追蹤指標<select id="metric"><option value="visitors">來賓人數</option><option value="ceu">培訓積分（PALMS 教育單位）</option><option value="workshop">工作坊場次（副主席確認）</option></select></label><label>計算期間<select id="period"><option value="cumulative">會籍／指定期間內累計</option><option value="1">每月</option><option value="3">每 3 個月</option><option value="6">每半年</option><option value="12">每年</option><option value="custom">自訂每期月數</option></select></label></div><label id="intervalField" hidden>每期月數<input id="intervalMonths" type="number" min="1" max="36" value="2"></label><label id="leadField">何時開始提醒追蹤<select id="leadMonths"><option value="0">從地基起算日開始</option><option value="1">期限前 1 個月</option><option value="3">期限前 3 個月</option><option value="6">期限前 6 個月</option></select></label></div>
     <div class="fields" id="automaticFields"><label>續約生效／地基起算日<input id="startOn" type="date"></label><label id="targetField">每月來賓目標（位）<input id="target" type="number" min="1" max="10000" value="1"></label></div>
     <p id="scheduleHint">每月與每 3 個月都從續約日起算，各期獨立檢視。</p>
     <details id="extraDefinition"><summary id="extraDefinitionSummary">補充說明（選填）</summary>
@@ -38,7 +39,7 @@
       <label id="criterionLabel">完成標準（選填）<textarea id="criterion" rows="2" maxlength="2000" placeholder="有額外約定時再補充"></textarea></label>
       <label>議定依據或備註（選填）<textarea id="source" rows="2" maxlength="3000" placeholder="有需要再補充原約定或確認紀錄"></textarea></label>
     </details>
-    <div class="fields"><label>地基期限／下次續約日<input id="dueOn" type="date" required></label><label id="manualCheckField">下次追蹤日<input id="nextCheckOn" type="date"></label></div>
+    <div class="fields"><label id="dueOnLabel">地基期限／下次續約日<input id="dueOn" type="date" required></label><label id="manualCheckField">下次追蹤日<input id="nextCheckOn" type="date"></label></div>
     <div class="fields"><label>主要追蹤人<select id="leadId" required></select></label><label>陪同追蹤 1<select id="companionOne"></select></label><label>陪同追蹤 2<select id="companionTwo"></select></label></div>
     <label id="amendReasonLabel" hidden>修改原因（保存前後內容）<textarea id="amendReason" maxlength="4000"></textarea></label>
     <p class="form-error" id="definitionError" role="alert"></p><footer><button type="button" data-close>取消</button><button type="submit" id="saveAndAddFoundation">儲存並新增下一項</button><button class="primary" type="submit">儲存地基</button></footer>
@@ -50,14 +51,14 @@
     <label>本次動作<select id="action"></select></label>
     <div id="reminderFields"><div class="fields"><label>實際提醒日期<input id="contactedOn" type="date"></label><label>提醒方式<select id="channel"><option>LINE</option><option>電話</option><option>當面</option><option>Email</option><option>其他</option></select></label></div><label>會員回覆<textarea id="response" rows="2" maxlength="2000" placeholder="尚未回覆時，請填寫「尚未回覆」"></textarea></label></div>
     <label id="statusField">進度／確認結果<select id="recordStatus"></select></label>
-    <div id="quarterFields"><label>確認哪一期工作坊<select id="periodKey"></select></label><label>實際參加日期<input id="attendedOn" type="date"></label></div>
+    <div id="quarterFields"><label>確認哪一期工作坊<select id="periodKey"></select></label><label>本期已核對完成場次<input id="completedCount" type="number" min="1" max="10000" value="1"></label><label>實際參加日期（多場請填最後一場，並於紀錄列出各場）<input id="attendedOn" type="date"></label></div>
     <label>本次紀錄、證據或決議依據<textarea id="note" rows="4" required maxlength="4000" placeholder="記錄提醒內容、進度佐證，或人工確認結果的依據"></textarea></label>
     <label id="nextField">下次追蹤日<input type="date" id="recordNextCheckOn"></label>
     <p class="form-error" id="recordError" role="alert"></p><footer><button type="button" data-close>取消</button><button class="primary" type="submit">儲存紀錄</button></footer>
   </form></dialog>
 
   <dialog id="detailDialog" aria-labelledby="detailTitle"><header><h2 id="detailTitle">地基與追蹤歷程</h2><button type="button" data-close aria-label="關閉">×</button></header><div id="detailContent"></div></dialog>
-  <script src="assets/js/renewal-foundations.js?v=4"></script>
+  <script src="assets/js/renewal-foundations.js?v=5"></script>
   <script src="assets/js/workspace-nav.js?v=15"></script>
 </body>
 </html>

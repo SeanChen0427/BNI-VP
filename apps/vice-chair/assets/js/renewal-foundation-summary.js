@@ -9,7 +9,7 @@
     if (error) return [{ id: `foundation-load-failed-${calendar.dateInput()}`, title: "續約地基追蹤尚未同步", detail: "目前無法確認是否有到期項目，請開啟追蹤頁查看。", icon: "基", tone: "urgent", link: "renewal-foundations.html", priority: 1, time: new Date().toISOString() }];
     return items.filter(item => relevant(item) && domain.attention(item).rank <= 2).map(item => {
       const attention = domain.attention(item);
-      return { id: `foundation-${item.id}-${item.revision}-${attention.key}-${calendar.dateInput()}`, title: `${item.memberName}・${attention.label}`, detail: `${item.title}・期限 ${item.dueOn}・主責 ${item.leadName}`, icon: "基", tone: attention.rank === 0 ? "urgent" : "workflow", link: `renewal-foundations.html?item=${encodeURIComponent(item.id)}`, priority: attention.rank, time: item.updatedAt };
+      return { id: `foundation-${item.id}-${item.revision}-${attention.key}-${calendar.dateInput()}`, title: `${item.memberName}・${attention.label}`, detail: `${item.title}・期限 ${domain.displayDeadline(item)}・主責 ${item.leadName}`, icon: "基", tone: attention.rank === 0 ? "urgent" : "workflow", link: `renewal-foundations.html?item=${encodeURIComponent(item.id)}`, priority: attention.rank, time: item.updatedAt };
     });
   }
   function render() {
@@ -18,8 +18,26 @@
     const active = items.filter(item => !domain.resolved(item));
     const due = active.filter(item => relevant(item) && domain.attention(item).rank <= 2);
     const list=document.getElementById("foundationHomeList");
-    if(list){list.replaceChildren();for(const item of active.filter(value=>domain.attention(value).rank<=2||domain.attention(value).rank===8)){const link=document.createElement("a"),title=document.createElement("b"),progress=document.createElement("span"),assignment=document.createElement("span");link.className="foundation-home-item";link.href=`renewal-foundations.html?item=${encodeURIComponent(item.id)}`;title.textContent=`${item.memberName}・${item.title}｜${domain.attention(item).label}`;progress.textContent=domain.progressText(item);assignment.textContent=`主責 ${item.leadName}｜起算 ${item.startOn||item.nextCheckOn}｜期限 ${item.dueOn}`;link.append(title,progress,assignment);list.append(link);}}
-    node.textContent = error ? "尚未同步，請開啟追蹤頁確認。" : `持續列管 ${active.length} 項・${domain.manager(session) ? "待跟進" : "我需跟進"} ${due.length} 項`;
+    if (list) {
+      list.replaceChildren();
+      for (const group of domain.groupByMember(active)) {
+        const link = document.createElement("a"), title = document.createElement("b");
+        link.className = "foundation-home-item";
+        link.href = `renewal-foundations.html?member=${encodeURIComponent(group.key)}`;
+        title.textContent = `${group.memberName}｜${group.items.length} 項地基`;
+        link.append(title);
+        for (const item of group.items) {
+          const row = document.createElement("span"), label = document.createElement("strong"), progress = document.createElement("span");
+          row.className = "foundation-home-condition";
+          label.textContent = `${item.title}｜${domain.attention(item).label}`;
+          progress.textContent = `${domain.compactProgress(item)}・主責 ${item.leadName}`;
+          row.append(label, progress);
+          link.append(row);
+        }
+        list.append(link);
+      }
+    }
+    node.textContent = error ? "尚未同步，請開啟追蹤頁確認。" : `持續列管 ${domain.groupByMember(active).length} 位會員／${active.length} 項・${domain.manager(session) ? "待跟進" : "我需跟進"} ${due.length} 項`;
   }
   function refresh() {
     if (pending) return pending;

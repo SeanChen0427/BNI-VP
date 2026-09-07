@@ -168,7 +168,7 @@
   }
   function foundationSnapshotText(value){
     if(!value)return "本次歷史月會尚未建立續約地基快照";
-    return `續約地基提醒（${calendar.formatTaipeiTimestamp(value.capturedAt,{year:true})} 核對）\n`+(value.items?.length?value.items.map(item=>`${item.memberName}｜${item.title}\n${item.progress}\n${item.attention}｜期限 ${item.dueOn}｜主責 ${item.leadName}`).join("\n\n"):"本次沒有需跟進的地基項目");
+    return `續約地基提醒（${calendar.formatTaipeiTimestamp(value.capturedAt,{year:true})} 核對）\n`+(value.items?.length?window.FulianRenewalFoundationDomain.groupByMember(value.items).map(group=>`${group.memberName}｜${group.items.length} 項地基\n`+group.items.map(item=>`${item.title}\n${item.progress}\n${item.attention}｜期限 ${item.dueOn}｜主責 ${item.leadName}`).join("\n\n")).join("\n\n"):"本次沒有需跟進的地基項目");
   }
   async function renderFoundationSnapshot(){
     const node=$("#meetingFoundationSnapshot"),currentId=record?.id;

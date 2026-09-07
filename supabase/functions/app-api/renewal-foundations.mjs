@@ -2,6 +2,7 @@ import "../../../apps/vice-chair/core/calendar-domain.js";
 import "../../../apps/vice-chair/core/renewal-foundation-domain.js";
 
 const domain = globalThis.FulianRenewalFoundationDomain;
+const calendar = globalThis.FulianCalendarDomain;
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
 const validateId = value => { if (!uuid.test(value || "")) fail("追蹤識別碼無效"); return value; };
@@ -118,7 +119,7 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
   api.snapshot = async context => {
     const items = (await list(context, await taskDirectory())).filter(item => domain.attention(item, now()).rank <= 2);
     // Monthly minutes are readable by all committee members: retain only progress summaries.
-    return { capturedAt: now().toISOString(), items: items.map(item => ({ id: item.id, memberName: item.memberName, title: item.title, dueOn: item.dueOn, leadName: item.leadName, progress: domain.progressText(item, now()), attention: domain.attention(item, now()).label })) };
+    return { capturedAt: now().toISOString(), items: items.map(item => ({ id: item.id, memberId: item.memberId, memberName: item.memberName, title: item.title, dueOn: item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn, leadName: item.leadName, progress: domain.progressText(item, now()), attention: domain.attention(item, now()).label })) };
   };
   return api;
 }

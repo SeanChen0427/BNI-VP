@@ -160,6 +160,26 @@ p {
   font-weight:750;
   color:#8b1b26;
 }
+.member-foundations {
+  margin-top:18px;
+}
+.foundation-condition {
+  padding:18px 0;
+  border-top:1px solid #e0e5ed;
+}
+.foundation-condition h3 {
+  margin:0;
+  font-size:17px;
+}
+.condition-progress {
+  margin:10px 0;
+  overflow-wrap:anywhere;
+}
+.foundation-condition summary {
+  cursor:pointer;
+  font-size:14px;
+  color:#627085;
+}
 .badge {
   border-radius:20px;
   background:#eef2f7;

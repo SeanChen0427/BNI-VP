@@ -271,3 +271,94 @@ test("同會員兩項地基獨立保存，確認工作坊不改動每月來賓",
   assert.equal(f.rows.get(id).data.periodResults, undefined);
   assert.equal(f.rows.get(id).data.status, "tracking");
 });
+
+const flexible = (extra = {}) => ({ ...base(), kind: "flexible", metric: "visitors", cadence: "recurring", intervalMonths: 3, leadMonths: 0, startOn: "2026-01-31", dueOn: "2027-01-31", target: 2, title: "", criterion: "", ...extra });
+
+test("自由地基支援三種指標、多種週期、累計啟動時間及有效目標", () => {
+  for (const metric of ["visitors", "ceu", "workshop"]) for (const intervalMonths of [1, 2, 3, 6, 12]) {
+    const value = domain.definition(flexible({ metric, intervalMonths }));
+    assert.equal(value.intervalMonths, intervalMonths);
+    assert.equal(value.metric, metric);
+    assert.ok(value.title);
+    assert.equal(value.nextCheckOn, value.startOn);
+  }
+  const cumulative = domain.definition(flexible({ metric: "ceu", cadence: "cumulative", target: 20.5, leadMonths: 6 }));
+  assert.equal(cumulative.nextCheckOn, "2026-07-31");
+  assert.equal(cumulative.intervalMonths, 0);
+  assert.equal(domain.attention(cumulative, "2026-07-30").key, "scheduled");
+  for (const invalid of [{ target: 0 }, { target: 1.5 }, { metric: "ceu", target: 1.001 }, { intervalMonths: 0 }, { intervalMonths: 1.5 }, { intervalMonths: 37 }, { leadMonths: 6 }, { metric: "score" }, { cadence: "weekly" }]) assert.throws(() => domain.definition(flexible(invalid)));
+});
+
+test("月底起算不漂移，半年各期獨立，舊期缺口持續呈現", () => {
+  const value = { ...domain.definition(flexible({ intervalMonths: 1 })), status: "tracking" };
+  const periods = domain.cycles(value, "2026-04-01");
+  assert.deepEqual(periods.map(p => [p.start, p.end]), [["2026-01-31", "2026-02-27"], ["2026-02-28", "2026-03-30"], ["2026-03-31", "2026-04-29"]]);
+  value.periodMeasurements = { "2026-03-31": { current: 2 } };
+  assert.equal(domain.attention(value, "2026-04-01").rank, 0);
+  assert.match(domain.compactProgress(value, "2026-04-01"), /另有 2 期/);
+  assert.deepEqual(domain.cycles(flexible({ intervalMonths: 6 }), "2026-09-01").map(p => p.start), ["2026-01-31", "2026-07-31"]);
+  const cumulative = { ...domain.definition(flexible({ cadence: "cumulative" })), measurement: { current: 2 } };
+  assert.equal(domain.cycles(cumulative, "2026-09-01").length, 1);
+  assert.equal(domain.attention(cumulative, "2026-09-01").label, "累計數據達標・待確認");
+});
+
+test("工作坊多場須副主席逐期核對，變更目標不沿用不足場次的完成判定", () => {
+  const value = { ...flexible({ metric: "workshop", startOn: "2026-01-01" }), status: "tracking" };
+  const input = { action: "confirm-quarter", periodKey: "2026-01-01", attendedOn: "2026-02-04", status: "achieved", completedCount: 2, note: "核對兩場參加證據" };
+  assert.throws(() => domain.transition(value, { ...input, completedCount: 1 }, vp, "2026-03-01"), /場次/);
+  assert.throws(() => domain.transition(value, input, lead, "2026-03-01"), /僅限副主席/);
+  const { next } = domain.transition(value, input, vp, "2026-03-01");
+  assert.equal(domain.attention(next, "2026-03-01").rank, 4);
+  assert.equal(domain.attention({ ...next, target: 3 }, "2026-03-01").rank, 1);
+  assert.throws(() => domain.transition(value, { action: "resolve", status: "achieved", note: "全期完成" }, vp), /逐期/);
+  assert.throws(() => domain.transition(value, { ...value, action: "amend", intervalMonths: 6, note: "改週期" }, vp), /週期不可改寫/);
+  assert.equal(domain.cycleReached({ kind: "quarterly_workshop", target: 1 }, { result: { status: "achieved" } }), true);
+});
+
+test("培訓採原始教育單位，空值不能當零，完整期間不重複加總", async () => {
+  const { foundationMetricCount } = await import("../../bni-analysis/engine/foundation-progress.mjs");
+  const report = (id, start, end, ceu, ceuRecorded = true) => ({ id, start, end, parsed: { period: { start, end }, members: [{ name: "測試會員", ceu, ceuRecorded, visitors: 2 }] } });
+  const input = { memberName: "測試會員", start: "2026-01-01", end: "2026-02-28", metric: "ceu", reports: [report("a", "2026-01-01", "2026-01-31", 10.25), report("b", "2026-02-01", "2026-02-28", 2.5)] };
+  assert.equal(foundationMetricCount(input).current, 12.75);
+  assert.equal(foundationMetricCount({ ...input, reports: [...input.reports, report("combined", input.start, input.end, 12.75)] }).current, 12.75);
+  for (const amount of [null, NaN, -1]) assert.equal(foundationMetricCount({ ...input, reports: [report("a", input.start, input.end, amount)] }).current, null);
+  assert.equal(foundationMetricCount({ ...input, reports: [report("a", input.start, input.end, 0, false)] }).current, null);
+  assert.equal(foundationMetricCount({ ...input, reports: [report("a", input.start, input.end, 0)] }).current, 0);
+  assert.equal(foundationMetricCount({ ...input, reports: [input.reports[0]] }).current, null);
+});
+
+test("同名不同會員不混合，同會員各項資料與權限獨立，月會只帶必要摘要", async () => {
+  const f = fixture({ hasRenewal: false });
+  const common = { ...flexible({ startOn: "2026-01-01", dueOn: "2027-01-01" }), action: "create", origin: "legacy", memberId };
+  await f.call(vp, { ...common, id });
+  await f.call(vp, { ...common, id: otherId, metric: "ceu", leadId: vpId, companionIds: [] });
+  const result = await f.call(lead);
+  const groups = domain.groupByMember(result.items);
+  assert.equal(groups.length, 1);
+  assert.equal(groups[0].items.length, 2);
+  assert.equal(result.items.find(item => item.id === otherId).canReadDetail, false);
+  await assert.rejects(f.call(lead, { id: otherId, revision: 1, action: "note", note: "未受派不可編輯" }), /受指派/);
+  assert.equal(domain.groupByMember([...result.items, { ...result.items[0], memberId: "another-member" }]).length, 2);
+  assert.equal(domain.summaryText(result.items).split("測試會員").length - 1, 1);
+  const { snapshot } = await f.call(vp, null, "?meeting=1");
+  assert.equal(snapshot.items[0].memberId, memberId);
+  assert.equal(snapshot.items[0].dueOn, "2026-12-31");
+  assert.equal(snapshot.items[0].criterion, undefined);
+});
+
+test("PALMS 解析與正式量測串接培訓，兩個地基共用報表但不共用結果", async () => {
+  const { parsePalmsText } = await import("../../bni-analysis/engine/parse-reports.mjs");
+  const row = cells => `<Row>${cells.map(([index, value]) => `<Cell ss:Index="${index}"><Data ss:Type="String">${value}</Data></Cell>`).join("")}</Row>`;
+  const xml = ceu => `<Workbook><Worksheet><Table>${row([[1,"從:"],[2,"2026-01-01T00:00:00"]])}${row([[1,"至:"],[2,"2026-01-31T00:00:00"]])}${row([[1,"姓氏"],[2,"名字"]])}${row([[1,"測試"],[2,"會員"],[16,"3"],[20,ceu]])}</Table></Worksheet></Workbook>`;
+  assert.equal(parsePalmsText(xml("")).members[0].ceuRecorded, false);
+  assert.equal(parsePalmsText(xml("無")).members[0].ceuRecorded, false);
+  assert.equal(parsePalmsText(xml("0")).members[0].ceuRecorded, true);
+  let downloads = 0;
+  const measure = createFoundationMeasurements({ reportImports: async () => [{ id: "palms-jan", period_start: "2026-01-01", period_end: "2026-01-31" }], reportCategory: () => "monthly", downloadReport: async () => { downloads++; return xml("12.5"); } });
+  const common = flexible({ startOn: "2026-01-01", dueOn: "2026-02-01" });
+  const [training, visitors] = await measure([{ ...common, metric: "ceu", cadence: "cumulative" }, { ...common, metric: "visitors", intervalMonths: 1 }], "2026-02-10");
+  assert.equal(training.measurement.current, 12.5);
+  assert.equal(visitors.periodMeasurements["2026-01-01"].current, 3);
+  assert.equal(downloads, 1);
+  assert.match(domain.reminderText({ ...common, cadence: "cumulative" }), /約定期限：2026-01-31/);
+});

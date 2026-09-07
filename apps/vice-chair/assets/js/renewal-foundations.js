@@ -27,24 +27,22 @@
     $("#unremindedCount").textContent = active.filter(item => !item.reminderCount).length;
     $("#achievedCount").textContent = items.filter(item => item.status === "achieved").length;
     const filter = $("#filter").value, search = $("#search").value.trim();
-    const visible = items.filter(item => {
-      if (editorContext) return item.memberName === editorContext.memberName;
-      if (selectedId) return item.id === selectedId;
-      if (params.get("case") && item.caseId !== params.get("case")) return false;
-      if (filter === "active" && domain.resolved(item)) return false;
-      if (filter === "mine" && (domain.resolved(item) || ![item.leadName, ...(item.companionNames || [])].includes(session.name))) return false;
-      if (filter === "attention" && domain.attention(item).rank > 2) return false;
-      return !search || `${item.memberName} ${item.title}`.includes(search);
-    }).sort((a, b) => domain.attention(a).rank - domain.attention(b).rank || a.nextCheckOn.localeCompare(b.nextCheckOn));
-    $("#foundationList").innerHTML = (selectedId || params.get("case") ? '<p>目前顯示指定地基／案件。<a href="renewal-foundations.html">查看全部追蹤</a></p>' : "") + (visible.length ? visible.map(item => {
+    const selected = items.find(item => item.id === selectedId);
+    const memberKey = params.get("member") || selected?.memberId || selected?.memberName;
+    const groups = domain.groupByMember(items).filter(group => {
+      if (editorContext && group.memberName !== editorContext.memberName) return false;
+      if (memberKey && group.key !== memberKey) return false;
+      if (params.get("case") && !group.items.some(item => item.caseId === params.get("case"))) return false;
+      return !search || group.items.some(item => `${item.memberName} ${item.title}`.includes(search));
+    }).map(group => ({ ...group, items: group.items.filter(item => filter === "all" || domain.resolved(item) === false || memberKey || editorContext) }))
+      .filter(group => group.items.length && (filter !== "mine" || group.items.some(item => !domain.resolved(item) && [item.leadName, ...(item.companionNames || [])].includes(session.name))) && (filter !== "attention" || group.items.some(item => domain.attention(item).rank <= 2)))
+      .sort((a, b) => Math.min(...a.items.map(item => domain.attention(item).rank)) - Math.min(...b.items.map(item => domain.attention(item).rank)));
+    $("#foundationList").innerHTML = (memberKey || params.get("case") ? '<p>目前顯示指定會員的地基。<a href="renewal-foundations.html">查看全部追蹤</a></p>' : "") + (groups.length ? groups.map(group => `<article class="foundation-card"><div class="card-head"><div><h2 class="member-name">${esc(group.memberName)}</h2><span>${group.items.length} 項地基・${group.items.filter(item => domain.attention(item).rank <= 2).length} 項需跟進</span></div>${manager ? `<button data-add="${esc(group.items[0].id)}">＋ 新增地基</button>` : ""}</div><div class="member-foundations">${group.items.map(item => {
       const attention = domain.attention(item);
-      return `<article class="foundation-card" id="foundation-${esc(item.id)}"><div class="card-head"><div><span class="member-name">${esc(item.memberName)}</span><h2>${esc(item.title)}</h2></div><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(attention.label)}</span></div>
-        <div class="facts"><span>條件期限 <b>${esc(item.dueOn)}</b></span><span>${item.kind === "manual" ? "下次追蹤" : "續約起算"} <b>${esc(item.kind === "manual" ? item.nextCheckOn : item.startOn)}</b></span><span>${esc(domain.labels[item.status])}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div>
-        ${item.canReadDetail ? `<div class="criterion">${esc(item.criterion)}<br><b>${esc(domain.progressText(item))}</b></div>` : `<p>${esc(domain.progressText(item))}</p>`}
-        <div class="facts"><span>主責 ${esc(item.leadName)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.reminderCount ? `已記錄 ${esc(item.reminderCount)} 次提醒・最近 ${esc(item.lastRemindedOn)}` : "尚無實際提醒紀錄"}</span></div>
-        <div class="card-actions">${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager ? `<button data-add="${esc(item.id)}">＋ 新增此會員地基</button>` : ""}${manager && !domain.resolved(item) ? `<button data-edit="${esc(item.id)}">調整條件／指派</button>` : ""}</div></article>`;
-    }).join("") : '<div class="empty"><b>目前範圍沒有地基追蹤</b><p>新約定從續約訪談設定；使用系統前已有約定，副主席可使用「補登既有地基」。</p></div>');
+      return `<section class="foundation-condition" id="foundation-${esc(item.id)}"><div class="card-head"><h3>${esc(item.title)}</h3><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(attention.label)}</span></div><p class="condition-progress">${esc(domain.compactProgress(item))}</p><div class="facts"><span>主責 ${esc(item.leadName)}</span><span>${item.reminderCount ? `已提醒 ${esc(item.reminderCount)} 次・最近 ${esc(item.lastRemindedOn)}` : "尚無提醒紀錄"}</span></div><details><summary>各期進度與操作</summary><div class="criterion">${item.canReadDetail ? esc(item.criterion) + "<br>" : ""}${esc(domain.progressText(item))}</div><div class="facts"><span>起算 ${esc(item.startOn || item.nextCheckOn)}</span><span>期限 ${esc(item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div><div class="card-actions">${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager && !domain.resolved(item) ? `<button data-edit="${esc(item.id)}">調整條件／指派</button>` : ""}</div></details></section>`;
+    }).join("")}</div></article>`).join("") : '<div class="empty"><b>目前範圍沒有地基追蹤</b><p>新約定從續約訪談設定；既有約定可使用「補登既有地基」。</p></div>');
   }
+
   async function load() {
     const data = await api();
     items = data.items;
@@ -55,11 +53,19 @@
     window.dispatchEvent(new CustomEvent("fulian:foundation-editor-ready"));
   }
   function definitionFields() {
-    const kind = $("#kind").value, manual = kind === "manual";
+    const kind = $("#kind").value, manual = kind === "manual", flexible = kind === "flexible";
+    const recurring = $("#period").value !== "cumulative";
+    $("#flexibleFields").hidden = !flexible;
+    $("#intervalField").hidden = !flexible || $("#period").value !== "custom";
+    $("#intervalMonths").required = !$("#intervalField").hidden;
+    $("#leadField").hidden = !flexible || recurring;
+    $("#dueOnLabel").firstChild.textContent = flexible ? "地基結束日（含當日）" : "地基期限／下次續約日";
+    $("#target").step = flexible && $("#metric").value === "ceu" ? "0.01" : "1";
+    $("#target").min = $("#target").step;
     $("#automaticFields").hidden = manual;
     $("#startOn").required = !manual;
     $("#targetField").hidden = kind === "quarterly_workshop";
-    $("#targetField").firstChild.textContent = kind === "visitors" ? "累計來賓目標（位）" : "每月來賓目標（位）";
+    $("#targetField").firstChild.textContent = flexible ? `${recurring ? "每期" : "累計"}目標（${domain.metricInfo({ metric: $("#metric").value }).unit}）` : kind === "visitors" ? "累計來賓目標（位）" : "每月來賓目標（位）";
     $("#target").required = !manual && kind !== "quarterly_workshop";
     $("#manualCheckField").hidden = !manual;
     $("#nextCheckOn").required = manual;
@@ -67,9 +73,9 @@
     $("#criterionLabel").firstChild.textContent = manual ? "完成標準（必填）" : "完成標準（選填）";
     $("#extraDefinitionSummary").textContent = manual ? "條件說明（請填完成標準）" : "補充說明（選填）";
     if (manual) $("#extraDefinition").open = true;
-    const suggested = domain.suggestedText({ kind, target: $("#target").value });
+    const suggested = domain.suggestedText({ kind, target: $("#target").value, metric: $("#metric").value, cadence: recurring ? "recurring" : "cumulative", intervalMonths: $("#period").value === "custom" ? $("#intervalMonths").value : $("#period").value });
     $("#title").placeholder = `留白使用「${suggested.title}」`;
-    $("#scheduleHint").textContent = kind === "visitors" ? "從續約日起累計正式 PALMS，在設定期限前 6 個月開始持續追蹤。" : kind === "manual" ? "依個案約定設定追蹤日期。" : "從續約日起，每月／每 3 個月各自檢視；前期未完成項目會持續保留。";
+    $("#scheduleHint").textContent = flexible ? `${recurring ? "各期從地基起算日起計算，前期未完成會持續保留。" : "在起算日至結束日內累計，可設定整個會籍或指定半年等期間。"}${$("#metric").value === "ceu" ? "培訓採 PALMS 教育單位，不是紅綠燈換算分數。" : $("#metric").value === "workshop" ? "工作坊由副主席核對場次及參加證據。" : "來賓以可完整核對期間的 PALMS 計算。"}` : kind === "visitors" ? "從續約日起累計正式 PALMS，在設定期限前 6 個月開始持續追蹤。" : kind === "manual" ? "依個案約定設定追蹤日期。" : "從續約日起，每月／每 3 個月各自檢視；前期未完成項目會持續保留。";
   }
   function openDefinition(item = null, legacy = false, previous = null) {
     const shared = item || previous;
@@ -93,8 +99,15 @@
     $("#sourceTaskId").innerHTML = option("", "請選擇續約案件") + sources.map(source => option(source.id, `${source.memberName}・${source.caseId}`)).join("");
     $("#sourceTaskId").value = sources.find(source => source.caseId === (item?.caseId || editorContext?.caseId || params.get("case") || previous?.caseId))?.id || "";
     $("#sourceTaskId").disabled = Boolean(creatingLegacy || item || editorContext || params.get("case"));
-    $("#kind").value = item?.kind || "monthly_visitors";
+    $("#kind").value = item?.kind || "flexible";
     $("#kind").disabled = Boolean(item);
+    for (const option of $("#kind").options) if (!["flexible", "manual"].includes(option.value)) option.disabled = !item;
+    $("#metric").value = item?.metric || "visitors";
+    const interval = String(item?.intervalMonths || 0);
+    $("#period").value = item?.cadence === "recurring" ? (["1", "3", "6", "12"].includes(interval) ? interval : "custom") : "cumulative";
+    $("#intervalMonths").value = item?.intervalMonths || 2;
+    $("#leadMonths").value = item?.leadMonths || 0;
+    for (const key of ["metric", "period", "intervalMonths"]) $(`#${key}`).disabled = Boolean(item);
     $("#startOn").value = shared?.startOn || "";
     $("#startOn").readOnly = Boolean(item);
     $("#target").value = item?.target || 1;
@@ -102,6 +115,7 @@
     if (item?.titleGenerated) $("#title").value = "";
     if (item?.criterionGenerated) $("#criterion").value = "";
     if (!item && previous) for (const key of ["dueOn", "nextCheckOn", "source"]) $(`#${key}`).value = previous[key] || "";
+    if ($("#kind").value === "flexible" && $("#dueOn").value) $("#dueOn").value = calendar.shiftDayKey($("#dueOn").value, -1);
     for (const [key, value] of [["leadId", shared?.leadId], ["companionOne", shared?.companionIds?.[0]], ["companionTwo", shared?.companionIds?.[1]]]) {
       $(`#${key}`).innerHTML = option("", key === "leadId" ? "請選擇主責" : "無") + people.map(person => option(person.id, person.name)).join("");
       $(`#${key}`).value = people.some(person => person.id === value) ? value : "";
@@ -117,8 +131,9 @@
     $("#contactedOn").required = $("#response").required = action === "reminder";
     $("#quarterFields").hidden = action !== "confirm-quarter";
     $("#attendedOn").required = action === "confirm-quarter";
+    $("#completedCount").required = action === "confirm-quarter";
     $("#statusField").hidden = !["progress", "resolve", "confirm-quarter"].includes(action);
-    $("#recordStatus").innerHTML = (action === "confirm-quarter" ? ["achieved", "unmet"] : action === "resolve" ? (["quarterly_workshop", "monthly_visitors"].includes(recording.kind) ? ["cancelled"] : ["achieved", "unmet", "cancelled"]) : ["tracking", "reported"]).map(status => option(status, domain.labels[status])).join("");
+    $("#recordStatus").innerHTML = (action === "confirm-quarter" ? ["achieved", "unmet"] : action === "resolve" ? ((domain.isRecurring(recording) || domain.isWorkshop(recording)) ? ["cancelled"] : ["achieved", "unmet", "cancelled"]) : ["tracking", "reported"]).map(status => option(status, domain.labels[status])).join("");
     $("#nextField").hidden = !(manager || recording.isLead) || ["resolve", "confirm-quarter"].includes(action) || recording.kind !== "manual";
     $("#recordNextCheckOn").required = !$("#nextField").hidden;
   }
@@ -129,8 +144,8 @@
     $("#recordItem").textContent = `${item.memberName}・${item.title}`;
     const actions = domain.resolved(item) ? ["reopen"] : ["reminder", "note"];
     if (!domain.resolved(item)) {
-      if ((manager || item.isLead) && item.status !== "unmet" && !["quarterly_workshop", "monthly_visitors"].includes(item.kind)) actions.push("progress");
-      if (manager && item.kind === "quarterly_workshop" && domain.cycles(item).length) actions.unshift("confirm-quarter");
+      if ((manager || item.isLead) && item.status !== "unmet" && !domain.isRecurring(item) && !domain.isWorkshop(item)) actions.push("progress");
+      if (manager && domain.isWorkshop(item) && domain.cycles(item).length) actions.unshift("confirm-quarter");
       if (manager) actions.push("resolve");
       if (manager && item.status === "unmet") actions.push("reopen");
     }
@@ -138,8 +153,8 @@
     $("#contactedOn").value = calendar.dateInput();
     $("#contactedOn").max = calendar.dateInput();
     $("#recordNextCheckOn").value = item.nextCheckOn;
-    $("#periodKey").innerHTML = domain.cycles(item).map(cycle => option(cycle.key, `${cycle.label}${cycle.result?.status === "achieved" ? "・已確認" : "・待確認"}`)).join("");
-    $("#periodKey").value = domain.cycles(item).find(cycle => cycle.result?.status !== "achieved")?.key || domain.cycles(item)[0]?.key || "";
+    $("#periodKey").innerHTML = domain.cycles(item).map(cycle => option(cycle.key, `${cycle.label}${domain.cycleReached(item, cycle) ? "・已確認" : "・待確認"}`)).join("");
+    $("#periodKey").value = domain.cycles(item).find(cycle => !domain.cycleReached(item, cycle))?.key || domain.cycles(item)[0]?.key || "";
     recordFields();
     $("#recordDialog").showModal();
   }
@@ -161,6 +176,13 @@
   $("#definitionForm").onsubmit = async event => {
     event.preventDefault();
     const body = Object.fromEntries(["sourceTaskId", "title", "criterion", "source", "dueOn", "nextCheckOn", "leadId", "kind", "startOn", "target"].map(key => [key, $(`#${key}`).value]));
+    if (body.kind === "flexible") {
+      body.metric = $("#metric").value;
+      body.cadence = $("#period").value === "cumulative" ? "cumulative" : "recurring";
+      body.intervalMonths = body.cadence === "recurring" ? Number($("#period").value === "custom" ? $("#intervalMonths").value : $("#period").value) : 0;
+      body.leadMonths = body.cadence === "cumulative" ? Number($("#leadMonths").value) : 0;
+      body.dueOn = calendar.shiftDayKey(body.dueOn, 1);
+    }
     body.origin = creatingLegacy ? "legacy" : "renewal";
     if (creatingLegacy) { body.memberId = $("#memberId").value; delete body.sourceTaskId; }
     body.companionIds = [$("#companionOne").value, $("#companionTwo").value].filter(Boolean);
@@ -176,7 +198,7 @@
   $("#recordForm").onsubmit = event => {
     event.preventDefault();
     const body = { id: recording.id, revision: recording.revision, action: $("#action").value, note: $("#note").value, status: $("#recordStatus").value };
-    if (body.action === "confirm-quarter") Object.assign(body, { periodKey: $("#periodKey").value, attendedOn: $("#attendedOn").value });
+    if (body.action === "confirm-quarter") Object.assign(body, { periodKey: $("#periodKey").value, attendedOn: $("#attendedOn").value, completedCount: $("#completedCount").value });
     if (body.action === "reminder") Object.assign(body, { contactedOn: $("#contactedOn").value, channel: $("#channel").value, response: $("#response").value });
     if (!$("#nextField").hidden) body.nextCheckOn = $("#recordNextCheckOn").value;
     save(body, $("#recordDialog"), $("#recordError"));
@@ -207,7 +229,8 @@
   $("#action").onchange = recordFields;
   $("#kind").onchange = definitionFields;
   $("#target").oninput = definitionFields;
-  $("#recordStatus").onchange = () => { $("#attendedOn").required = $("#action").value === "confirm-quarter" && $("#recordStatus").value === "achieved"; };
+  for (const key of ["metric", "period", "intervalMonths", "leadMonths"]) $(`#${key}`).onchange = definitionFields;
+  $("#recordStatus").onchange = () => { $("#completedCount").required = $("#attendedOn").required = $("#action").value === "confirm-quarter" && $("#recordStatus").value === "achieved"; };
   $("#filter").onchange = () => { selectedId = ""; render(); };
   $("#search").oninput = () => { selectedId = ""; render(); };
   $("#createFoundation").hidden = !manager || !(editorContext || params.get("case"));

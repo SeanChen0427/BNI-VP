@@ -31,8 +31,14 @@ export function foundationCoverage({ start, end, reports }) {
 }
 
 export function foundationVisitorCount({ memberName, start, end, reports }) {
+  return foundationMetricCount({ memberName, start, end, reports, metric: "visitors" });
+}
+
+export function foundationMetricCount({ memberName, start, end, reports, metric }) {
+  if (!["visitors", "ceu"].includes(metric)) throw new Error("不支援的 PALMS 地基指標");
+  const unit = metric === "ceu" ? "分" : "位";
   const coverage = foundationCoverage({ start, end, reports });
-  const result = { current: null, periodStart: start, periodEnd: coverage.coveredThrough, requestedEnd: end, sources: [], reason: "缺少連續且符合起算日的 PALMS，不能以 0 人或其他期間代替" };
+  const result = { current: null, periodStart: start, periodEnd: coverage.coveredThrough, requestedEnd: end, sources: [], reason: "缺少連續且符合起算日的 PALMS，不能以 0 或其他期間代替" };
   if (!coverage.complete) return result;
   let count = 0;
   for (const source of coverage.selected) {
@@ -40,10 +46,11 @@ export function foundationVisitorCount({ memberName, start, end, reports }) {
     if (!report || report.period.start !== source.start || report.period.end !== source.end) return { ...result, reason: "報表內容期間與匯入索引不符，待重新核對" };
     const members = report.members.filter(row => normalizedName(row.name) === normalizedName(memberName));
     if (members.length !== 1) return { ...result, reason: "會員姓名無法唯一對帳，待補正正式資料" };
-    const visitors = members[0].visitors;
-    if (!Number.isInteger(visitors) || visitors < 0) return { ...result, reason: "來賓人數無效，待補正正式資料" };
-    count += visitors;
-    result.sources.push({ id: source.id, start: source.start, end: source.end, visitors });
+    const amount = members[0][metric];
+    if (!Number.isFinite(amount) || amount < 0 || (metric === "visitors" && !Number.isInteger(amount)) || (metric === "ceu" && members[0].ceuRecorded === false)) return { ...result, reason: `${metric === "ceu" ? "培訓積分" : "來賓人數"}無效或未提供，待補正正式資料` };
+    count += amount;
+    result.sources.push({ id: source.id, start: source.start, end: source.end, [metric]: amount });
   }
-  return { ...result, current: count, reason: "", formula: result.sources.map(source => `${source.start}～${source.end}：${source.visitors}`).join(" + ") + ` = ${count} 位` };
+  count = Math.round(count * 100) / 100;
+  return { ...result, metric, current: count, reason: "", formula: result.sources.map(source => `${source.start}～${source.end}：${source[metric]}`).join(" + ") + ` = ${count} ${unit}` };
 }

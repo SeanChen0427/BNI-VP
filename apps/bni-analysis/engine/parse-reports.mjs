@@ -36,6 +36,7 @@ export function parsePalmsText(xml, sourceLabel = "PALMS 上傳檔") {
       oneToOne: toNumber(c[17]),
       tyfcb: toNumber(c[18]),
       ceu: toNumber(c[19]),
+      ceuRecorded: c[19] != null && String(c[19]).trim() !== "" && Number.isFinite(Number(String(c[19]).replace(/,/g, ""))),
     });
   }
   if (members.length === 0) throw new Error(`PALMS 解析不到任何會員資料列：${sourceLabel}`);

@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.3.0",
+      publishedAt: "2026-09-08",
+      title: "多元地基與會員集中追蹤",
+      level: "normal",
+      changes: Object.freeze([
+        "來賓、培訓積分及工作坊可設定會籍或指定期間累計，或每月、每三個月、半年、每年與自訂月數目標。",
+        "同會員多項地基集中在一張卡，首頁與訪談先看當期進度，再展開各期紀錄。",
+        "培訓採 PALMS 教育單位，工作坊仍由副主席核對；既有地基與各自歷程保留。"
+      ]),
+      impact: "改善項目與補充說明可留白。教學待試用確認後更新。"
+    }),
+    Object.freeze({
       version: "1.2.1",
       publishedAt: "2026-09-07",
       title: "地基設定簡化與首頁位置調整",

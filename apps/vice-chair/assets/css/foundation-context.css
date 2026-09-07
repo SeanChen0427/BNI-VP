@@ -195,6 +195,23 @@
   line-height:1.7;
   margin-top:5px;
 }
+.foundation-home-condition {
+  padding:9px 0 6px 12px;
+  border-left:2px solid #e4e8ee;
+}
+.foundation-context .foundation-condition {
+  border-top:1px solid #e4e8ee;
+  padding:16px 0;
+}
+.foundation-context .foundation-condition h3 {
+  font-size:16px;
+  margin:0;
+}
+.foundation-context .foundation-condition summary {
+  cursor:pointer;
+  font-size:14px;
+  color:#627085;
+}
 .foundation-meeting {
   white-space:pre-wrap;
   background:#fff8ed;

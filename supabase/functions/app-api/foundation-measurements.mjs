@@ -1,4 +1,4 @@
-import { foundationCoverage, foundationVisitorCount } from "../../../apps/bni-analysis/engine/foundation-progress.mjs";
+import { foundationCoverage, foundationMetricCount } from "../../../apps/bni-analysis/engine/foundation-progress.mjs";
 import { parsePalmsText } from "../../../apps/bni-analysis/engine/parse-reports.mjs";
 import "../../../apps/vice-chair/core/renewal-foundation-domain.js";
 const domain = globalThis.FulianRenewalFoundationDomain;
@@ -6,7 +6,7 @@ const calendar = globalThis.FulianCalendarDomain;
 
 export function createFoundationMeasurements({ reportImports, reportCategory, downloadReport }) {
   return async function measure(items, now = new Date()) {
-    const numeric = items.filter(item => ["visitors", "monthly_visitors"].includes(item.kind));
+    const numeric = items.filter(item => ["visitors", "monthly_visitors"].includes(item.kind) || (item.kind === "flexible" && ["visitors", "ceu"].includes(item.metric)));
     if (!numeric.length) return items;
     const rows = (await reportImports()).filter(row => ["renewal", "annual", "halfYear", "monthly"].includes(reportCategory(row)));
     const today = calendar.dateInput(now), lastCompleteMonth = calendar.monthEndDate(calendar.shiftMonthKey(calendar.monthKey(now), -1));
@@ -23,12 +23,12 @@ export function createFoundationMeasurements({ reportImports, reportCategory, do
           if (!parsed.has(selected.id)) parsed.set(selected.id, downloadReport(selected.row).then(text => parsePalmsText(text, "續約地基 PALMS")));
           return { ...selected, parsed: await parsed.get(selected.id) };
         }));
-        return foundationVisitorCount({ memberName: item.memberName, start, end, reports });
+        return foundationMetricCount({ memberName: item.memberName, start, end, reports, metric: item.metric === "ceu" ? "ceu" : "visitors" });
       } catch { return { current: null, periodStart: start, periodEnd: null, reason: "正式 PALMS 讀取或解析失敗，請副主席重新核對" }; }
     }
     return Promise.all(items.map(async item => {
-      if (item.kind === "visitors") return { ...item, measurement: await count(item, item.startOn, calendar.shiftDayKey(item.dueOn, -1)) };
-      if (item.kind === "monthly_visitors") {
+      if (item.kind === "visitors" || (numeric.includes(item) && item.cadence === "cumulative")) return { ...item, measurement: await count(item, item.startOn, calendar.shiftDayKey(item.dueOn, -1)) };
+      if (item.kind === "monthly_visitors" || (numeric.includes(item) && item.cadence === "recurring")) {
         const entries = await Promise.all(domain.cycles(item, now).map(async cycle => [cycle.key, await count(item, cycle.start, cycle.end)]));
         return { ...item, periodMeasurements: Object.fromEntries(entries) };
       }
