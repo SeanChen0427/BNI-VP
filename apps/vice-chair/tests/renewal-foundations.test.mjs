@@ -362,3 +362,73 @@ test("PALMS 解析與正式量測串接培訓，兩個地基共用報表但不�
   assert.equal(downloads, 1);
   assert.match(domain.reminderText({ ...common, cadence: "cumulative" }), /約定期限：2026-01-31/);
 });
+
+test("可修正既有起算日，重新核對受影響期間且保留原確認與提醒歷程", () => {
+  for (const kind of ["quarterly_workshop", "monthly_visitors", "visitors", "flexible"]) {
+    const value = { ...domain.definition(flexible({ kind, metric: "workshop", startOn: "2026-01-01", dueOn: "2027-01-01" })), status: "tracking", reminderCount: 2, lastRemindedOn: "2026-02-01", periodResults: { "2026-01-01": { status: "achieved", count: 2 }, "2026-04-01": { status: "achieved", count: 2 } }, measurement: { current: 99 }, periodMeasurements: { old: { current: 99 } } };
+    const input = { ...value, action: "amend", startOn: "2026-02-01", note: "更正誤填的起算日" };
+    const { next, detail } = domain.transition(value, input, vp, "2026-08-01");
+    assert.equal(next.startOn, "2026-02-01");
+    assert.equal(next.nextCheckOn, domain.trackingStartsOn(next));
+    assert.equal(next.measurement, undefined);
+    assert.equal(next.periodMeasurements, undefined);
+    assert.equal(next.periodResults["2026-01-01"], undefined);
+    assert.equal(next.reminderCount, 2);
+    assert.equal(value.periodResults["2026-01-01"].status, "achieved");
+    assert.equal(detail.scheduleChanged, true);
+    assert.throws(() => domain.transition(value, input, lead), /僅限副主席/);
+    assert.throws(() => domain.transition(value, { ...input, startOn: "2027-02-01" }, vp), /適用期間/);
+  }
+});
+
+test("日期更正只沿用完整區間相同的工作坊；已達成的累計改期後重新追蹤", () => {
+  const value = { ...domain.definition(flexible({ metric: "workshop", startOn: "2026-01-01", dueOn: "2027-01-01" })), status: "tracking", periodResults: { "2026-01-01": { status: "achieved", count: 2 }, "2026-04-01": { status: "achieved", count: 2 } } };
+  const { next, detail } = domain.transition(value, { ...value, action: "amend", startOn: "2026-04-01", note: "前一期不在約定範圍" }, vp);
+  assert.deepEqual(Object.keys(next.periodResults), ["2026-04-01"]);
+  assert.equal(detail.resetPeriodCount, 1);
+  const shortened = domain.transition(value, { ...value, action: "amend", dueOn: "2026-05-01", note: "更正結束日" }, vp).next;
+  assert.deepEqual(Object.keys(shortened.periodResults), ["2026-01-01"]);
+  const done = { ...domain.definition(flexible({ cadence: "cumulative" })), status: "achieved" };
+  assert.equal(domain.transition(done, { ...done, action: "amend", startOn: "2026-02-01", note: "重核期間" }, vp).next.status, "tracking");
+});
+
+test("可刪除與復原地基，刪除前狀態保留且非管理者不可操作", () => {
+  for (const status of ["tracking", "achieved", "unmet", "cancelled"]) {
+    const value = { ...base(), status };
+    const { next, detail } = domain.transition(value, { action: "delete", note: "誤建刪除" }, vp, "2026-09-08");
+    assert.equal(next.status, "cancelled");
+    assert.equal(next.statusBeforeDelete, status);
+    assert.equal(detail.operation, "delete");
+    assert.ok(next.deletedAt);
+    assert.throws(() => domain.transition(next, { action: "note", note: "不可修改已刪除" }, vp), /已刪除/);
+    assert.throws(() => domain.transition(next, { action: "restore", note: "復原" }, lead), /僅限副主席/);
+    const restored = domain.transition(next, { action: "restore", note: "誤刪復原" }, vp).next;
+    assert.equal(restored.status, status);
+    assert.equal(restored.deletedAt, undefined);
+    assert.throws(() => domain.transition(value, { action: "delete", note: "" }, vp), /本次紀錄/);
+  }
+});
+
+test("API 刪除逐項生效、排除首頁月會訪談，保留可復原稽核與版本衝突保護", async () => {
+  const f = fixture({ hasRenewal: false });
+  const input = { ...flexible({ startOn: "2026-01-01" }), origin: "legacy", memberId, action: "create" };
+  await f.call(vp, { ...input, id });
+  await f.call(vp, { ...input, id: otherId });
+  await assert.rejects(f.call(lead, { id, action: "delete", revision: 1, note: "刪除" }), /僅限副主席/);
+  await f.call(vp, { id, action: "delete", revision: 1, note: "誤建" });
+  for (const query of ["", "?summary=1", "?summary=1&contextTask=RE-TEST"]) assert.deepEqual((await f.call(vp, null, query)).items.map(x => x.id), [otherId]);
+  assert.deepEqual((await f.call(vp, null, "?meeting=1")).snapshot.items.map(x => x.id), [otherId]);
+  assert.equal((await f.call(vp, null, "?deleted=1")).items[0].id, id);
+  await assert.rejects(f.call(lead, null, "?deleted=1"), /僅限副主席/);
+  await assert.rejects(f.call(lead, null, `?id=${id}`), /僅限副主席/);
+  assert.equal(f.writes.at(-1).p_action, "resolve");
+  assert.equal(f.events.at(-1).detail.operation, "delete");
+  await assert.rejects(f.call(vp, { id, revision: 1, action: "restore", note: "過期版本" }), /重新整理/);
+  await f.call(vp, { id, revision: 2, action: "restore", note: "復原" });
+  assert.equal((await f.call(vp)).items.length, 2);
+  assert.equal(f.writes.at(-1).p_action, "reopen");
+  await f.call(vp, { ...input, id, action: "amend", revision: 3, startOn: "2026-02-01", note: "修正起算" });
+  assert.equal(f.events.at(-1).previous_data.startOn, "2026-01-01");
+  assert.equal(f.rows.get(id).data.startOn, "2026-02-01");
+  assert.equal(f.rows.get(otherId).revision, 1);
+});

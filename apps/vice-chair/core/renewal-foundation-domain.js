@@ -131,14 +131,33 @@
   function transition(current, input, context, now = new Date()) {
     const isManager = manager(context), isLead = current.leadId === context.personId;
     if (!canReadDetail(current, context)) throw Object.assign(new Error("只有副主席與受指派人員可更新追蹤"), { status: 403 });
-    if (resolved(current) && input.action !== "reopen") throw new Error("已停止或達成的追蹤須先由副主席填寫原因重新開啟");
+    if (current.deletedAt && input.action !== "restore") throw new Error("此地基已刪除，請先復原");
+    if (resolved(current) && !["reopen", "amend", "delete", "restore"].includes(input.action)) throw new Error("已停止或達成的追蹤須先由副主席填寫原因重新開啟");
     const next = { ...current };
     const detail = { note: required(input.note, "本次紀錄／原因", 4000) };
-    if (["amend", "resolve", "reopen", "confirm-quarter"].includes(input.action) && !isManager) throw Object.assign(new Error("此操作僅限副主席或 Admin"), { status: 403 });
-    if (input.action === "amend") {
+    if (["amend", "resolve", "reopen", "confirm-quarter", "delete", "restore"].includes(input.action) && !isManager) throw Object.assign(new Error("此操作僅限副主席或 Admin"), { status: 403 });
+    if (input.action === "delete") {
+      Object.assign(next, { deletedAt: new Date(now).toISOString(), deletedBy: context.name, statusBeforeDelete: current.status, status: "cancelled" });
+      detail.operation = "delete";
+    } else if (input.action === "restore") {
+      if (!current.deletedAt) throw new Error("此地基未刪除");
+      next.status = current.statusBeforeDelete || "tracking";
+      for (const key of ["deletedAt", "deletedBy", "statusBeforeDelete"]) delete next[key];
+      detail.operation = "restore";
+    } else if (input.action === "amend") {
       const updated = definition(input);
-      if (current.kind !== updated.kind || (current.startOn && current.startOn !== updated.startOn)) throw new Error("地基類型與起算日不可事後改寫；請停止原項目並新增正確條件");
+      if (current.kind !== updated.kind) throw new Error("地基類型不可改寫，請另建正確條件");
       if (current.kind === "flexible" && ["metric", "cadence", "intervalMonths"].some(key => current[key] !== updated[key])) throw new Error("已建立地基的指標與週期不可改寫，請停止原項目並新增");
+      if (current.startOn !== updated.startOn || current.dueOn !== updated.dueOn) {
+        const oldPeriods = new Map(cycles(current, current.dueOn).map(cycle => [cycle.key, cycle.end]));
+        const newPeriods = new Map(cycles(updated, updated.dueOn).map(cycle => [cycle.key, cycle.end]));
+        next.periodResults = Object.fromEntries(Object.entries(current.periodResults || {}).filter(([key]) => oldPeriods.has(key) && oldPeriods.get(key) === newPeriods.get(key)));
+        detail.scheduleChanged = true;
+        detail.resetPeriodCount = Object.keys(current.periodResults || {}).length - Object.keys(next.periodResults).length;
+        delete next.measurement;
+        delete next.periodMeasurements;
+        if (["reported", "achieved", "unmet"].includes(current.status)) next.status = "tracking";
+      }
       Object.assign(next, updated);
     } else if (input.action === "confirm-quarter") {
       if (!isWorkshop(current)) throw new Error("此項目不是工作坊地基");

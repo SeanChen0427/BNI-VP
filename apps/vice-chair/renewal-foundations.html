@@ -11,7 +11,7 @@
   <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
   <script src="core/calendar-domain.js?v=5"></script>
-  <script src="core/renewal-foundation-domain.js?v=4"></script>
+  <script src="core/renewal-foundation-domain.js?v=5"></script>
 </head>
 <body>
   <header class="topbar"><a href="index.html">← 回工作台</a><strong>富聯分會</strong><div><span data-auth-name>使用者</span>・<span data-auth-role>職務</span> <button data-auth-logout>登出</button></div></header>
@@ -20,7 +20,7 @@
     <p class="notice">續約訪談結案後仍持續追蹤。達成結果須人工確認；期限已過會提示檢視，正式處置依委員會與董事顧問流程辦理。</p>
     <div id="pageMessage" role="status" aria-live="polite"></div>
     <section class="summary" aria-label="追蹤摘要"><article><span>持續列管</span><b id="activeCount">—</b></article><article><span>需要跟進</span><b id="attentionCount">—</b></article><article><span>尚無提醒紀錄</span><b id="unremindedCount">—</b></article><article><span>已確認達成</span><b id="achievedCount">—</b></article></section>
-    <section class="toolbar"><label>查看範圍<select id="filter"><option value="active">持續列管</option><option value="mine">我負責／陪同</option><option value="attention">需要跟進</option><option value="all">全部（含已達成與停止）</option></select></label><label>搜尋會員或項目<input type="search" id="search" placeholder="輸入姓名或改善項目"></label><button id="refresh">重新整理</button></section>
+    <section class="toolbar"><label>查看範圍<select id="filter"><option value="active">持續列管</option><option value="mine">我負責／陪同</option><option value="attention">需要跟進</option><option value="all">全部（含已達成與停止）</option><option value="deleted" id="deletedFilter" hidden>已刪除（可復原）</option></select></label><label>搜尋會員或項目<input type="search" id="search" placeholder="輸入姓名或改善項目"></label><button id="refresh">重新整理</button></section>
     <section id="foundationList" class="foundation-list" aria-live="polite"><p>正在讀取地基追蹤…</p></section>
   </main>
 
@@ -33,6 +33,7 @@
     <label>地基類型<select id="kind"><option value="flexible">指標與期間目標</option><option value="manual">其他人工追蹤條件</option><option value="monthly_visitors" hidden>原有每月來賓</option><option value="quarterly_workshop" hidden>原有每 3 個月工作坊</option><option value="visitors" hidden>原有續約前累計來賓</option></select></label>
     <div id="flexibleFields"><div class="fields"><label>追蹤指標<select id="metric"><option value="visitors">來賓人數</option><option value="ceu">培訓積分（PALMS 教育單位）</option><option value="workshop">工作坊場次（副主席確認）</option></select></label><label>計算期間<select id="period"><option value="cumulative">會籍／指定期間內累計</option><option value="1">每月</option><option value="3">每 3 個月</option><option value="6">每半年</option><option value="12">每年</option><option value="custom">自訂每期月數</option></select></label></div><label id="intervalField" hidden>每期月數<input id="intervalMonths" type="number" min="1" max="36" value="2"></label><label id="leadField">何時開始提醒追蹤<select id="leadMonths"><option value="0">從地基起算日開始</option><option value="1">期限前 1 個月</option><option value="3">期限前 3 個月</option><option value="6">期限前 6 個月</option></select></label></div>
     <div class="fields" id="automaticFields"><label>續約生效／地基起算日<input id="startOn" type="date"></label><label id="targetField">每月來賓目標（位）<input id="target" type="number" min="1" max="10000" value="1"></label></div>
+    <p id="scheduleChangeHint" hidden>修正起算日或期限後，系統會重新安排各期及核對數據。期間有變動的工作坊須重新確認；期間完全相同的確認仍保留，原紀錄可在歷程查看。</p>
     <p id="scheduleHint">每月與每 3 個月都從續約日起算，各期獨立檢視。</p>
     <details id="extraDefinition"><summary id="extraDefinitionSummary">補充說明（選填）</summary>
       <label>改善項目（選填）<input id="title" maxlength="160" placeholder="留白會依地基設定自動產生"></label>
@@ -47,7 +48,7 @@
 
   <dialog id="recordDialog" aria-labelledby="recordTitle"><form id="recordForm">
     <header><h2 id="recordTitle">新增追蹤紀錄</h2><button type="button" data-close aria-label="關閉">×</button></header>
-    <p id="recordItem"></p>
+    <p id="recordItem"></p><p id="recordOperationHint"></p>
     <label>本次動作<select id="action"></select></label>
     <div id="reminderFields"><div class="fields"><label>實際提醒日期<input id="contactedOn" type="date"></label><label>提醒方式<select id="channel"><option>LINE</option><option>電話</option><option>當面</option><option>Email</option><option>其他</option></select></label></div><label>會員回覆<textarea id="response" rows="2" maxlength="2000" placeholder="尚未回覆時，請填寫「尚未回覆」"></textarea></label></div>
     <label id="statusField">進度／確認結果<select id="recordStatus"></select></label>
@@ -58,7 +59,7 @@
   </form></dialog>
 
   <dialog id="detailDialog" aria-labelledby="detailTitle"><header><h2 id="detailTitle">地基與追蹤歷程</h2><button type="button" data-close aria-label="關閉">×</button></header><div id="detailContent"></div></dialog>
-  <script src="assets/js/renewal-foundations.js?v=6"></script>
+  <script src="assets/js/renewal-foundations.js?v=7"></script>
   <script src="assets/js/workspace-nav.js?v=15"></script>
 </body>
 </html>

@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.3.1",
+      publishedAt: "2026-09-08",
+      title: "地基起算日修正與刪除",
+      level: "normal",
+      changes: Object.freeze([
+        "副主席可修正已建立地基的起算日；系統重新安排期間，保留原紀錄供核對。",
+        "每項地基可刪除，並從已刪除清單復原；不影響同會員其他地基。",
+        "工作總覽地基追蹤移至待處理案件清單下方。"
+      ]),
+      impact: "期間改變的工作坊須重新確認；教學待試用確認後更新。"
+    }),
+    Object.freeze({
       version: "1.3.0",
       publishedAt: "2026-09-08",
       title: "多元地基與會員集中追蹤",

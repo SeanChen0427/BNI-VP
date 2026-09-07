@@ -15,8 +15,8 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
     value.leadName = directory.personById.get(value.leadId);
     value.companionNames = value.companionIds.map(id => directory.personById.get(id));
   }
-  async function list(context, directory, contextMemberId = null) {
-    const rows = await db("renewal_foundations?select=*&order=created_at.desc");
+  async function list(context, directory, contextMemberId = null, deleted = false) {
+    const rows = (await db("renewal_foundations?select=*&order=created_at.desc")).filter(row => Boolean(row.data.deletedAt) === deleted);
     const memberByFoundation = new Map(rows.map(row => [row.id, row.member_id]));
     const activeIds = new Set(directory.personByName.values());
     const measured = await measure(rows.map(hydrate), now());
@@ -55,11 +55,14 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
         validateId(id);
         const rows = await db(`renewal_foundations?id=eq.${id}&select=*&limit=1`);
         if (!rows[0]) fail("找不到此地基追蹤", 404);
+        if (rows[0].data.deletedAt && !domain.manager(context)) fail("已刪除地基僅限副主席查看", 403);
         if (!domain.canReadDetail(hydrate(rows[0]), context) && rows[0].member_id !== contextMemberId) fail("只有副主席與受指派人員可查看完整追蹤紀錄", 403);
         const events = await db(`renewal_foundation_events?foundation_id=eq.${id}&select=event_type,actor_name,detail,previous_data,next_data,created_at&order=created_at.desc`);
         return { events };
       }
-      const items = await list(context, directory, contextMemberId);
+      const deleted = url.searchParams.get("deleted") === "1";
+      if (deleted && !domain.manager(context)) fail("已刪除地基僅限副主席查看", 403);
+      const items = await list(context, directory, contextMemberId, deleted);
       if (url.searchParams.get("summary") === "1") return { items };
       const sources = domain.manager(context)
         ? await db(`tasks?source=eq.${taskSource}&category=eq.renewal&select=id,member_id,title,source_reference&order=created_at.desc`)
@@ -112,7 +115,8 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
     for (const key of ["id", "memberId", "revision", "createdAt", "updatedAt"]) delete next[key];
     await db("rpc/edge_save_renewal_foundation", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ p_id: id, p_revision: current ? body.revision : 0, p_source_task_id: sourceTaskId, p_member_id: memberId, p_data: next, p_action: body.action, p_actor_id: context.personId, p_actor_name: context.name, p_detail: detail }),
+      // Reversible deletion uses the existing stop/reopen audit contract; operation distinguishes it in history.
+      body: JSON.stringify({ p_id: id, p_revision: current ? body.revision : 0, p_source_task_id: sourceTaskId, p_member_id: memberId, p_data: next, p_action: ({ delete: "resolve", restore: "reopen" })[body.action] || body.action, p_actor_id: context.personId, p_actor_name: context.name, p_detail: detail }),
     });
     return { saved: true, id };
   };

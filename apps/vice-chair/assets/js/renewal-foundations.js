@@ -9,7 +9,7 @@
   const option = (value, label) => `<option value="${esc(value)}">${esc(label)}</option>`;
   const params = new URLSearchParams(location.search);
   const editorContext = window.FulianFoundationEditorContext;
-  const eventLabels = { create: "建立地基", amend: "調整條件／指派", note: "補充紀錄", reminder: "已實際提醒", progress: "回報進度", resolve: "人工確認結果", reopen: "重新開啟", "confirm-quarter": "確認本期工作坊" };
+  const eventLabels = { delete: "刪除地基", restore: "復原地基", create: "建立地基", amend: "調整條件／指派", note: "補充紀錄", reminder: "已實際提醒", progress: "回報進度", resolve: "人工確認結果", reopen: "重新開啟", "confirm-quarter": "確認本期工作坊" };
   let items = [], sources = [], members = [], people = [], creatingLegacy = false, editing = null, recording = null, creationId = "", busy = false;
   let selectedId = params.get("item") || "";
 
@@ -34,17 +34,17 @@
       if (memberKey && group.key !== memberKey) return false;
       if (params.get("case") && !group.items.some(item => item.caseId === params.get("case"))) return false;
       return !search || group.items.some(item => `${item.memberName} ${item.title}`.includes(search));
-    }).map(group => ({ ...group, items: group.items.filter(item => filter === "all" || domain.resolved(item) === false || memberKey || editorContext) }))
+    }).map(group => ({ ...group, items: group.items.filter(item => filter === "deleted" || filter === "all" || domain.resolved(item) === false || memberKey || editorContext) }))
       .filter(group => group.items.length && (filter !== "mine" || group.items.some(item => !domain.resolved(item) && [item.leadName, ...(item.companionNames || [])].includes(session.name))) && (filter !== "attention" || group.items.some(item => domain.attention(item).rank <= 2)))
       .sort((a, b) => Math.min(...a.items.map(item => domain.attention(item).rank)) - Math.min(...b.items.map(item => domain.attention(item).rank)));
-    $("#foundationList").innerHTML = (memberKey || params.get("case") ? '<p>目前顯示指定會員的地基。<a href="renewal-foundations.html">查看全部追蹤</a></p>' : "") + (groups.length ? groups.map(group => `<article class="foundation-card"><div class="card-head"><div><h2 class="member-name">${esc(group.memberName)}</h2><span>${group.items.length} 項地基・${group.items.filter(item => domain.attention(item).rank <= 2).length} 項需跟進</span></div>${manager ? `<button data-add="${esc(group.items[0].id)}">＋ 新增地基</button>` : ""}</div><div class="member-foundations">${group.items.map(item => {
+    $("#foundationList").innerHTML = (memberKey || params.get("case") ? '<p>目前顯示指定會員的地基。<a href="renewal-foundations.html">查看全部追蹤</a></p>' : "") + (groups.length ? groups.map(group => `<article class="foundation-card"><div class="card-head"><div><h2 class="member-name">${esc(group.memberName)}</h2><span>${group.items.length} 項地基・${group.items.filter(item => domain.attention(item).rank <= 2).length} 項需跟進</span></div>${manager && !group.items[0].deletedAt ? `<button data-add="${esc(group.items[0].id)}">＋ 新增地基</button>` : ""}</div><div class="member-foundations">${group.items.map(item => {
       const attention = domain.attention(item);
-      return `<section class="foundation-condition" id="foundation-${esc(item.id)}"><div class="card-head"><h3>${esc(item.title)}</h3><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(attention.label)}</span></div><p class="condition-progress">${esc(domain.compactProgress(item))}</p><div class="facts"><span>主責 ${esc(item.leadName)}</span><span>${item.reminderCount ? `已提醒 ${esc(item.reminderCount)} 次・最近 ${esc(item.lastRemindedOn)}` : "尚無提醒紀錄"}</span></div><details><summary>各期進度與操作</summary><div class="criterion">${item.canReadDetail ? esc(item.criterion) + "<br>" : ""}${esc(domain.progressText(item))}</div><div class="facts"><span>起算 ${esc(item.startOn || item.nextCheckOn)}</span><span>期限 ${esc(item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div><div class="card-actions">${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager && !domain.resolved(item) ? `<button data-edit="${esc(item.id)}">調整條件／指派</button>` : ""}</div></details></section>`;
+      return `<section class="foundation-condition" id="foundation-${esc(item.id)}"><div class="card-head"><h3>${esc(item.title)}</h3><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(item.deletedAt ? "已刪除" : attention.label)}</span></div><p class="condition-progress">${esc(domain.compactProgress(item))}</p><div class="facts"><span>主責 ${esc(item.leadName)}</span><span>${item.reminderCount ? `已提醒 ${esc(item.reminderCount)} 次・最近 ${esc(item.lastRemindedOn)}` : "尚無提醒紀錄"}</span></div><details><summary>各期進度與操作</summary><div class="criterion">${item.canReadDetail ? esc(item.criterion) + "<br>" : ""}${esc(domain.progressText(item))}</div><div class="facts"><span>起算 ${esc(item.startOn || item.nextCheckOn)}</span><span>期限 ${esc(item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div><div class="card-actions">${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && !item.deletedAt && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager && !item.deletedAt ? `<button data-edit="${esc(item.id)}">調整條件／指派</button><button data-delete="${esc(item.id)}">刪除地基</button>` : ""}${manager && item.deletedAt ? `<button data-restore="${esc(item.id)}">復原地基</button>` : ""}</div></details></section>`;
     }).join("")}</div></article>`).join("") : '<div class="empty"><b>目前範圍沒有地基追蹤</b><p>新約定從續約訪談設定；既有約定可使用「補登既有地基」。</p></div>');
   }
 
   async function load() {
-    const data = await api();
+    const data = await api(null, $("#filter").value === "deleted" ? "?deleted=1" : "");
     items = data.items;
     sources = data.sources;
     members = data.members || [];
@@ -115,7 +115,8 @@
     $("#leadMonths").value = item?.leadMonths || 0;
     for (const key of ["metric", "period", "intervalMonths"]) $(`#${key}`).disabled = Boolean(item);
     $("#startOn").value = shared?.startOn || "";
-    $("#startOn").readOnly = Boolean(item);
+    $("#startOn").readOnly = false;
+    $("#scheduleChangeHint").hidden = !item || item.kind === "manual";
     $("#target").value = item?.target || 1;
     for (const key of ["title", "criterion", "source", "dueOn", "nextCheckOn"]) $(`#${key}`).value = item?.[key] || "";
     if (item?.titleGenerated) $("#title").value = "";
@@ -140,16 +141,17 @@
     $("#completedCount").required = action === "confirm-quarter";
     $("#statusField").hidden = !["progress", "resolve", "confirm-quarter"].includes(action);
     $("#recordStatus").innerHTML = (action === "confirm-quarter" ? ["achieved", "unmet"] : action === "resolve" ? ((domain.isRecurring(recording) || domain.isWorkshop(recording)) ? ["cancelled"] : ["achieved", "unmet", "cancelled"]) : ["tracking", "reported"]).map(status => option(status, domain.labels[status])).join("");
-    $("#nextField").hidden = !(manager || recording.isLead) || ["resolve", "confirm-quarter"].includes(action) || recording.kind !== "manual";
+    $("#nextField").hidden = !(manager || recording.isLead) || ["resolve", "confirm-quarter", "delete", "restore"].includes(action) || recording.kind !== "manual";
     $("#recordNextCheckOn").required = !$("#nextField").hidden;
   }
-  function openRecord(item) {
+  function openRecord(item, operation = null) {
     recording = item;
     $("#recordForm").reset();
     $("#recordError").textContent = "";
     $("#recordItem").textContent = `${item.memberName}・${item.title}`;
-    const actions = domain.resolved(item) ? ["reopen"] : ["reminder", "note"];
-    if (!domain.resolved(item)) {
+    $("#recordOperationHint").textContent = operation === "delete" ? "刪除後不再出現在首頁、月會及訪談追蹤；原始紀錄保留，可從已刪除清單復原。請填寫刪除原因。" : operation === "restore" ? "復原後回到刪除前的狀態與原本期程。請填寫復原原因。" : "";
+    const actions = operation ? [operation] : domain.resolved(item) ? ["reopen"] : ["reminder", "note"];
+    if (!operation && !domain.resolved(item)) {
       if ((manager || item.isLead) && item.status !== "unmet" && !domain.isRecurring(item) && !domain.isWorkshop(item)) actions.push("progress");
       if (manager && domain.isWorkshop(item) && domain.cycles(item).length) actions.unshift("confirm-quarter");
       if (manager) actions.push("resolve");
@@ -214,19 +216,20 @@
     $("#detailDialog").showModal();
     try {
       const { events } = await api(null, `?id=${encodeURIComponent(item.id)}`);
-      $("#detailContent").innerHTML = `<h3>${esc(item.memberName)}・${esc(item.title)}</h3><p class="criterion">${esc(item.criterion)}</p><p>設定來源：${item.origin === "legacy" ? "既有地基補登" : "續約訪談"}・登錄時間：${esc(calendar.formatTaipeiTimestamp(item.createdAt, { year: true }))}</p><h4>議定依據與確認紀錄</h4><p class="detail-source">${esc(item.source || "未填寫補充依據")}</p><h4>追蹤歷程</h4>` + events.map(event => `<article class="history-item"><b>${esc(eventLabels[event.event_type])}</b> <small>${esc(event.actor_name)}・${esc(calendar.formatTaipeiTimestamp(event.created_at, { year: true, seconds: true }))}</small><p>${esc(event.detail.note)}</p>${event.detail.periodKey ? `<p>檢視期起日：${esc(event.detail.periodKey)}・參加日期：${esc(event.detail.attendedOn || "未達成")}</p>` : ""}${event.detail.contactedOn ? `<p>實際提醒：${esc(event.detail.contactedOn)}・${esc(event.detail.channel)}<br>會員回覆：${esc(event.detail.response)}</p>` : ""}${event.previous_data?.status !== event.next_data.status ? `<p>結果：${esc(domain.labels[event.next_data.status])}</p>` : ""}${event.event_type === "amend" ? `<details><summary>查看調整前後內容</summary><pre>${esc(JSON.stringify({ 原紀錄: event.previous_data, 新紀錄: event.next_data }, null, 2))}</pre></details>` : ""}<p>下次追蹤：${esc(event.next_data.nextCheckOn)}・主責：${esc(event.next_data.leadName)}</p></article>`).join("");
+      $("#detailContent").innerHTML = `<h3>${esc(item.memberName)}・${esc(item.title)}</h3><p class="criterion">${esc(item.criterion)}</p><p>設定來源：${item.origin === "legacy" ? "既有地基補登" : "續約訪談"}・登錄時間：${esc(calendar.formatTaipeiTimestamp(item.createdAt, { year: true }))}</p><h4>議定依據與確認紀錄</h4><p class="detail-source">${esc(item.source || "未填寫補充依據")}</p><h4>追蹤歷程</h4>` + events.map(event => `<article class="history-item"><b>${esc(eventLabels[event.detail.operation || event.event_type])}</b> <small>${esc(event.actor_name)}・${esc(calendar.formatTaipeiTimestamp(event.created_at, { year: true, seconds: true }))}</small><p>${esc(event.detail.note)}</p>${event.detail.scheduleChanged ? `<p>已重排追蹤期間；${esc(event.detail.resetPeriodCount)} 期原確認需重新核對。原紀錄保留在調整前快照。</p>` : ""}${event.detail.periodKey ? `<p>檢視期起日：${esc(event.detail.periodKey)}・參加日期：${esc(event.detail.attendedOn || "未達成")}</p>` : ""}${event.detail.contactedOn ? `<p>實際提醒：${esc(event.detail.contactedOn)}・${esc(event.detail.channel)}<br>會員回覆：${esc(event.detail.response)}</p>` : ""}${event.previous_data?.status !== event.next_data.status ? `<p>結果：${esc(domain.labels[event.next_data.status])}</p>` : ""}${event.event_type === "amend" ? `<details><summary>查看調整前後內容</summary><pre>${esc(JSON.stringify({ 原紀錄: event.previous_data, 新紀錄: event.next_data }, null, 2))}</pre></details>` : ""}<p>下次追蹤：${esc(event.next_data.nextCheckOn)}・主責：${esc(event.next_data.leadName)}</p></article>`).join("");
     } catch (error) { $("#detailContent").textContent = error.message; }
   }
   $("#foundationList").onclick = async event => {
     const button = event.target.closest("button");
     if (!button) return;
-    const key = ["detail", "record", "copy", "edit", "add"].find(key => button.dataset[key]);
+    const key = ["detail", "record", "copy", "edit", "add", "delete", "restore"].find(key => button.dataset[key]);
     const item = items.find(item => item.id === button.dataset[key]);
     if (!item) return;
     if (key === "detail") return detail(item);
     if (key === "edit") return openDefinition(item);
     if (key === "add") return openDefinition(null, !editorContext && !params.get("case") && item.origin === "legacy", item);
     if (key === "record") return openRecord(item);
+    if (["delete", "restore"].includes(key)) return openRecord(item, key);
     try { await navigator.clipboard.writeText(domain.reminderText(item)); message("提醒文字已複製。實際聯繫會員後，請使用「記錄提醒／進度」保存提醒與回覆。"); }
     catch { message("瀏覽器無法複製，請確認剪貼簿權限後重試。"); }
   };
@@ -237,7 +240,8 @@
   $("#target").oninput = definitionFields;
   for (const key of ["metric", "period", "intervalMonths", "leadMonths"]) $(`#${key}`).onchange = definitionFields;
   $("#recordStatus").onchange = () => { $("#completedCount").required = $("#attendedOn").required = $("#action").value === "confirm-quarter" && $("#recordStatus").value === "achieved"; };
-  $("#filter").onchange = () => { selectedId = ""; render(); };
+  $("#deletedFilter").hidden = !manager;
+  $("#filter").onchange = async () => { selectedId = ""; try { await load(); } catch (error) { items = []; render(); message(error.message); } };
   $("#search").oninput = () => { selectedId = ""; render(); };
   $("#createFoundation").hidden = !manager || !(editorContext || params.get("case"));
   $("#importLegacyFoundation").hidden = !manager || Boolean(editorContext || params.get("case"));
