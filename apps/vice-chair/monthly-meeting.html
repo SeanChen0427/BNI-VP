@@ -97,8 +97,8 @@
         </section>
 
         <section class="meeting-card" data-guide-id="monthly.care-card">
-          <div class="section-title" data-guide-id="monthly.care-source"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">需要後續行動的項目須排定追蹤人員與日期；續約項目若會中確認不續約，可直接保留決議而不建立工作，結案後若改為續約則追加更正。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
-          <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成／不續約</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
+          <div class="section-title" data-guide-id="monthly.care-source"><span>03</span><div><small>RENEWAL & CARE</small><h2>續約及需要輔導的會員</h2><p id="careSource">需要後續行動的項目須排定追蹤人員與日期；續約項目若會中確認不續約，可直接保留決議而不建立工作，結案後若改為續約則追加更正。期中或特定會員關懷可選「不安排關懷」，保留本次決議後結案。</p></div><button type="button" class="soft-button" onclick="window.open('member-care.html','_blank','noopener')">開啟會員關懷儀表板 ↗</button><button type="button" class="soft-button" id="refreshCare">更新追蹤名單</button></div>
+          <div class="care-board-summary"><div><small>待討論</small><strong id="carePendingCount">0</strong></div><div><small>追蹤中／已安排</small><strong id="careActiveCount">0</strong></div><div><small>已完成／不續約／不關懷</small><strong id="careDoneCount">0</strong></div><span><i><em id="careProgressBar"></em></i><b id="careProgressText">0%</b></span></div>
           <div id="careVisualBoard" class="care-visual-board" data-guide-id="monthly.care-board"></div>
           <textarea id="careMembers" hidden readonly></textarea>
           <div id="meetingFoundationSnapshot" class="foundation-meeting" aria-live="polite">正在讀取續約地基提醒…</div>
@@ -147,8 +147,8 @@
   </dialog>
   <div id="toast"></div>
   <script src="vendor/docx.iife.js"></script>
-  <script src="core/monthly-meeting-domain.js?v=3"></script>
-  <script src="assets/js/monthly-meeting.js?v=19"></script>
-  <script src="assets/js/workspace-nav.js?v=15"></script>
+  <script src="core/monthly-meeting-domain.js?v=4"></script>
+  <script src="assets/js/monthly-meeting.js?v=20"></script>
+  <script src="assets/js/workspace-nav.js?v=16"></script>
 </body>
 </html>

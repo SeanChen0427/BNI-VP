@@ -1,7 +1,7 @@
 (function(){
   const $=selector=>document.querySelector(selector),$$=selector=>[...document.querySelectorAll(selector)];
   const session=FulianAuth.getSession(),identity=`${session.role}:${session.name}`,canManage=["vp","admin"].includes(session.role),TASK_KEY=FulianCaseDomain.TASK_STORAGE_KEY,calendar=window.FulianCalendarDomain;
-  const {isNewMemberReview,latestRenewalDecisionAmendment,effectiveCareDisposition,isConfirmedNonRenewal,hasRenewalDecisionCorrection,requiresCareAssignment,missingCareAssignments}=FulianMonthlyMeetingDomain;
+  const {isNewMemberReview,latestRenewalDecisionAmendment,effectiveCareDisposition,isConfirmedNonRenewal,isCareWaived,isCareDecisionComplete,hasRenewalDecisionCorrection,requiresCareAssignment,missingCareAssignments}=FulianMonthlyMeetingDomain;
   const editableIds=["meetingMonth","meetingDate","reportMonth","recorder","attendanceMemberCount","absenceActual","absenceList","lateActual","lateList","proxyActual","proxyList","attendanceNotes","chapterTarget","lostCount","applicationCount","growthCount","approvedCount","conditionalCount","pendingReviewCount","growthNotes","careActions","memberAssistance","motions","conclusion","followUps"];
   let store={settings:{chapterSizeTarget:51},records:[]},record=null,saveTimer=null,snapshot=null,renewalCorrectionRequest=null;
   const pad=value=>String(value).padStart(2,"0"),isoDate=date=>`${date.getUTCFullYear()}-${pad(date.getUTCMonth()+1)}-${pad(date.getUTCDate())}`;
@@ -30,8 +30,8 @@
     return{lostCount:departures.length,applicationCount:applications.length,growthCount:approved.length-departures.length,approvedCount:approved.length,conditionalCount:0,pendingReviewCount:pending.length,taskCareMembers:care,taskIds:tasks.map(task=>task.id),completedTaskIds:tasks.filter(isClosedTask).map(task=>task.id)};
   }
   async function loadBni(){try{const response=await fetch("/api/bni-analysis",{cache:"no-store"});if(response.ok)snapshot=await response.json()}catch{}}
-  const careStates={pending:"待討論",scheduled:"已排定",active:"追蹤中",done:"已完成"},careDispositions={follow_up:"排定後續工作",non_renewal:"確認不續約"};
-  function careStateLabel(item){return isConfirmedNonRenewal(item)?"確認不續約":careStates[item.state]||"待討論"}
+  const careStates={pending:"待討論",scheduled:"已排定",active:"追蹤中",done:"已完成"},careDispositions={follow_up:"排定後續工作",non_renewal:"確認不續約",no_follow_up:"不安排關懷"};
+  function careStateLabel(item){return isConfirmedNonRenewal(item)?"確認不續約":isCareWaived(item)?"不安排關懷":careStates[item.state]||"待討論"}
   function identityName(value){const parts=String(value||"").split(":");return parts.length>1?parts.slice(1).join(":"):String(value||"")}
   function correctionTime(value){return calendar.formatTaipeiTimestamp(value,{year:true})||String(value||"")}
   function careId(category,title){return`${category}-${title}`.replace(/\s+/g,"").replace(/[^\p{Letter}\p{Number}\-↔／]/gu,"").slice(0,100)}
@@ -50,11 +50,11 @@
       if(matched)Object.assign(matched,assignment);
       else push("已排定關懷案件",task.member,`${task.type}｜${task.stage}`,task.lead?`已由 ${task.lead} 負責`:"尚未指派負責人",assignment);
     }
-    for(const saved of existing||[])if(isConfirmedNonRenewal(saved)&&!items.some(item=>item.id===saved.id))items.push({...saved});
+    for(const saved of existing||[])if(isCareDecisionComplete(saved)&&!items.some(item=>item.id===saved.id))items.push({...saved});
     const previous=new Map((existing||[]).map(item=>[item.id,item])),liveTaskIds=new Set(context.taskIds||[]),completedTaskIds=new Set(context.completedTaskIds||[]);
     return items.map(item=>{
       const saved=previous.get(item.id);if(!saved)return item;
-      if(isConfirmedNonRenewal(saved)){const taskId=[item.taskId,saved.taskId].find(id=>id&&liveTaskIds.has(id))||"";return{...item,disposition:"non_renewal",assignmentRequired:false,state:"done",owner:"",companion:"",dueDate:"",note:saved.note||"",taskId,taskCreatedByMeeting:Boolean(taskId&&(item.taskCreatedByMeeting||saved.taskCreatedByMeeting)),syncMissing:false,taskDeleted:false}}
+      if(isCareDecisionComplete(saved)){const taskId=[item.taskId,saved.taskId].find(id=>id&&liveTaskIds.has(id))||"";return{...item,disposition:effectiveCareDisposition(saved),assignmentRequired:false,state:"done",owner:"",companion:"",dueDate:"",note:saved.note||"",taskId,taskCreatedByMeeting:Boolean(taskId&&(item.taskCreatedByMeeting||saved.taskCreatedByMeeting)),syncMissing:false,taskDeleted:false}}
       if(item.taskId)return{...item,disposition:item.disposition||saved.disposition,state:completedTaskIds.has(item.taskId)?"done":item.state};
       const savedTaskExists=saved.taskId&&liveTaskIds.has(saved.taskId);
       const staleSchedule=saved.taskId&&!savedTaskExists&&["scheduled","active"].includes(saved.state);
@@ -64,7 +64,7 @@
   }
   function careMembersText(items=[]){
     if(!items.length)return"目前會員關懷儀表板與進行中案件均無待討論名單。";
-    const groups=new Map();for(const item of items){if(!groups.has(item.category))groups.set(item.category,[]);const nonRenewal=isConfirmedNonRenewal(item),correction=latestRenewalDecisionAmendment(item),decision=nonRenewal?"會議決議：確認不續約":correction?"原會議決議：確認不續約｜結案後更正：恢復續約追蹤":`建議：${item.action}`,management=[careStateLabel(item),nonRenewal&&"無需建立新工作排程",nonRenewal&&item.taskId&&"既有工作待另行確認",item.owner&&`負責：${item.owner}`,item.companion&&`陪訪：${item.companion}`,item.dueDate&&`排定：${item.dueDate}`,correction&&`更正原因：${correction.reason}`,correction&&`更正人：${identityName(correction.correctedBy)}`,correction&&`更正時間：${correctionTime(correction.correctedAt)}`,item.note&&`紀錄：${item.note}`].filter(Boolean).join("｜");groups.get(item.category).push(`${item.title}｜${item.detail}｜${decision}｜處理：${management}`)}
+    const groups=new Map();for(const item of items){if(!groups.has(item.category))groups.set(item.category,[]);const nonRenewal=isConfirmedNonRenewal(item),correction=latestRenewalDecisionAmendment(item),decision=nonRenewal?"會議決議：確認不續約":isCareWaived(item)?"會議決議：不安排關懷":correction?"原會議決議：確認不續約｜結案後更正：恢復續約追蹤":`建議：${item.action}`,management=[careStateLabel(item),isCareDecisionComplete(item)&&"無需建立新工作排程",isCareDecisionComplete(item)&&item.taskId&&"既有工作待另行確認",item.owner&&`負責：${item.owner}`,item.companion&&`陪訪：${item.companion}`,item.dueDate&&`排定：${item.dueDate}`,correction&&`更正原因：${correction.reason}`,correction&&`更正人：${identityName(correction.correctedBy)}`,correction&&`更正時間：${correctionTime(correction.correctedAt)}`,item.note&&`紀錄：${item.note}`].filter(Boolean).join("｜");groups.get(item.category).push(`${item.title}｜${item.detail}｜${decision}｜處理：${management}`)}
     return[...groups].map(([category,rows])=>`【${category}】\n${rows.join("\n")}`).join("\n\n");
   }
   function renewalCorrectionsText(items=[]){
@@ -72,7 +72,7 @@
     return rows.join("\n");
   }
   function renderCareSummary(items=[]){
-    const actionable=items.filter(requiresCareAssignment),nonRenewal=items.filter(isConfirmedNonRenewal),pending=actionable.filter(item=>item.state==="pending").length,active=actionable.filter(item=>["scheduled","active"].includes(item.state)).length,done=actionable.filter(item=>item.state==="done").length+nonRenewal.length,total=actionable.length+nonRenewal.length,percent=total?Math.round(done/total*100):0;
+    const actionable=items.filter(requiresCareAssignment),nonRenewal=items.filter(isCareDecisionComplete),pending=actionable.filter(item=>item.state==="pending").length,active=actionable.filter(item=>["scheduled","active"].includes(item.state)).length,done=actionable.filter(item=>item.state==="done").length+nonRenewal.length,total=actionable.length+nonRenewal.length,percent=total?Math.round(done/total*100):0;
     $("#carePendingCount").textContent=pending;$("#careActiveCount").textContent=active;$("#careDoneCount").textContent=done;$("#careProgressBar").style.width=`${percent}%`;$("#careProgressText").textContent=`${percent}%`;
   }
   async function syncCareTask(item){
@@ -103,8 +103,9 @@
     localStorage.setItem(TASK_KEY,JSON.stringify(tasks));await window.FulianTaskStore.flush();item.taskId=id;item.taskCreatedByMeeting=task.source==="monthly-meeting";if(item.state==="pending")item.state="scheduled";window.dispatchEvent(new CustomEvent("fulian:data-changed",{detail:{source:"monthly-meeting"}}));return created?"created":"updated";
   }
   function careAssignmentControls(item,people){
-    const correction=latestRenewalDecisionAmendment(item),disposition=effectiveCareDisposition(item)||"follow_up",decision=item.taskType==="renewal"?`<label class="full care-disposition">${correction?"目前有效處理":"本次月會決議"}<select class="care-control" data-field="disposition"><option value="follow_up" ${disposition==="follow_up"?"selected":""}>${careDispositions.follow_up}</option><option value="non_renewal" ${disposition==="non_renewal"?"selected":""}>${careDispositions.non_renewal}（不建立工作）</option></select></label>`:"",amendment=correction?`<div class="care-amendment-note"><b>結案後已更正</b><span>原決議「確認不續約」完整保留；${escapeHtml(identityName(correction.correctedBy))} 於 ${escapeHtml(correctionTime(correction.correctedAt))} 更正為恢復續約追蹤。</span><small>原因：${escapeHtml(correction.reason)}</small></div>`:"";
+    const correction=latestRenewalDecisionAmendment(item),disposition=effectiveCareDisposition(item)||"follow_up",decision=["renewal","special","midterm"].includes(item.taskType)?`<label class="full care-disposition">${correction?"目前有效處理":"本次月會決議"}<select class="care-control" data-field="disposition"><option value="follow_up" ${disposition==="follow_up"?"selected":""}>${careDispositions.follow_up}</option>${item.taskType==="renewal"?`<option value="non_renewal" ${disposition==="non_renewal"?"selected":""}>${careDispositions.non_renewal}（不建立工作）</option>`:`<option value="no_follow_up" ${disposition==="no_follow_up"?"selected":""}>${careDispositions.no_follow_up}（不建立工作）</option>`}</select></label>`:"",amendment=correction?`<div class="care-amendment-note"><b>結案後已更正</b><span>原決議「確認不續約」完整保留；${escapeHtml(identityName(correction.correctedBy))} 於 ${escapeHtml(correctionTime(correction.correctedAt))} 更正為恢復續約追蹤。</span><small>原因：${escapeHtml(correction.reason)}</small></div>`:"";
     if(isConfirmedNonRenewal(item))return`${decision}<div class="care-non-renewal-note"><b>已確認不續約</b><span>本項只保留月會決議，不要求追蹤委員或排定日期，也不建立新工作。這不會自動變更會員主檔或離會狀態。</span></div>${item.taskId?`<div class="care-existing-task-note"><b>已有工作仍保留</b><span>為避免誤刪訪談或案件紀錄，請至工作總覽另行確認處理。</span></div>`:""}<label class="full">決議備註（選填）<textarea class="care-control" data-field="note" placeholder="例如：會員於本次月會確認不續約">${escapeHtml(item.note||"")}</textarea></label>`;
+    if(isCareWaived(item))return`${decision}<div class="care-non-renewal-note"><b>本次不安排關懷</b><span>例如會員已表明不續約，本項可保留決議並結案，不要求追蹤委員或日期。此決議只適用本次月會，不會自動變更會員資格。</span></div>${item.taskId?`<div class="care-existing-task-note"><b>已有工作仍保留</b><span>請至工作總覽另行確認既有案件。</span></div>`:""}<label class="full">決議備註（選填）<textarea class="care-control" data-field="note" placeholder="例如：已表明不續約，本次不安排關懷">${escapeHtml(item.note||"")}</textarea></label>`;
     if(!requiresCareAssignment(item))return`${decision}<div class="care-non-renewal-note"><b>無需排定</b><span>本項為資訊紀錄，不需建立後續工作。</span></div><label class="full">備註（選填）<textarea class="care-control" data-field="note">${escapeHtml(item.note||"")}</textarea></label>`;
     return`${decision}${amendment}<label>追蹤委員（必填）<select class="care-control" data-field="owner" required><option value="">請選擇追蹤委員</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.owner===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>陪訪委員（選填）<select class="care-control" data-field="companion"><option value="">不指定陪訪</option>${people.map(name=>`<option value="${escapeHtml(name)}" ${item.companion===name?"selected":""}>${escapeHtml(name)}</option>`).join("")}</select></label><label>處理狀態<select class="care-control" data-field="state">${Object.entries(careStates).map(([value,label])=>`<option value="${value}" ${item.state===value?"selected":""}>${label}</option>`).join("")}</select></label><label>排定日期（必填）<input class="care-control" data-field="dueDate" type="date" required value="${escapeHtml(item.dueDate||"")}"></label><label class="full">${correction?"原決議備註":"工作備註"}<textarea class="care-control" data-field="note" placeholder="儲存後同步到首頁工作排定">${escapeHtml(item.note||"")}</textarea></label>`;
   }
@@ -113,11 +114,11 @@
     const item=record.care.items.find(value=>value.id===card.dataset.careId);if(!item)return;
     const index=record.care.items.indexOf(item),previous={...item},field=control.dataset.field;
     if(field==="disposition"){
-      const disposition=control.value==="non_renewal"?"non_renewal":"follow_up";
+      const disposition=control.value==="non_renewal"&&item.taskType==="renewal"?"non_renewal":control.value==="no_follow_up"&&["special","midterm"].includes(item.taskType)?"no_follow_up":"follow_up";
       if(disposition==="non_renewal"&&!confirm(`確認在本次月會將「${item.title}」記錄為不續約？\n此項不再要求或建立新的工作排定；為避免誤刪紀錄，已存在的工作會保留供你另行確認。`)){control.value=previous.disposition||"follow_up";return}
-      item.disposition=disposition;item.assignmentRequired=disposition!=="non_renewal";
-      if(disposition==="non_renewal"){item.state="done";item.owner="";item.companion="";item.dueDate=""}
-      else if(isConfirmedNonRenewal(previous)){
+      item.disposition=disposition;item.assignmentRequired=!isCareDecisionComplete(item);
+      if(isCareDecisionComplete(item)){item.state="done";item.owner="";item.companion="";item.dueDate=""}
+      else if(isCareDecisionComplete(previous)){
         item.state="pending";item.taskDeleted=false;item.syncMissing=false;
         const existing=loadTasks().find(task=>!isClosedTask(task)&&((item.taskId&&task.id===item.taskId)||FulianCaseDomain.sameTaskIdentity(task,item)));
         if(existing){item.owner=existing.lead||"";item.companion=existing.companions?.[0]||"";item.dueDate=String(existing.scheduledAt||"").slice(0,10);item.state="scheduled";item.taskId=existing.id;item.taskCreatedByMeeting=existing.source==="monthly-meeting"&&existing.sourceCareId===item.id}
@@ -130,6 +131,7 @@
     try{
       const synced=await syncCareTask(item);record.care.members=careMembersText(record.care.items);$("#careMembers").value=record.care.members;renderCareBoard(record.care.items);scheduleSave();
       if(field==="disposition"&&isConfirmedNonRenewal(item))toast(synced==="existing"?"已記錄不續約；既有工作仍保留待確認":"已記錄確認不續約，不需排定工作");
+      else if(field==="disposition"&&isCareWaived(item))toast(synced==="existing"?"已記錄不安排關懷；既有工作仍保留待確認":"已記錄不安排關懷，不需排定工作");
       else if(field==="disposition")toast("已恢復為需排定後續工作");
       else if(synced==="created")toast("已同步建立首頁工作排定");
     }catch(error){record.care.items[index]=previous;record.care.members=careMembersText(record.care.items);$("#careMembers").value=record.care.members;renderCareBoard(record.care.items);toast(error.message||"工作排定同步失敗")}
@@ -137,7 +139,7 @@
   function renderCareBoard(items=[]){
     const board=$("#careVisualBoard"),config=FulianAuth.getConfig(),people=[config.vpName,...config.committee].filter(Boolean),groups=new Map();
     for(const item of items){if(!groups.has(item.category))groups.set(item.category,[]);groups.get(item.category).push(item)}
-    board.innerHTML=items.length?[...groups].map(([category,rows],index)=>`<details class="care-group" ${index<2?"open":""}><summary><b>${escapeHtml(category)}</b><span>${rows.length} 項</span></summary><div class="care-card-grid">${rows.map(item=>`<article class="care-manage-card ${requiresCareAssignment(item)&&(!item.owner||!item.dueDate)?"missing-owner":""} ${item.taskDeleted&&requiresCareAssignment(item)?"deleted-schedule":""}" data-care-id="${escapeHtml(item.id)}" data-state="${escapeHtml(item.state)}" data-disposition="${escapeHtml(effectiveCareDisposition(item)||"")}"><div class="care-card-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></div><span class="care-state-badge">${escapeHtml(careStateLabel(item))}</span></div><p class="care-card-detail">${escapeHtml(item.detail)}</p><p class="care-card-action">${isConfirmedNonRenewal(item)?"會議決議：確認不續約":hasRenewalDecisionCorrection(item)?"結案後更正：恢復續約追蹤":`建議：${escapeHtml(item.action)}`}</p>${item.taskDeleted&&requiresCareAssignment(item)?`<div class="care-sync-warning"><div><b>原工作排程已刪除</b><span>月會紀錄與原分工仍保留；系統不會自動復活案件。</span></div>${canManage&&record.status!=="final"?`<button type="button" data-recreate-care="${escapeHtml(item.id)}">重新建立工作排程</button>`:""}</div>`:""}<div class="care-card-controls">${careAssignmentControls(item,people)}</div>${renewalCorrectionAction(item)}</article>`).join("")}</div></details>`).join(""):(record.care?.members?`<pre class="care-legacy-record">${escapeHtml(record.care.members)}</pre>`:`<div class="history-empty">目前沒有需要討論或排定的續約及輔導項目</div>`);
+    board.innerHTML=items.length?[...groups].map(([category,rows],index)=>`<details class="care-group" ${index<2?"open":""}><summary><b>${escapeHtml(category)}</b><span>${rows.length} 項</span></summary><div class="care-card-grid">${rows.map(item=>`<article class="care-manage-card ${requiresCareAssignment(item)&&(!item.owner||!item.dueDate)?"missing-owner":""} ${item.taskDeleted&&requiresCareAssignment(item)?"deleted-schedule":""}" data-care-id="${escapeHtml(item.id)}" data-state="${escapeHtml(item.state)}" data-disposition="${escapeHtml(effectiveCareDisposition(item)||"")}"><div class="care-card-head"><div><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.category)}</small></div><span class="care-state-badge">${escapeHtml(careStateLabel(item))}</span></div><p class="care-card-detail">${escapeHtml(item.detail)}</p><p class="care-card-action">${isConfirmedNonRenewal(item)?"會議決議：確認不續約":isCareWaived(item)?"會議決議：不安排關懷":hasRenewalDecisionCorrection(item)?"結案後更正：恢復續約追蹤":`建議：${escapeHtml(item.action)}`}</p>${item.taskDeleted&&requiresCareAssignment(item)?`<div class="care-sync-warning"><div><b>原工作排程已刪除</b><span>月會紀錄與原分工仍保留；系統不會自動復活案件。</span></div>${canManage&&record.status!=="final"?`<button type="button" data-recreate-care="${escapeHtml(item.id)}">重新建立工作排程</button>`:""}</div>`:""}<div class="care-card-controls">${careAssignmentControls(item,people)}</div>${renewalCorrectionAction(item)}</article>`).join("")}</div></details>`).join(""):(record.care?.members?`<pre class="care-legacy-record">${escapeHtml(record.care.members)}</pre>`:`<div class="history-empty">目前沒有需要討論或排定的續約及輔導項目</div>`);
     renderCareSummary(items);
     board.querySelectorAll("[data-amend-renewal]").forEach(button=>button.onclick=()=>openRenewalCorrection(button.dataset.amendRenewal));
     if(!canManage||record.status==="final")return;

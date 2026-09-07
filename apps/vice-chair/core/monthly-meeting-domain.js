@@ -51,6 +51,14 @@
     return item.taskType==="renewal"&&effectiveCareDisposition(item)===NON_RENEWAL_DISPOSITION;
   }
 
+  function isCareWaived(item={}){
+    return ["special","midterm"].includes(item.taskType)&&effectiveCareDisposition(item)==="no_follow_up";
+  }
+
+  function isCareDecisionComplete(item={}){
+    return isConfirmedNonRenewal(item)||isCareWaived(item);
+  }
+
   function hasRenewalDecisionCorrection(item={}){
     return item.taskType==="renewal"
       &&item.disposition===NON_RENEWAL_DISPOSITION
@@ -59,7 +67,7 @@
 
   function isValidCareDisposition(item={}){
     const disposition=String(item.disposition||"");
-    const baseValid=!disposition||disposition===FOLLOW_UP_DISPOSITION||(item.taskType==="renewal"&&disposition===NON_RENEWAL_DISPOSITION);
+    const baseValid=!disposition||disposition===FOLLOW_UP_DISPOSITION||(item.taskType==="renewal"&&disposition===NON_RENEWAL_DISPOSITION)||(["special","midterm"].includes(item.taskType)&&disposition==="no_follow_up");
     const amendments=decisionAmendments(item);
     return (item.decisionAmendments===undefined||Array.isArray(item.decisionAmendments))
       &&baseValid
@@ -99,13 +107,13 @@
   }
 
   function normalizeCareItem(item={}){
-    if(isConfirmedNonRenewal(item))return{...item,assignmentRequired:false,state:"done",owner:"",companion:"",dueDate:"",taskDeleted:false,syncMissing:false};
+    if(isCareDecisionComplete(item))return{...item,assignmentRequired:false,state:"done",owner:"",companion:"",dueDate:"",taskDeleted:false,syncMissing:false};
     if(effectiveCareDisposition(item)===FOLLOW_UP_DISPOSITION)return{...item,assignmentRequired:true};
     return{...item};
   }
 
   function requiresCareAssignment(item={}){
-    if(isConfirmedNonRenewal(item))return false;
+    if(isCareDecisionComplete(item))return false;
     if(effectiveCareDisposition(item)===FOLLOW_UP_DISPOSITION)return true;
     return item.assignmentRequired!==false;
   }
@@ -122,5 +130,5 @@
     return items.some(item=>requiresCareAssignment(item)&&item.owner&&item.owner===item.companion);
   }
 
-  return{FOLLOW_UP_DISPOSITION,NON_RENEWAL_DISPOSITION,RENEWAL_RESUMED_AMENDMENT,isNewMemberReview,decisionAmendments,isValidRenewalDecisionAmendment,latestRenewalDecisionAmendment,effectiveCareDisposition,isConfirmedNonRenewal,hasRenewalDecisionCorrection,isValidCareDisposition,applyRenewalDecisionCorrection,normalizeCareItem,requiresCareAssignment,isCareScheduleComplete,missingCareAssignments,hasCareAssignmentConflict};
+  return{FOLLOW_UP_DISPOSITION,NON_RENEWAL_DISPOSITION,RENEWAL_RESUMED_AMENDMENT,isNewMemberReview,decisionAmendments,isValidRenewalDecisionAmendment,latestRenewalDecisionAmendment,effectiveCareDisposition,isConfirmedNonRenewal,isCareWaived,isCareDecisionComplete,hasRenewalDecisionCorrection,isValidCareDisposition,applyRenewalDecisionCorrection,normalizeCareItem,requiresCareAssignment,isCareScheduleComplete,missingCareAssignments,hasCareAssignmentConflict};
 });

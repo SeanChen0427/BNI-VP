@@ -183,7 +183,7 @@ async function committeeMeetings(req,url,res){
     if(storedRecord?.status==="final")return record.status==="final"?json(res,200,{record:storedRecord,alreadyFinal:true}):json(res,409,{message:"已結案月會不能改回草稿；續約變更請使用專用更正"});
     const careItems=Array.isArray(record.care?.items)?record.care.items:[];
     if(careItems.some(item=>monthlyMeetingDomain.decisionAmendments(item).length))return json(res,409,{message:"結案後續約更正只能使用專用操作，不能隨整份月會覆寫"});
-    if(careItems.some(item=>!monthlyMeetingDomain.isValidCareDisposition(item)))return json(res,400,{message:"確認不續約只能用於續約項目"});
+    if(careItems.some(item=>!monthlyMeetingDomain.isValidCareDisposition(item)))return json(res,400,{message:"確認不續約只能用於續約項目；不安排關懷只適用期中或特定會員關懷"});
     record={...record,care:{...(record.care||{}),items:careItems.map(monthlyMeetingDomain.normalizeCareItem)}};
     if(record.status==="final"&&monthlyMeetingDomain.missingCareAssignments(record.care?.items||[]).length)return json(res,400,{message:"需要後續行動的續約及輔導項目，都必須完成追蹤委員與排定日期後才能結案"});
     if(monthlyMeetingDomain.hasCareAssignmentConflict(record.care?.items||[]))return json(res,400,{message:"負責委員與陪訪委員不能是同一人"});

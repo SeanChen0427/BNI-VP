@@ -14,7 +14,7 @@ test("續約項目可記錄確認不續約且不要求工作排定", () => {
   assert.match(html, /已完成／不續約/);
   assert.match(script, /data-field="disposition"/);
   assert.match(script, /value="non_renewal"/);
-  assert.match(script, /item\.assignmentRequired=disposition!=="non_renewal"/);
+  assert.match(script, /item\.assignmentRequired=!isCareDecisionComplete\(item\)/);
   assert.match(script, /已記錄確認不續約，不需排定工作/);
   assert.match(script, /會議決議：確認不續約/);
   assert.match(styles, /data-disposition="non_renewal"/);

@@ -53,7 +53,7 @@
     },
     "global-shell":{
       id:"global-shell",
-      version:VERSION,
+      version:"1.0.1",
       title:"認識你的富聯工作區",
       page:"全站操作",
       roles:EVERYONE,
@@ -84,6 +84,7 @@
         {id:"vote",section:"主選單",target:'[data-guide-id="nav.vote"]',title:"投票與決議",body:"直接前往案件中心的待投票區，查看目前需要你回饋或投票的案件；右側數字代表目前待處理數量。",fact:{label:"按下後",text:"只會開啟待投票清單，不會替你投票。"},reveal:"sidebar"},
         {id:"attendance",section:"主選單",target:'[data-guide-id="nav.attendance"]',title:"出席與紀律",body:"進入每週例會點名與出席紀錄。可查看代理、遲到、缺席等狀態；正式保存與公告會在頁面內另外確認。",reveal:"sidebar"},
         {id:"reminders",section:"主選單",target:'[data-guide-id="nav.reminders"]',title:"常態通知",body:"管理會員委員會群的固定通知與發送排程，也能查看投遞結果。這是副主席管理入口，實際發送前仍有頁面內確認。",roles:VP_ONLY,fact:{label:"資料影響",text:"進入頁面不會發送訊息；按下正式發送功能才會影響群組。"},reveal:"sidebar"},
+        {id:"foundations",section:"主選單",target:'[data-guide-id="nav.renewal-foundations"]',title:"續約地基追蹤",body:"持續追蹤續約時約定的來賓、培訓或工作坊目標。同會員的多項條件集中顯示；副主席可補登以前已有的地基，受指派人員可記錄提醒與回覆。",reveal:"sidebar"},
         {id:"monthly-meeting",section:"主選單",target:'[data-guide-id="nav.monthly-meeting"]',title:"會員委員會月會",body:"準備與保存每月會員委員會會議資料，包含出席、關懷、續約與工作分工；歷史月會也從同一頁查閱。",reveal:"sidebar"},
         {id:"member-care",section:"主選單",target:'[data-guide-id="nav.member-care"]',title:"會員關懷儀表板",body:"查看分析核心同步的會員燈號、趨勢與關懷提示，再從需要關注的項目安排後續工作。系統只呈現分析結果，不會在此重算規則。",reveal:"sidebar"},
         {id:"resources",section:"資源與管理",target:'[data-guide-id="nav.resources"]',title:"常用資源",body:"展開常用文稿與外部連結。副主席會看到待寄當責信及文稿範本；會員委員只會看到其角色可用的連結。",fact:{label:"權限",text:"不同角色看到的子項目不同。"},reveal:"sidebar"},
@@ -105,7 +106,7 @@
     },
     "page:index":{
       id:"page:index",
-      version:VERSION,
+      version:"1.0.1",
       title:"工作總覽完整導覽",
       page:"工作總覽",
       roles:EVERYONE,
@@ -131,6 +132,7 @@
         {id:"filter-handover",section:"優先工作",target:'[data-guide-id="home.filter-handover"]',title:"換屆待指派",body:"只有換屆後仍有工作包含卸任或轉任人員時才會出現。由此集中找出需要重新指定接手人的項目。",roles:VP_ONLY},
         {id:"case-table",section:"優先工作",target:'[data-guide-id="home.case-table"]',title:"從案件列直接進入下一步",body:"每列依序顯示案件、目前階段或你的動作、負責人、時程與下一步。最右側操作會帶到相應頁面，不會在首頁直接代你送出。"},
         {id:"schedule",section:"優先工作",target:'[data-guide-id="home.schedule-work"]',title:"排定新工作",body:"需要主動建立或安排工作時由此進入案件中心。真正建立案件前仍會填寫類型、會員、負責人與期限。"},
+        {id:"foundations",section:"續約地基",target:'[data-guide-id="home.foundations"]',title:"待處理事項下方的續約地基追蹤",body:"每位會員一張卡，集中顯示多項地基的目前進度與目標。從「查看地基與提醒紀錄」進入設定、逐期確認及聯繫紀錄；地基不會因訪談結案或通知已讀而消失。"},
         {id:"monthly-data",section:"副主席管理",target:'[data-guide-id="home.monthly-data"]',title:"每月資料更新",body:"月初檢查分析所需的資料檔是否齊全，並顯示本期完成比例。只有副主席會在首頁看到這個管理區塊。",roles:VP_ONLY,fact:{label:"資料影響",text:"區塊本身只顯示檢查結果；上傳與入檔會另有明確流程。"}},
         {id:"monthly-refresh",section:"副主席管理",target:'[data-guide-id="home.monthly-refresh"]',title:"重新檢查",body:"資料剛完成更新但畫面尚未反映時，按這裡重新向系統檢查目前狀態；它不會刪除既有報表。",roles:VP_ONLY},
         {id:"learning",section:"副主席工具",target:'[data-guide-id="home.learning"]',title:"交接與學習",body:"顯示副主席制度課程的閱讀進度，讓你從上次位置繼續。這個課程與目前的系統操作導覽分開保存。",roles:VP_ONLY},

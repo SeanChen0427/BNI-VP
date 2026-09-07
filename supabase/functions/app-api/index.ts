@@ -2015,12 +2015,17 @@ function isConfirmedMonthlyNonRenewal(item: any) {
   return item?.taskType === "renewal" && effectiveMonthlyCareDisposition(item) === MONTHLY_NON_RENEWAL_DISPOSITION;
 }
 
+function isMonthlyCareWaived(item: any) {
+  return ["special", "midterm"].includes(item?.taskType) && effectiveMonthlyCareDisposition(item) === "no_follow_up";
+}
+
 function isValidMonthlyCareDisposition(item: any) {
   const disposition = String(item?.disposition || "");
   const amendments = monthlyDecisionAmendments(item);
   const baseValid = !disposition
     || disposition === MONTHLY_FOLLOW_UP_DISPOSITION
-    || (item?.taskType === "renewal" && disposition === MONTHLY_NON_RENEWAL_DISPOSITION);
+    || (item?.taskType === "renewal" && disposition === MONTHLY_NON_RENEWAL_DISPOSITION)
+    || (["special", "midterm"].includes(item?.taskType) && disposition === "no_follow_up");
   return (item?.decisionAmendments === undefined || Array.isArray(item.decisionAmendments))
     && baseValid
     && amendments.length <= 1
@@ -2070,7 +2075,7 @@ function applyMonthlyRenewalDecisionCorrection(item: any, correction: any) {
 
 function normalizeMonthlyCareItems(items: any[]) {
   return items.map((item: any) => {
-    if (isConfirmedMonthlyNonRenewal(item)) {
+    if (isConfirmedMonthlyNonRenewal(item) || isMonthlyCareWaived(item)) {
       return {
         ...item,
         assignmentRequired: false,
@@ -2088,7 +2093,7 @@ function normalizeMonthlyCareItems(items: any[]) {
 }
 
 function monthlyCareRequiresAssignment(item: any) {
-  if (isConfirmedMonthlyNonRenewal(item)) return false;
+  if (isConfirmedMonthlyNonRenewal(item) || isMonthlyCareWaived(item)) return false;
   if (effectiveMonthlyCareDisposition(item) === MONTHLY_FOLLOW_UP_DISPOSITION) return true;
   return item?.assignmentRequired !== false;
 }
@@ -2395,7 +2400,7 @@ async function committeeMeetingsApi(request: Request, context: Context) {
   if (rawItems.some((item: any) => monthlyDecisionAmendments(item).length)) {
     throw Object.assign(new Error("結案後續約更正只能使用專用操作，不能隨整份月會覆寫"), { status: 409 });
   }
-  if (rawItems.some((item: any) => !isValidMonthlyCareDisposition(item))) throw new Error("確認不續約只能用於續約項目");
+  if (rawItems.some((item: any) => !isValidMonthlyCareDisposition(item))) throw new Error("確認不續約只能用於續約項目；不安排關懷只適用期中或特定會員關懷");
   const items = normalizeMonthlyCareItems(rawItems);
   record = { ...record, care: { ...(record.care || {}), items } };
   if (items.some((item: any) => monthlyCareRequiresAssignment(item) && item.owner && item.owner === item.companion)) throw new Error("負責委員與陪訪委員不能是同一人");

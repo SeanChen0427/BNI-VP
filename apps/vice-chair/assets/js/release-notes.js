@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.3.2",
+      publishedAt: "2026-09-08",
+      title: "月會不關懷結案與地基操作教學",
+      level: "normal",
+      changes: Object.freeze([
+        "期中及特定會員關懷可選擇不安排關懷，保存決議後不再因缺少委員或日期而卡住月會結案。",
+        "首頁及主選單導覽加入續約地基追蹤，追蹤頁補齊多項設定、週期、確認、提醒、日期修正及刪除復原教學。",
+        "月會與期中／續約訪談教學同步說明地基摘要與後續操作。"
+      ]),
+      impact: "重新整理後可使用。月會不關懷決議只適用本次會議，已有工作與會員資格不會自動變更。"
+    }),
+    Object.freeze({
       version: "1.3.1",
       publishedAt: "2026-09-08",
       title: "地基起算日修正與刪除",
