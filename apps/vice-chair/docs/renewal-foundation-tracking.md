@@ -1,6 +1,6 @@
 # 續約訪談地基與持續追蹤
 
-需求來源：富聯內規／Sean 2026-09-07 現行決策。程式已加入本次開發版本，尚待 migration、Edge Function 與前端正式部署；不代表正式個案已建檔。
+需求來源：富聯內規／Sean 2026-09-07 現行決策。v1.2.0 已於同日完成 migration、Edge Function 與 GitHub Pages 正式部署；正式個案仍由副主席建檔。部署、驗證及回復方式見 [部署紀錄](DEPLOYMENT_LOG_2026-09-07_RENEWAL_FOUNDATIONS.md)。
 
 ## 設定入口與唯一紀錄
 

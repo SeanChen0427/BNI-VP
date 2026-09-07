@@ -100,4 +100,4 @@ GitHub Pages、Supabase 正式後端、正式資料遷移與主要 LINE／AI 串
 ## 2026-09-07 續約後半年期中關懷
 
 - Sean 提出未來將老會員續約後半年也納入期中關懷；自動開案與週期契約尚待另案實作。本次續約地基先帶入既有期中／期末訪談。
-- 續約地基 migration、Edge Function 及前端正式部署、正式個案建檔與復原鏡像核對仍待完成。
+- 續約地基正式個案建檔、復原鏡像核對及 Admin／委員登入實機驗收仍待完成。migration、Edge Function 與前端已正式部署，副主席正式頁面載入已驗證，見 `DEPLOYMENT_LOG_2026-09-07_RENEWAL_FOUNDATIONS.md`。

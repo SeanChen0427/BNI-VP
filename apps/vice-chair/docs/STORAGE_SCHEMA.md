@@ -105,7 +105,7 @@
 5. 前端不保存正式密碼或 API Key；Supabase 登入所需的短期 token 只放於目前分頁的 `sessionStorage`，不得放入 `localStorage`。
 
 
-## 續約地基新增 Schema（2026-09-07，待部署）
+## 續約地基 Schema（2026-09-07 已部署）
 
 - `renewal_foundations`：固定連結會員；訪談來源連結續約任務，既有地基補登的來源任務為空且 `data.origin=legacy`，資料庫約束來源配對並禁止事後改換會員／來源。保存條件類型、原起算日、目標、下次續約日、指派、每期工作坊確認、提醒摘要及 revision。原訪談結案後可繼續追蹤，不改寫原訪談。
 - `renewal_foundation_events`：伺服器保存操作者、時間、提醒／確認內容及變更前後快照。只新增，不允許瀏覽器直讀直寫。

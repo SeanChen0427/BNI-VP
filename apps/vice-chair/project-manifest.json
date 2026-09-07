@@ -87,7 +87,7 @@
     "course.html": "副主席交接課程",
     "settings.html": "角色、Admin 年度換屆、帳密、個人 AI 與使用者版更新紀錄",
     "login.html": "Supabase Auth 共用帳號登入與姓名選擇",
-    "renewal-foundations.html": "續約地基逐期追蹤、人工提醒與工作坊確認（本次開發，待部署）"
+    "renewal-foundations.html": "續約地基逐期追蹤、既有地基補登、人工提醒與工作坊確認"
   },
   "dataContinuity": {
     "formalOperationalSource": "Supabase",
