@@ -1,6 +1,6 @@
 {
   "schema": "fulian.unified-project.v1",
-  "updated": "2026-09-06",
+  "updated": "2026-09-07",
   "product": "富聯分會會員委員會整合系統",
   "runtime": {
     "type": "production multi-page web application with local development and recovery runtime",
@@ -33,7 +33,8 @@
     "localApi": "apps/vice-chair/preview-server.mjs",
     "lineRecurringReminders": "supabase/functions/_shared/line-reminder-domain.mjs",
     "lineOfficialAccountRouting": "supabase/functions/_shared/line-channel-domain.mjs",
-    "lineCaseFeedbackCall": "supabase/functions/_shared/case-feedback-call-domain.mjs"
+    "lineCaseFeedbackCall": "supabase/functions/_shared/case-feedback-call-domain.mjs",
+    "renewalFoundationMetrics": "apps/bni-analysis/engine/foundation-progress.mjs"
   },
   "verification": [
     "npm run check"

@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-09-06",
+  "updated": "2026-09-07",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -29,7 +29,8 @@
     "storage": "docs/STORAGE_SCHEMA.md",
     "roadmap": "docs/REFACTOR_ROADMAP.md",
     "changeHistory": "CHANGELOG.md",
-    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_ANNUAL_HANDOVER.md"
+    "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_ANNUAL_HANDOVER.md",
+    "renewalFoundationTracking": "docs/renewal-foundation-tracking.md"
   },
   "domainOwners": {
     "caseStageAndStorageKeys": "core/case-domain.js",
@@ -65,7 +66,8 @@
     "authenticationRuntime": "assets/js/auth.js",
     "memberDirectoryLoader": "assets/js/member-directory.js",
     "productionApiBridge": "assets/js/supabase-data.js",
-    "localPreviewApi": "preview-server.mjs"
+    "localPreviewApi": "preview-server.mjs",
+    "renewalFoundationTracking": "core/renewal-foundation-domain.js"
   },
   "pages": {
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",
@@ -84,7 +86,8 @@
     "departure-form.html": "離會訪談",
     "course.html": "副主席交接課程",
     "settings.html": "角色、Admin 年度換屆、帳密、個人 AI 與使用者版更新紀錄",
-    "login.html": "Supabase Auth 共用帳號登入與姓名選擇"
+    "login.html": "Supabase Auth 共用帳號登入與姓名選擇",
+    "renewal-foundations.html": "續約地基逐期追蹤、人工提醒與工作坊確認（本次開發，待部署）"
   },
   "dataContinuity": {
     "formalOperationalSource": "Supabase",

@@ -1,0 +1,229 @@
+.foundation-context,.foundation-context *,.foundation-modal,.foundation-modal * {
+  box-sizing:border-box;
+  min-width:0;
+}
+.foundation-context {
+  margin:24px 0;
+  padding:22px;
+  border:1px solid #dce2eb;
+  border-radius:12px;
+  background:#fff;
+  color:#283549;
+  font-family:system-ui,-apple-system,sans-serif;
+}
+.foundation-context .hero {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:0;
+  background:none;
+  border:0;
+}
+.foundation-context h1 {
+  font-size:23px;
+  margin:10px 0;
+}
+.foundation-context .hero small {
+  color:#9e1721;
+  font-size:12px;
+  letter-spacing:.1em;
+}
+.foundation-context p {
+  font-size:14px;
+  line-height:1.8;
+}
+.foundation-context .notice {
+  border-left:3px solid #a91419;
+  padding-left:12px;
+}
+.foundation-context .summary {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:10px;
+}
+.foundation-context .summary article {
+  background:#f4f6f9;
+  border-radius:8px;
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+.foundation-context .summary b {
+  font-size:24px;
+}
+.foundation-context .toolbar {
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  align-items:end;
+  margin:20px 0;
+}
+.foundation-context .toolbar label {
+  flex:1;
+  min-width:130px;
+}
+.foundation-context .foundation-card {
+  border-top:1px solid #dce2eb;
+  padding:18px 0;
+}
+.foundation-context .card-head {
+  display:flex;
+  justify-content:space-between;
+  gap:14px;
+}
+.foundation-context h2 {
+  font-size:19px;
+}
+.foundation-context .facts {
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px 18px;
+  font-size:13px;
+  color:#627085;
+  margin:12px 0;
+}
+.foundation-context .criterion,.foundation-snapshot {
+  white-space:pre-wrap;
+  line-height:1.8;
+  overflow-wrap:anywhere;
+}
+.foundation-context .badge {
+  font-size:12px;
+  color:#8f2f24;
+}
+.foundation-context .card-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.foundation-context button,.foundation-modal button {
+  border:1px solid #cad3df;
+  border-radius:8px;
+  padding:9px 12px;
+  background:#fff;
+  color:#243448;
+  cursor:pointer;
+  font:inherit;
+}
+.foundation-context button.primary,.foundation-modal button.primary {
+  background:#a91419;
+  color:white;
+}
+.foundation-context label,.foundation-modal label {
+  display:flex;
+  flex-direction:column;
+  gap:7px;
+  font-size:14px;
+  margin-top:15px;
+}
+.foundation-context input,.foundation-context select,.foundation-modal input,.foundation-modal select,.foundation-modal textarea {
+  font:inherit;
+  font-size:16px;
+  border:1px solid #cbd4df;
+  border-radius:8px;
+  padding:10px;
+  width:100%;
+  background:white;
+  color:#253349;
+}
+.foundation-context [hidden],.foundation-modal [hidden] {
+  display:none!important;
+}
+.foundation-modal {
+  width:min(680px,calc(100% - 28px));
+  max-height:90vh;
+  border:0;
+  border-radius:14px;
+  padding:26px;
+  color:#253349;
+  font-family:system-ui,sans-serif;
+}
+.foundation-modal::backdrop {
+  background:#14223d80;
+}
+.foundation-modal header,.foundation-modal footer {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:15px;
+}
+.foundation-modal footer {
+  justify-content:flex-end;
+  margin-top:22px;
+}
+.foundation-modal .fields {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:14px;
+}
+.foundation-modal p {
+  line-height:1.8;
+  white-space:pre-wrap;
+}
+.foundation-modal .history-item {
+  border-top:1px solid #dce2eb;
+  padding:16px 0;
+}
+.foundation-modal pre {
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.foundation-modal .form-error,.foundation-context #pageMessage {
+  color:#a32625;
+}
+.foundation-home-list {
+  padding:0 24px 20px;
+  display:grid;
+  gap:12px;
+}
+.foundation-home-item {
+  display:block;
+  border-top:1px solid #e4e8ee;
+  padding-top:14px;
+  text-decoration:none;
+  color:inherit;
+}
+.foundation-home-item b {
+  display:block;
+  color:#9d1722;
+}
+.foundation-home-item span {
+  display:block;
+  font-size:14px;
+  line-height:1.7;
+  margin-top:5px;
+}
+.foundation-meeting {
+  white-space:pre-wrap;
+  background:#fff8ed;
+  border:1px solid #e8d9bd;
+  padding:18px;
+  border-radius:10px;
+  margin:20px 0;
+  line-height:1.8;
+}
+.foundation-modal :focus-visible {
+  outline:3px solid #508cc4;
+  outline-offset:2px;
+}
+@media(max-width:650px) {
+  .foundation-context {
+    padding:16px;
+  }
+  .foundation-context .hero,.foundation-context .card-head {
+    flex-direction:column;
+    align-items:start;
+  }
+  .foundation-context .summary {
+    grid-template-columns:repeat(2,1fr);
+  }
+  .foundation-home-list {
+    padding:0 16px 16px;
+  }
+  .foundation-context .toolbar {
+    flex-direction:column;
+    align-items:stretch;
+  }
+}

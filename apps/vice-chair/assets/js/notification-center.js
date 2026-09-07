@@ -186,7 +186,7 @@
           time: monthlyDataStatus.generatedAt
         }))
       : [];
-    items = [...accountabilityItems(), ...dataItems, ...taskItems, ...announcementItems()].sort((a, b) => a.priority - b.priority || new Date(b.time) - new Date(a.time));
+    items = [...(window.FulianFoundationSummary?.notifications() || []), ...accountabilityItems(), ...dataItems, ...taskItems, ...announcementItems()].sort((a, b) => a.priority - b.priority || new Date(b.time) - new Date(a.time));
   }
 
   function render() {
@@ -245,6 +245,7 @@
   });
   addEventListener("storage", render);
   addEventListener("fulian:data-changed", render);
+  addEventListener("fulian:foundation-changed", render);
   addEventListener("fulian:monthly-data-status", event => {
     monthlyDataStatus = event.detail;
     render();

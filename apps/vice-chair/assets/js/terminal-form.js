@@ -196,6 +196,7 @@ function serialize() {
     else if (el.type === "checkbox") out[el.id] = el.checked;
     else out[el.id] = el.value;
   });
+  out.renewalFoundationSnapshot=window.FulianFoundationInterview?.snapshotText()||"";
   out.member = currentMember.name; out.loginUser = $("#loginUser").value;out.renewalRuleVersion=2;
   out.renewalMetricsSnapshot=snapshotMatches(renewalMetricsSnapshot)?renewalMetricsSnapshot:null;
   return out;
@@ -344,6 +345,9 @@ async function downloadWord() {
     missing[0].node?.focus?.();
     return;
   }
+  let foundationSnapshot;
+  try { foundationSnapshot = await window.FulianFoundationInterview.capture(); }
+  catch(error) { toast(`地基核對失敗：${error.message}`); return; }
   terminalCompletion.begin();
   const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, PageOrientation, ShadingType } = docx;
   const m = currentMember.metrics, fp = window.formPeriods;
@@ -394,7 +398,7 @@ async function downloadWord() {
   children.push(
     para(`17. 本人同意於副主席公告續約完成後，兩個月內完成MSP（上）或（下）其中一堂培訓。${$("#mspUnderstood").checked?"■":"□"} 已了解`,{bold:true}),
     para(`培訓日期－MSP（上）：${answer("#mspUp")||"　　　　"}／MSP（下）：${answer("#mspDown")||"　　　　"}`),
-    para(`簽名：${answer("#memberSignature")||"_____________________"}`),para("18. 分會相關地基備註說明：",{bold:true}),answerPara("chapterNotes"),
+    para(`簽名：${answer("#memberSignature")||"_____________________"}`),para("18. 分會相關地基備註說明：",{bold:true}),answerPara("chapterNotes"),para("本會員續約地基與追蹤快照",{bold:true}),...foundationSnapshot.split("\n").map(line=>para(line)),
     para("19. 您對分會有什麼具體的建議（請重點陳述）？",{bold:true}),answerPara("chapterSuggestionAnswer"),
     para("20. 了解會員委員會有同意會員續約、謝絕會員續約或會員有條件續約的權力。（一旦會員委員會做出不予續約決定，分會董事顧問有權確保訪談流程無瑕疵，才能做此不予續約決定）。",{bold:true}),para(`${$("#policyUnderstood").checked?"■":"□"} 已了解`),
     para("審核會員貢獻的評估條件如下：",{bold:true}),para("(a) 未能帶來足夠數量的合格業務引薦和來賓\n(b) 未參加會議或經常遲到／早退\n(c) 未能展現出足夠的職業素養或始終準備不足\n(d) 拒絕擔任分會領導職位\n(e) 未能遵守某項政策、方針或道德規範"),

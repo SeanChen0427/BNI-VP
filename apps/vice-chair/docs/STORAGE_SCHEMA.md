@@ -103,3 +103,14 @@
 3. Word 與截圖進 Private Storage。
 4. 登入維持三組共用帳號（2026-07-19 決策，不改一人一帳號）；離任或懷疑外洩時更換共用密碼。
 5. 前端不保存正式密碼或 API Key；Supabase 登入所需的短期 token 只放於目前分頁的 `sessionStorage`，不得放入 `localStorage`。
+
+
+## 續約地基新增 Schema（2026-09-07，待部署）
+
+- `renewal_foundations`：固定連結會員；訪談來源連結續約任務，既有地基補登的來源任務為空且 `data.origin=legacy`，資料庫約束來源配對並禁止事後改換會員／來源。保存條件類型、原起算日、目標、下次續約日、指派、每期工作坊確認、提醒摘要及 revision。原訪談結案後可繼續追蹤，不改寫原訪談。
+- `renewal_foundation_events`：伺服器保存操作者、時間、提醒／確認內容及變更前後快照。只新增，不允許瀏覽器直讀直寫。
+- `edge_save_renewal_foundation`：service-role-only 交易，原子檢查版本、寫入狀態及追加事件，防止並行覆蓋與部分成功。
+- 來賓進度由分析核心依 Private Storage 正式報表即時計算，不把畫面數字或會員提供的估算寫成正式 PALMS。
+- `committee_meetings.care_summary.foundationSnapshot`：保存當次月會需要跟進的必要進度；由後端建立，已結案不跟隨新報表改寫。訪談草稿的 `renewalFoundationSnapshot` 與正式 Word 保留該次訪談文字快照。
+
+規格見 [續約地基追蹤](renewal-foundation-tracking.md)。

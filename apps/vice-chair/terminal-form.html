@@ -10,7 +10,7 @@
   <script src="assets/js/supabase-config.js?v=1"></script>
   <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
-  <script src="core/calendar-domain.js?v=4"></script>
+  <script src="core/calendar-domain.js?v=5"></script>
   <script src="core/case-domain.js?v=9"></script>
   <script src="assets/js/task-store.js?v=8"></script>
   <script src="assets/js/case-state-store.js?v=12"></script>
@@ -23,6 +23,8 @@
   <link rel="stylesheet" href="assets/css/terminal-form-extra.css">
   <link rel="stylesheet" href="assets/css/interview-completion.css?v=1">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=6">
+  <link rel="stylesheet" href="assets/css/foundation-context.css?v=1">
+  <script src="core/renewal-foundation-domain.js?v=2"></script>
 </head>
 <body>
   <header class="topbar">
@@ -83,6 +85,7 @@
           <div id="experienceQuestions"></div>
         </section>
 
+<section class="foundation-context" id="renewalFoundationPanel"><p>正在核對續約地基…</p></section>
         <section class="form-card" id="agreement">
           <div class="section-head"><span>05</span><div><h2>制度確認與總結</h2><p>完成確認後即可產生 Word</p></div></div>
           <div class="agreement-box">
@@ -110,8 +113,9 @@
   </main>
   <div id="toast"></div>
   <script src="vendor/docx.iife.js"></script>
-  <script src="assets/js/terminal-form.js?v=11"></script>
+  <script src="assets/js/terminal-form.js?v=12"></script>
   <script src="assets/js/terminal-form-live.js?v=8"></script>
-  <script src="assets/js/workspace-nav.js?v=14"></script>
+  <script src="assets/js/workspace-nav.js?v=15"></script>
+  <script src="assets/js/renewal-foundation-interview.js?v=2"></script>
 </body>
 </html>

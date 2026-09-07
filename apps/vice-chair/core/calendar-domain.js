@@ -161,5 +161,10 @@
     const monthCount=(endYear-startYear)*12+endNumber-startNumber+1;
     return{start:`${startMonth}-01`,end:monthEndDate(endMonth),monthCount,first:count==="1"};
   }
-  return{TAIPEI_TIME_ZONE,daysUntil,countdownLabel,sameMonth,dateInput,dateTimeInput,dateStamp,shiftDayKey,dateTimeAfterDays,monthKey,shiftMonthKey,monthEndDate,analysisEffectiveOn,monthlyAnalysisCycle,defaultVoteDeadline,monthHeading,renewalPalmsPeriod,formatTaipeiTimestamp,formatTaipeiDate,formatTaipeiTime,formatTaipeiWeekday,taipeiParts,toInstant:validDate};
+  function shiftDateMonths(value,offset){
+    const date=dateInput(value),month=shiftMonthKey(date.slice(0,7),offset);
+    if(!date||!month)return"";
+    return`${month}-${z(Math.min(Number(date.slice(8)),Number(monthEndDate(month).slice(8))))}`;
+  }
+  return{TAIPEI_TIME_ZONE,daysUntil,countdownLabel,sameMonth,dateInput,dateTimeInput,dateStamp,shiftDayKey,dateTimeAfterDays,monthKey,shiftMonthKey,monthEndDate,analysisEffectiveOn,monthlyAnalysisCycle,defaultVoteDeadline,monthHeading,renewalPalmsPeriod,shiftDateMonths,formatTaipeiTimestamp,formatTaipeiDate,formatTaipeiTime,formatTaipeiWeekday,taipeiParts,toInstant:validDate};
 });

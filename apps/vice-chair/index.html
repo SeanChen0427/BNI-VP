@@ -11,7 +11,7 @@
   <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
   <script src="assets/js/member-directory.js?v=2"></script>
-  <script src="core/calendar-domain.js?v=4"></script>
+  <script src="core/calendar-domain.js?v=5"></script>
   <script src="core/case-domain.js?v=9"></script>
   <script src="core/onboarding-domain.js?v=3"></script>
   <script src="assets/js/task-store.js?v=8"></script>
@@ -33,6 +33,7 @@
   <link rel="stylesheet" href="assets/css/ai-assistant.css?v=1">
   <link rel="stylesheet" href="assets/css/onboarding.css?v=7">
   <style>.committee-only,.strict-vp-only{display:none}.committee-mode .committee-only,.vp-mode .strict-vp-only{display:block}</style>
+  <link rel="stylesheet" href="assets/css/foundation-context.css?v=1">
 </head>
 <body data-guide-page="page:index">
   <div class="app-shell">
@@ -42,6 +43,7 @@
         <p class="nav-label">日常工作</p>
         <a class="nav-item active" href="index.html" data-guide-id="nav.home"><span class="nav-icon">總</span><b>工作總覽</b></a>
         <a class="nav-item" href="case-board.html" data-guide-id="nav.cases"><span class="nav-icon">案</span><b>進行中案件</b><em id="navCaseCount">0</em></a>
+        <a class="nav-item" href="renewal-foundations.html"><span class="nav-icon">基</span><b>續約地基追蹤</b></a>
         <details class="nav-group">
           <summary class="nav-item" data-guide-id="nav.interviews"><span class="nav-icon">訪</span><b>訪談與輔導</b><i>⌄</i></summary>
           <div class="subnav">
@@ -72,6 +74,7 @@
       <header class="topbar"><button class="menu-button" id="openMenu" data-guide-id="global.mobile-menu" aria-label="開啟選單">☰</button><div class="page-heading" data-guide-id="global.page-heading"><small>富聯分會・會員委員會</small><strong>工作總覽</strong></div><div class="top-actions"><button type="button" class="guide-help-button" data-guide-id="global.guide-help" aria-label="開啟操作教學"><span class="guide-help-icon" aria-hidden="true">?</span><span>操作教學</span></button><button class="release-trigger" id="releaseNotesTrigger" data-guide-id="global.release" type="button"><span class="release-trigger-new" id="releaseNotesNew">NEW</span><b id="releaseNotesVersion">v—</b></button><label class="role-switch" data-guide-id="global.top-identity">登入身份 <b data-auth-name></b>・<span data-auth-role></span></label><button class="notice" id="notificationBell" data-guide-id="global.notifications" type="button" aria-label="開啟通知中心" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg><span id="notificationCount" hidden>0</span></button><aside class="notification-panel" id="notificationPanel" data-guide-id="global.notification-panel" hidden><div class="notification-head"><div><small>NOTIFICATION CENTER</small><strong>提醒中心</strong></div><button type="button" id="markAllNotificationsRead">全部已讀</button></div><div class="notification-list" id="notificationList"></div></aside></div></header>
       <div class="content">
         <section class="month-hero" data-guide-id="home.month-hero"><div><span class="eyebrow" id="monthEyebrow">MONTHLY COMMAND CENTER</span><h1 id="monthTitle">本月會員狀態與工作規劃</h1><p>先掌握工作量與期限，再從優先案件直接進入下一步。</p></div><div class="hero-summary" data-guide-id="home.hero-summary"><div><small id="heroPendingLabel">本月待完成</small><strong id="monthPendingCount">0</strong><span>項工作</span></div><div class="warning"><small id="heroDueLabel">3日內到期</small><strong id="monthDueCount">0</strong><span>項工作</span></div><div><small id="heroDoneLabel">本月已完成</small><strong id="monthDoneCount">0</strong><span>項工作</span></div></div></section>
+        <section class="panel" aria-label="續約地基追蹤"><div class="panel-head"><div><small>RENEWAL FOLLOW-UP</small><h2>續約地基追蹤</h2><p id="foundationSummaryText" aria-live="polite">正在讀取後續追蹤狀態…</p></div><a href="renewal-foundations.html">查看地基與提醒紀錄 →</a></div><div id="foundationHomeList" class="foundation-home-list"></div></section>
         <section class="panel announcement-board" aria-labelledby="announcementTitle">
           <div class="announcement-head"><div><small>TEAM NOTICE BOARD</small><h2 id="announcementTitle">會員委員會公告欄</h2></div><span>全員可留言</span></div>
           <div class="announcement-layout">
@@ -120,12 +123,14 @@
       <footer class="release-dialog-actions"><a href="settings.html#releaseNotes">查看完整更新紀錄</a><button type="button" id="acknowledgeRelease">我知道了</button></footer>
     </div>
   </dialog>
-  <script src="assets/js/release-notes.js?v=28"></script>
+  <script src="assets/js/release-notes.js?v=29"></script>
   <script src="assets/js/dashboard.js?v=7"></script>
   <script src="assets/js/work-planner.js?v=13"></script>
   <script src="assets/js/announcement-board.js?v=3"></script>
   <script src="core/accountability-email-domain.js?v=1"></script>
-  <script src="assets/js/notification-center.js?v=8"></script>
+  <script src="core/renewal-foundation-domain.js?v=2"></script>
+  <script src="assets/js/renewal-foundation-summary.js?v=2"></script>
+  <script src="assets/js/notification-center.js?v=9"></script>
   <script src="assets/js/monthly-data-update.js?v=6"></script>
   <script src="assets/js/ai-assistant.js?v=3"></script>
   <script src="assets/js/onboarding-guides.js?v=5"></script>

@@ -29,6 +29,18 @@
   });
 
   catalog.registerGuides({
+    "page:renewal-foundations":page({
+      key:"renewal-foundations",name:"續約地基追蹤",version:"1.0.0",
+      title:"把續約約定持續追蹤到每一期",
+      vp:"新約定從續約訪談設定；使用系統前已有的地基，可在此補登。工作坊要逐期記錄實際參加日期。",
+      committee:"工作總覽與這裡會持續列出地基進度。主責及陪同人員可留下聯繫紀錄，未受指派者只看必要摘要。",
+      steps:[
+        s("legacy","補登原約定","#importLegacyFoundation","補登使用系統前的地基","直接選擇在籍會員，依原約定填起算日、期限、條件與依據。補登後接續原週期，過去已參加的工作坊仍須逐期確認。",{roles:VP}),
+        s("summary","追蹤概況",".summary","掌握尚待跟進的地基","尚未起算、資料待補、未達成與已確認完成是不同狀態；資料待補不等於零人。"),
+        s("filter","查找會員",".toolbar","依範圍查找地基","可查看自己受指派的條件、所有列管項目或需要跟進的會員。"),
+        s("items","逐期跟進","#foundationList","逐月與每 3 個月分開檢視","來賓顯示目前與目標，工作坊由副主席逐期確認。複製文案後，須實際聯繫才記錄已提醒；歷程保留回覆與證據。")
+      ]
+    }),
     "page:case-board":page({
       key:"case-board",
       name:"進行中案件",

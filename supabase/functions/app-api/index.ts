@@ -9,6 +9,8 @@ import "../../../apps/vice-chair/core/accountability-email-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
 import "../../../apps/vice-chair/core/annual-handover-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
+import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
+import { createFoundationMeasurements } from "./foundation-measurements.mjs";
 import {
   buildCaseFeedbackNoticeText,
   buildCaseResultAnnouncementMessage,
@@ -2400,6 +2402,7 @@ async function committeeMeetingsApi(request: Request, context: Context) {
   if (record.status === "final" && items.some((item: any) => monthlyCareRequiresAssignment(item) && (!String(item.owner || "").trim() || !String(item.dueDate || "").trim()))) {
     throw new Error("需要後續行動的續約及輔導項目，都必須完成追蹤委員與排定日期後才能結案");
   }
+  record = { ...record, care: { ...(record.care || {}), foundationSnapshot: await renewalFoundationsApi.snapshot(context) } };
   record = (await ensureMonthlyCareTasks(record, context)).record;
   const recorderId = ids.get(record.recorder) || context.personId;
   const attendeeIds = (record.attendees || []).map((name: string) => ids.get(name)).filter(Boolean);
@@ -6152,6 +6155,8 @@ async function committeeBoardApi(request: Request, context: Context) {
   throw new Error("不支援的留言板操作");
 }
 
+const renewalFoundationsApi = createRenewalFoundationsApi({ db, taskDirectory, taskSource: TASK_SOURCE, measure: createFoundationMeasurements({ reportImports, reportCategory, downloadReport }) });
+
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: cors(request) });
   if (!supabaseUrl || !anonKey || !serviceKey) return respond(request, 500, { message: "Supabase Edge API 環境設定不完整" });
@@ -6164,6 +6169,7 @@ Deno.serve(async (request) => {
     let result;
     if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
+    else if (path === "/api/renewal-foundations") result = await renewalFoundationsApi(request, context);
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);
     else if (path === "/api/new-member-registration") result = await newMemberRegistrationApi(request, context);
     else if (path === "/api/member-departure") result = await memberDepartureApi(request, context);
