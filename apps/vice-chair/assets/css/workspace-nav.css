@@ -32,13 +32,17 @@
 }
 .workspace-back-button:hover{border-color:#ead6d4!important;background:#fff7f5!important}
 .workspace-back-button .workspace-back-arrow{font-size:17px;line-height:1}
-.workspace-menu-scrim{
+.workspace-menu-scrim,
+.workspace-menu-scrim:hover,
+.workspace-menu-scrim:active{
   position:fixed;
   inset:0;
   z-index:998;
   border:0;
   padding:0;
   background:#19110e73;
+  border-radius:0;
+  box-shadow:none;
   opacity:0;
   pointer-events:none;
   transition:opacity .2s ease;

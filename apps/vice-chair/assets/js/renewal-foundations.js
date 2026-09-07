@@ -39,7 +39,7 @@
       .sort((a, b) => Math.min(...a.items.map(item => domain.attention(item).rank)) - Math.min(...b.items.map(item => domain.attention(item).rank)));
     $("#foundationList").innerHTML = (memberKey || params.get("case") ? '<p>目前顯示指定會員的地基。<a href="renewal-foundations.html">查看全部追蹤</a></p>' : "") + (groups.length ? groups.map(group => `<article class="foundation-card"><div class="card-head"><div><h2 class="member-name">${esc(group.memberName)}</h2><span>${group.items.length} 項地基・${group.items.filter(item => domain.attention(item).rank <= 2).length} 項需跟進</span></div>${manager && !group.items[0].deletedAt ? `<button data-add="${esc(group.items[0].id)}">＋ 新增地基</button>` : ""}</div><div class="member-foundations">${group.items.map(item => {
       const attention = domain.attention(item);
-      return `<section class="foundation-condition" id="foundation-${esc(item.id)}"><div class="card-head"><h3>${esc(item.title)}</h3><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(item.deletedAt ? "已刪除" : attention.label)}</span></div><p class="condition-progress">${esc(domain.compactProgress(item))}</p><div class="facts"><span>主責 ${esc(item.leadName)}</span><span>${item.reminderCount ? `已提醒 ${esc(item.reminderCount)} 次・最近 ${esc(item.lastRemindedOn)}` : "尚無提醒紀錄"}</span></div><details><summary>各期進度與操作</summary><div class="criterion">${item.canReadDetail ? esc(item.criterion) + "<br>" : ""}${esc(domain.progressText(item))}</div><div class="facts"><span>起算 ${esc(item.startOn || item.nextCheckOn)}</span><span>期限 ${esc(item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div><div class="card-actions">${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && !item.deletedAt && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager && !item.deletedAt ? `<button data-edit="${esc(item.id)}">調整條件／指派</button><button data-delete="${esc(item.id)}">刪除地基</button>` : ""}${manager && item.deletedAt ? `<button data-restore="${esc(item.id)}">復原地基</button>` : ""}</div></details></section>`;
+      return `<section class="foundation-condition" id="foundation-${esc(item.id)}"><div class="card-head"><h3>${esc(item.title)}</h3><span class="badge ${attention.rank === 0 ? "urgent" : attention.rank <= 2 ? "warning" : domain.resolved(item) ? "done" : ""}">${esc(item.deletedAt ? "已刪除" : attention.label)}</span></div><p class="condition-progress">${esc(domain.compactProgress(item))}</p><div class="facts"><span>主責 ${esc(item.leadName)}</span><span>${item.reminderCount ? `已提醒 ${esc(item.reminderCount)} 次・最近 ${esc(item.lastRemindedOn)}` : "尚無提醒紀錄"}</span></div><details><summary>各期進度與操作</summary><div class="criterion">${item.canReadDetail ? esc(item.criterion) + "<br>" : ""}${esc(domain.progressText(item))}</div><div class="facts"><span>起算 ${esc(item.startOn || item.nextCheckOn)}</span><span>期限 ${esc(item.kind === "flexible" ? calendar.shiftDayKey(item.dueOn, -1) : item.dueOn)}</span><span>陪同 ${esc(item.companionNames?.join("、") || "無")}</span><span>${item.origin === "legacy" ? "既有地基補登" : "續約訪談設定"}</span></div><div class="card-actions">${session.role !== "admin" ? `<button data-foundation-guide="card">？ 各項操作教學</button>` : ""}${item.canReadDetail ? `<button data-detail="${esc(item.id)}">查看歷程</button>${item.canRecord && !item.deletedAt && (!domain.resolved(item) || manager) ? `<button data-record="${esc(item.id)}">${domain.resolved(item) ? "重新開啟" : "記錄提醒／進度"}</button>` : ""}${!domain.resolved(item) ? `<button data-copy="${esc(item.id)}">複製提醒文字</button>` : ""}` : ""}${manager && !item.deletedAt ? `<button data-edit="${esc(item.id)}">調整條件／指派</button><button data-delete="${esc(item.id)}">刪除地基</button>` : ""}${manager && item.deletedAt ? `<button data-restore="${esc(item.id)}">復原地基</button>` : ""}</div></details></section>`;
     }).join("")}</div></article>`).join("") : '<div class="empty"><b>目前範圍沒有地基追蹤</b><p>新約定從續約訪談設定；既有約定可使用「補登既有地基」。</p></div>');
   }
 
@@ -131,6 +131,7 @@
     $("#amendReason").required = Boolean(item);
     definitionFields();
     $("#definitionDialog").showModal();
+    window.FulianFoundationControlGuides?.open($("#definitionDialog"), "definition", true);
   }
   function recordFields() {
     const action = $("#action").value;
@@ -165,6 +166,7 @@
     $("#periodKey").value = domain.cycles(item).find(cycle => !domain.cycleReached(item, cycle))?.key || domain.cycles(item)[0]?.key || "";
     recordFields();
     $("#recordDialog").showModal();
+    window.FulianFoundationControlGuides?.open($("#recordDialog"), "record", true);
   }
   async function save(body, dialog, errorNode) {
     if (busy) return;
@@ -213,15 +215,19 @@
   };
   async function detail(item) {
     $("#detailContent").textContent = "正在讀取完整歷程…";
+    $('[data-foundation-guide="detail"]').disabled = true;
     $("#detailDialog").showModal();
     try {
       const { events } = await api(null, `?id=${encodeURIComponent(item.id)}`);
       $("#detailContent").innerHTML = `<h3>${esc(item.memberName)}・${esc(item.title)}</h3><p class="criterion">${esc(item.criterion)}</p><p>設定來源：${item.origin === "legacy" ? "既有地基補登" : "續約訪談"}・登錄時間：${esc(calendar.formatTaipeiTimestamp(item.createdAt, { year: true }))}</p><h4>議定依據與確認紀錄</h4><p class="detail-source">${esc(item.source || "未填寫補充依據")}</p><h4>追蹤歷程</h4>` + events.map(event => `<article class="history-item"><b>${esc(eventLabels[event.detail.operation || event.event_type])}</b> <small>${esc(event.actor_name)}・${esc(calendar.formatTaipeiTimestamp(event.created_at, { year: true, seconds: true }))}</small><p>${esc(event.detail.note)}</p>${event.detail.scheduleChanged ? `<p>已重排追蹤期間；${esc(event.detail.resetPeriodCount)} 期原確認需重新核對。原紀錄保留在調整前快照。</p>` : ""}${event.detail.periodKey ? `<p>檢視期起日：${esc(event.detail.periodKey)}・參加日期：${esc(event.detail.attendedOn || "未達成")}</p>` : ""}${event.detail.contactedOn ? `<p>實際提醒：${esc(event.detail.contactedOn)}・${esc(event.detail.channel)}<br>會員回覆：${esc(event.detail.response)}</p>` : ""}${event.previous_data?.status !== event.next_data.status ? `<p>結果：${esc(domain.labels[event.next_data.status])}</p>` : ""}${event.event_type === "amend" ? `<details><summary>查看調整前後內容</summary><pre>${esc(JSON.stringify({ 原紀錄: event.previous_data, 新紀錄: event.next_data }, null, 2))}</pre></details>` : ""}<p>下次追蹤：${esc(event.next_data.nextCheckOn)}・主責：${esc(event.next_data.leadName)}</p></article>`).join("");
+      $('[data-foundation-guide="detail"]').disabled = false;
+      window.FulianFoundationControlGuides?.open($("#detailDialog"), "detail", true);
     } catch (error) { $("#detailContent").textContent = error.message; }
   }
   $("#foundationList").onclick = async event => {
     const button = event.target.closest("button");
     if (!button) return;
+    if (button.hasAttribute("data-foundation-guide")) return;
     const key = ["detail", "record", "copy", "edit", "add", "delete", "restore"].find(key => button.dataset[key]);
     const item = items.find(item => item.id === button.dataset[key]);
     if (!item) return;

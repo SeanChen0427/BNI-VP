@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.3.3",
+      publishedAt: "2026-09-08",
+      title: "主選單閃白修正與地基表單深入教學",
+      level: "normal",
+      changes: Object.freeze([
+        "修正主選單開啟後，滑鼠移到右側遮罩會變白遮住頁面的問題。",
+        "新增、調整與追蹤紀錄表單加入逐步教學，依當前欄位與動作說明操作、必填原因及保存結果。",
+        "每項地基加入按鈕操作教學，涵蓋歷程、提醒、複製、修改、刪除與復原；教學結束保留未保存輸入。"
+      ]),
+      impact: "可從表單內的教學按鈕重看，手機亦適用；教學不會代填、保存或確認地基。"
+    }),
+    Object.freeze({
       version: "1.3.2",
       publishedAt: "2026-09-08",
       title: "月會不關懷結案與地基操作教學",

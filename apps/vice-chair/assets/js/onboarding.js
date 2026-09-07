@@ -22,6 +22,7 @@
   let replaying=false;
   let returnFocus=null;
   let uiSnapshot=null;
+  let contextScope=null;
   let positionFrame=0;
 
   const helpButton=existingHelpButton||document.createElement("button");
@@ -260,7 +261,8 @@
       ai:{element:ai,hidden:ai?.hidden??true,expanded:launcher?.getAttribute("aria-expanded")||"false",launcher},
       notifications:{element:notificationPanel,hidden:notificationPanel?.hidden??true,expanded:notificationBell?.getAttribute("aria-expanded")||"false",bell:notificationBell},
       workspace:{drawer:workspaceDrawer,open:workspaceDrawer?.classList.contains("open")||false,scrim:workspaceScrim,show:workspaceScrim?.classList.contains("show")||false,button:workspaceButton,expanded:workspaceButton?.getAttribute("aria-expanded")||"false"},
-      inert:[...document.body.children].filter(element=>element!==tourRoot).map(element=>({element,inert:element.inert}))
+      inert:[...document.body.children,...(contextScope?.matches("dialog[open]")?[...contextScope.children]:[])].filter(element=>element!==tourRoot&&element!==contextScope).map(element=>({element,inert:element.inert})),
+      contextScroll:contextScope?{top:contextScope.scrollTop,left:contextScope.scrollLeft}:null
     };
   }
 
@@ -284,6 +286,7 @@
     document.body.classList.toggle("workspace-nav-open",workspace.open);
     document.body.classList.remove("guide-tour-ai");
     setTourInert(false);
+    if(contextScope&&uiSnapshot.contextScroll){contextScope.scrollTop=uiSnapshot.contextScroll.top;contextScope.scrollLeft=uiSnapshot.contextScroll.left;}
     uiSnapshot=null;
   }
 
@@ -446,6 +449,7 @@
     card.style.setProperty("--guide-progress",`${(activeIndex+1)/activeGuide.steps.length*100}%`);
     card.querySelector(".guide-more").open=false;
     await scrollTargetIntoView(target);
+    if(!activeGuide||tourRoot.hidden)return;
     positionFor(target);
     stepTitle.focus({preventScroll:true});
     liveRegion.textContent=`${activeGuide.page}，${step.section}，第 ${activeIndex+1} 步，共 ${activeGuide.steps.length} 步：${step.title}。${step.body}`;
@@ -462,6 +466,7 @@
     activeGuide=guide;
     activeIndex=restart||replaying||transitionReset?0:domain.clampStep(state.currentStep,guide.steps.length);
     uiSnapshot=snapshotInterface();
+    if(contextScope?.matches("dialog[open]"))contextScope.append(tourRoot);
     setTourInert(true);
     document.body.classList.add("guide-tour-active");
     tourRoot.hidden=false;
@@ -474,6 +479,8 @@
     document.body.classList.remove("guide-tour-active");
     card.classList.remove("guide-card-mobile-top");
     tourRoot.hidden=true;
+    document.body.append(tourRoot);
+    contextScope=null;
     const focusTarget=returnFocus?.isConnected?returnFocus:helpButton;
     activeGuide=null;
     activeIndex=0;
@@ -646,6 +653,23 @@
     Promise.resolve(document.fonts?.ready).catch(()=>{}).finally(()=>setTimeout(attempt,700));
   }
 
+  // Context tours point at the already-open form; never open, fill or submit it.
+  window.FulianOnboarding=Object.freeze({
+    openContext(guide,scope,{automatic=false}={}){
+      if(!scope?.isConnected||!tourRoot.hidden||introDialog.open||centerDialog.open)return false;
+      if(!guide?.steps?.length||!guide.roles?.includes(identity.role))return false;
+      if(automatic&&(!config.autoStart||!domain.shouldAutoStart(progress,guide.id,guide.version,isDismissed(guide))))return false;
+      const modal=scope.closest("dialog");
+      if(modal&&!modal.open)return false;
+      contextScope=modal||null;
+      returnFocus=document.activeElement;
+      startGuide(guide,{restart:true});
+      return true;
+    }
+  });
+  document.addEventListener("close",event=>{if(contextScope===event.target)endTour({restoreFocus:false});},true);
+  document.addEventListener("cancel",event=>{if(contextScope===event.target){event.preventDefault();pauseTour();}},true);
+  window.dispatchEvent(new CustomEvent("fulian:guide-ready"));
   updateHelpState();
   scheduleAutoStart();
 })();
