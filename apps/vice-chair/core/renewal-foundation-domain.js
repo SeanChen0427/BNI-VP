@@ -16,13 +16,25 @@
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value || "") || calendar.dateInput(value) !== value) throw new Error(`${label}日期無效`);
     return value;
   }
+  function optional(value, label, max) {
+    if (value == null || value === "") return "";
+    if (typeof value !== "string" || value.trim().length > max) throw new Error(`${label}最多 ${max} 字`);
+    return value.trim();
+  }
+  function suggestedText(input) {
+    const count = Number.isInteger(Number(input.target)) && Number(input.target) > 0 ? Number(input.target) : "指定人數";
+    if (input.kind === "monthly_visitors") return { title: `每月 ${count} 位來賓`, criterion: `每月 ${count} 位來賓，各月分開計算` };
+    if (input.kind === "quarterly_workshop") return { title: "每 3 個月 1 場工作坊", criterion: "從地基起算日起，每 3 個月參加 1 場工作坊，由副主席逐期確認" };
+    if (input.kind === "visitors") return { title: `續約前累計 ${count} 位來賓`, criterion: `在地基適用期間內累計 ${count} 位來賓` };
+    return { title: "其他地基", criterion: "" };
+  }
   function definition(input) {
     const kind = input.kind || "manual";
     if (!["manual", "visitors", "monthly_visitors", "quarterly_workshop"].includes(kind)) throw new Error("地基類型無效");
     const result = {
-      title: required(input.title, "改善項目", 160),
-      criterion: required(input.criterion, "完成標準", 2000),
-      source: required(input.source, "議定依據與確認紀錄", 3000),
+      title: optional(input.title, "改善項目", 160),
+      criterion: kind === "manual" ? required(input.criterion, "完成標準", 2000) : optional(input.criterion, "完成標準", 2000),
+      source: optional(input.source, "議定依據與確認紀錄", 3000),
       dueOn: day(input.dueOn, "條件期限"),
       nextCheckOn: kind === "manual" ? day(input.nextCheckOn, "下次追蹤") : day(input.startOn, "地基適用開始"),
       leadId: required(input.leadId, "主要追蹤人", 100),
@@ -36,6 +48,11 @@
       if (!Number.isInteger(result.target) || result.target < 1 || result.target > 10000) throw new Error("來賓目標須為正整數");
       result.nextCheckOn = kind === "visitors" ? [result.startOn, calendar.shiftDateMonths(result.dueOn, -6)].sort().pop() : result.startOn;
     }
+    const suggested = suggestedText(result);
+    result.titleGenerated = !result.title;
+    result.criterionGenerated = !result.criterion;
+    result.title ||= suggested.title;
+    result.criterion ||= suggested.criterion;
     if (result.companionIds.length > 2 || result.companionIds.includes(result.leadId) || result.companionIds.some(id => typeof id !== "string" || !id)) throw new Error("陪同追蹤最多 2 位，且不可與主責重複");
     return result;
   }
@@ -150,5 +167,5 @@
   function summaryText(items, now = new Date()) {
     return items.map(value => `${value.memberName}｜${value.title}\n約定：${value.criterion || "詳見受保護的續約訪談"}\n${progressText(value, now)}\n期限 ${value.dueOn}｜${attention(value, now).label}｜主責 ${value.leadName}`).join("\n\n") || "目前沒有續約地基紀錄";
   }
-  return { labels, resolved, manager, assigned, canReadDetail, required, day, definition, attention, transition, reminderText, cycles, trackingStartsOn, progressText, summaryText };
+  return { labels, resolved, manager, assigned, canReadDetail, required, day, definition, suggestedText, attention, transition, reminderText, cycles, trackingStartsOn, progressText, summaryText };
 });

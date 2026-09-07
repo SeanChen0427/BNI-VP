@@ -1,6 +1,18 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.2.1",
+      publishedAt: "2026-09-07",
+      title: "地基設定簡化與首頁位置調整",
+      level: "normal",
+      changes: Object.freeze([
+        "設定來賓或工作坊地基後，改善項目與完成標準可留白，系統依類型及目標產生；議定依據與備註改為選填。",
+        "同會員可儲存後接著新增下一項，沿用會員、日期與追蹤人，各項獨立追蹤。",
+        "首頁地基追蹤移到我的工作區塊上方。"
+      ]),
+      impact: "既有地基紀錄保留；其他人工條件仍需填寫具體完成標準。教學待試用確認後更新。"
+    }),
+    Object.freeze({
       version: "1.2.0",
       publishedAt: "2026-09-07",
       title: "續約地基逐期追蹤",

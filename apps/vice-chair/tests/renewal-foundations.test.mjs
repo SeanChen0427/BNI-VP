@@ -70,7 +70,7 @@ function fixture({ hasRenewal = true } = {}) {
     if (path.startsWith("task_assignments?")) return assignments;
     if (path.startsWith("tasks?")) return !hasRenewal ? [] : [{ id: sourceId, member_id: memberId, source_reference: "RE-TEST", status: "completed" }];
     if (path.startsWith("renewal_foundation_events?")) return events;
-    if (path.startsWith("renewal_foundations?")) return [...rows.values()];
+    if (path.startsWith("renewal_foundations?")) return path.includes("id=eq.") ? [...rows.values()].filter(row => path.includes(row.id)) : [...rows.values()];
     if (path === "rpc/edge_save_renewal_foundation") {
       const data = JSON.parse(options.body), old = rows.get(data.p_id);
       if ((old?.revision || 0) !== data.p_revision) throw new Error("revision conflict");
@@ -238,4 +238,36 @@ test("無續約案件的在籍會員可補登既有地基，日期不重設且�
   assert.equal(f.rows.get(id).data.origin, "legacy");
   assert.equal((await f.call(vp)).items[0].memberId, memberId);
   assert.equal((await f.call(other)).items[0].criterion, undefined);
+});
+
+
+test("結構化地基可省略文字，自動產生標題與標準，不補造議定證據", () => {
+  const input = { ...base(), kind: "monthly_visitors", startOn: "2026-10-01", dueOn: "2027-10-01", target: 2, title: "", criterion: "", source: "" };
+  const value = domain.definition(input);
+  assert.equal(value.title, "每月 2 位來賓");
+  assert.equal(value.criterion, "每月 2 位來賓，各月分開計算");
+  assert.equal(value.source, "");
+  assert.equal(value.titleGenerated, true);
+  assert.equal(domain.definition({ ...input, kind: "quarterly_workshop" }).title, "每 3 個月 1 場工作坊");
+  assert.equal(domain.definition({ ...input, kind: "visitors", target: 4 }).title, "續約前累計 4 位來賓");
+  const custom = domain.definition({ ...input, title: "自訂摘要", criterion: "另有約定", source: "補充依據" });
+  assert.equal(custom.title, "自訂摘要");
+  assert.equal(custom.titleGenerated, false);
+  assert.throws(() => domain.definition({ ...input, title: "長".repeat(161) }), /最多/);
+  assert.throws(() => domain.definition({ ...input, kind: "manual" }), /完成標準/);
+  assert.equal(domain.definition({ ...input, kind: "manual", criterion: "完成指定事項" }).title, "其他地基");
+});
+
+test("同會員兩項地基獨立保存，確認工作坊不改動每月來賓", async () => {
+  const f = fixture({ hasRenewal: false });
+  const common = { ...base(), action: "create", origin: "legacy", memberId, startOn: "2026-01-01", dueOn: "2027-01-01", target: 1, title: "", criterion: "", source: "" };
+  await f.call(vp, { ...common, id, kind: "monthly_visitors" });
+  await f.call(vp, { ...common, id: otherId, kind: "quarterly_workshop" });
+  assert.equal((await f.call(vp)).items.length, 2);
+  assert.equal(f.rows.get(id).data.title, "每月 1 位來賓");
+  await f.call(vp, { id: otherId, revision: 1, action: "confirm-quarter", periodKey: "2026-01-01", attendedOn: "2026-02-03", status: "achieved", note: "核對該期簽到" });
+  assert.equal(f.rows.get(otherId).data.periodResults["2026-01-01"].status, "achieved");
+  assert.equal(f.rows.get(id).revision, 1);
+  assert.equal(f.rows.get(id).data.periodResults, undefined);
+  assert.equal(f.rows.get(id).data.status, "tracking");
 });

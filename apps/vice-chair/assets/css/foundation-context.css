@@ -227,3 +227,17 @@
     align-items:stretch;
   }
 }
+
+.foundation-modal #extraDefinition {
+  margin-top:16px;
+  padding:14px;
+  border:1px solid #e0e5ed;
+  border-radius:9px;
+}
+.foundation-modal #extraDefinitionSummary {
+  cursor:pointer;
+  font-weight:650;
+}
+.foundation-modal footer {
+  flex-wrap:wrap;
+}

@@ -37,7 +37,7 @@
       for (const dialog of template.querySelectorAll("dialog")) {
         const copy = document.importNode(dialog, true); copy.classList.add("foundation-modal"); document.body.append(copy);
       }
-      await loadScript("assets/js/renewal-foundations.js?v=3");
+      await loadScript("assets/js/renewal-foundations.js?v=4");
       // Refresh explicitly so completion/export never races the first API response.
       await window.FulianFoundationPage.refresh();
     } else await refresh();
