@@ -75,7 +75,7 @@ assert.ok(submission.includes("中心區完成"));
 assert.ok(submission.includes("實際要求以當次中心區確認為準"));
 
 const courseHtml = await readFile(
-  new URL("../course.html", import.meta.url),
+  new URL("../docs/history/course-before-2026-09-09-integration.html.txt", import.meta.url),
   "utf8"
 );
 const courseApp = await readFile(
@@ -97,4 +97,19 @@ for (const leftover of [
 assert.ok(courseHtml.includes("重新開始課程"));
 assert.ok(courseHtml.includes("26</b><small>實務單元"));
 
+const integrated = await readFile(new URL("../course.html", import.meta.url), "utf8");
+assert.equal((integrated.match(/data-chapter data-version=/g) || []).length, 22);
+assert.ok(integrated.includes('data-guide-page="page:course"'));
+assert.ok(integrated.includes('321A 完整內部指引'));
+assert.ok(integrated.includes('會員委員會保密承諾'));
+assert.ok(integrated.includes('assets/css/dashboard.css'));
+for(const id of ['sidebar','notificationBell','notificationPanel','releaseNotesDialog','guide-read-progress']) assert.ok(integrated.includes('id="'+id+'"'));
+assert.ok(integrated.includes('assets/js/notification-center.js'));
+assert.ok(integrated.includes('assets/js/release-notes.js'));
+const compatibility = await readFile(new URL('../handover-guide.html', import.meta.url), 'utf8');
+assert.ok(compatibility.includes("'course.html'+location.search+location.hash"));
+assert.ok(integrated.includes('assets/js/handover-guide.js'));
+assert.ok(!integrated.includes('assets/js/app-v2.js'));
+assert.ok(!integrated.includes('<iframe'));
+assert.ok(integrated.includes('if(FulianAuth.getSession()?.role==="committee")location.replace("index.html")'));
 console.log("course-content tests passed");

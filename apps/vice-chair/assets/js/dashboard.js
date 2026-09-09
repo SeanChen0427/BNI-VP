@@ -10,7 +10,7 @@ document.querySelectorAll("details[data-nav-key]").forEach(group=>{const key=gro
 document.body.classList.toggle("committee-mode",session.role==="committee");
 document.body.classList.toggle("vp-mode",["vp","admin"].includes(session.role));
 document.querySelectorAll('a[href="#"].disabled').forEach(link=>link.addEventListener("click",event=>event.preventDefault()));
-try{const course=JSON.parse(localStorage.getItem("fulian-vp-course-v2")||"null"),total=course?.totalLessons||0,percent=total?Math.round((course?.done?.length||0)/total*100):0;document.querySelector("#courseProgress").textContent=`${percent}%`;document.querySelector("#courseProgressBar").style.width=`${percent}%`}catch{}
+try{const topics=window.FulianGuideTopics||[],record=JSON.parse(localStorage.getItem('fulian-complete-guide-v1:'+session.name)||'{}'),done=topics.filter(t=>record.read?.[t.id]===t.version).length,percent=topics.length?Math.round(done/topics.length*100):0;document.querySelector('#courseProgress').textContent=percent+'%';document.querySelector('#courseProgressBar').style.width=percent+'%'}catch{}
 const memberDataButton=document.querySelector("#status .panel-head button");
 if(memberDataButton){memberDataButton.textContent="查看完整儀表板 →";memberDataButton.addEventListener("click",()=>location.href="member-care.html")}
 async function syncBniSummary(){

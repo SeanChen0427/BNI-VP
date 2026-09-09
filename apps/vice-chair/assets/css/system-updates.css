@@ -1,0 +1,63 @@
+:root {
+  --red: #a91419;
+  --ink: #292a2d;
+  --muted: #666970;
+  --line: #e6e1dc;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  color: var(--ink);
+  background: #f5f3f0;
+  font: 400 15px/1.7 "Noto Sans TC", sans-serif;
+}
+.topbar {
+  min-height: 72px;
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+}
+.topbar > a { color: var(--red); text-decoration: none; }
+.brand-title { margin-right: auto; white-space: nowrap; }
+.session { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.session button, .updates-page button {
+  min-height: 44px;
+  padding: 9px 18px;
+  border: 1px solid #d8cdc8;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--red);
+  cursor: pointer;
+  font: 700 14px/1.5 "Noto Sans TC", sans-serif;
+}
+.updates-page button:hover:not(:disabled) { background: #f9ecec; border-color: var(--red); }
+.updates-page button:disabled { cursor: default; color: #79716b; background: #f5f3f0; }
+.updates-page :focus-visible { outline: 3px solid #2077b2; outline-offset: 3px; }
+.updates-page { max-width: 960px; margin: 0 auto; padding: 44px 28px 60px; }
+.updates-heading small { color: var(--red); font-weight: 700; }
+.updates-heading h1 { margin: 8px 0; font-size: clamp(26px, 4vw, 36px); }
+.updates-heading p { margin: 0; color: var(--muted); }
+.updates-current { margin: 28px 0 36px; padding: 20px; background: #fff; border: 1px solid var(--line); border-radius: 16px; }
+.updates-current .release-current { margin-bottom: 12px; }
+.updates-history-section > h2 { margin: 0 0 16px; font-size: 23px; }
+.updates-search { margin-bottom: 22px; }
+.updates-search label { display: block; margin-bottom: 8px; font-weight: 700; }
+.updates-search > div { display: flex; gap: 10px; }
+.updates-search input { min-width: 0; flex: 1; min-height: 48px; padding: 10px 14px; border: 1px solid #cfc8c1; border-radius: 10px; font: inherit; font-size: 16px; background: #fff; }
+.updates-search p, .updates-history-note { font-size: 13px; color: var(--muted); }
+.updates-page .release-history-item { background: #fff; }
+.updates-pagination { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 22px; }
+.updates-pagination p { color: var(--muted); font-size: 14px; }
+.updates-empty { padding: 30px 20px; border: 1px dashed #cfc8c1; border-radius: 12px; background: #fff; }
+.updates-history-note { margin-top: 32px; }
+[hidden] { display: none !important; }
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; padding: 12px 16px; gap: 10px; }
+  .session { flex-wrap: wrap; }
+  .updates-page { padding: 28px 16px 44px; }
+  .updates-current { padding: 14px; }
+  .updates-current button { width: 100%; }
+}

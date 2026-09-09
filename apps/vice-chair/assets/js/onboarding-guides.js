@@ -53,7 +53,7 @@
     },
     "global-shell":{
       id:"global-shell",
-      version:"1.0.1",
+      version:"1.0.2",
       title:"認識你的富聯工作區",
       page:"全站操作",
       roles:EVERYONE,
@@ -93,6 +93,7 @@
         {id:"links",section:"資源與管理",target:'[data-guide-id="nav.links"]',title:"常用連結",body:"集中開啟工作會用到的外部網站。連結會依角色整理；離開系統前會清楚標示目的地。",reveal:"sidebar"},
         {id:"learning",section:"資源與管理",target:'[data-guide-id="nav.learning"]',title:"交接與學習",body:"這個區域放的是職務制度教材，與你正在看的「系統操作導覽」分開。操作導覽教你怎麼用畫面，制度課程則教副主席如何判斷與交接。",fact:{label:"兩者差異",text:"完成進度彼此獨立，不會互相覆蓋。"},reveal:"sidebar"},
         {id:"vp-course",section:"資源與管理",target:'[data-guide-id="nav.vp-course"]',title:"副主席交接教學",body:"進入副主席制度課程，依章節學習角色責任與業務規則。這不是系統按鈕教學，日常不必每次重看。",roles:VP_ONLY,reveal:"sidebar"},
+        {id:"system-updates",section:"資源與管理",target:'[data-guide-id="nav.system-updates"]',title:"系統更新",body:"開啟獨立更新頁，搜尋全部歷史並展開各版本說明；設定頁只保留目前版本及入口。",reveal:"sidebar"},
         {id:"settings",section:"資源與管理",target:'[data-guide-id="nav.settings"]',title:"系統與個人 AI",body:"管理你自己的 AI 平台連線與系統設定。只有符合角色權限的管理區塊會顯示；任何密碼或 API Key 都不會出現在導覽文字中。",reveal:"sidebar"},
         {id:"identity",section:"身份與安全",target:'[data-guide-id="global.sidebar-identity"]',title:"確認目前登入身份",body:"共用帳號登入後，這裡會顯示你選擇的姓名與目前角色。進行回饋、投票或紀錄前，先確認身份正確。",reveal:"sidebar"},
         {id:"logout",section:"身份與安全",target:'[data-guide-id="global.logout"]',title:"安全登出",body:"工作完成或使用共用裝置時，請由這裡登出。登出會結束目前工作階段，但不會刪除已正式保存的資料。",reveal:"sidebar"},

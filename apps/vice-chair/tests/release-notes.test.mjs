@@ -16,10 +16,17 @@ test("首頁版本入口與工作提醒鈴鐺彼此獨立", () => {
   assert.doesNotMatch(notificationScript, /releaseNotes|系統版本更新/);
 });
 
-test("使用者版更新歷史放在設定頁且不顯示技術 CHANGELOG", () => {
+test("設定頁只保留版本入口，首頁與主選單可進入完整更新頁", () => {
   assert.match(settings, /id="releaseNotes"/);
   assert.match(settings, /系統版本與更新/);
-  assert.match(settings, /id="releaseNotesHistory"/);
+  assert.doesNotMatch(settings, /id="releaseNotesHistory"/);
+  assert.match(settings, /href="system-updates.html"/);
+  assert.match(index, /href="system-updates.html"/);
+  assert.match(read("assets/js/workspace-nav.js"), /系統更新", "system-updates.html"/);
+  const updates = read("system-updates.html");
+  assert.match(updates, /assets\/js\/auth.js/);
+  assert.match(updates, /id="releaseNotesHistory"/);
+  assert.doesNotMatch(updates, /CHANGELOG\.md/);
   assert.doesNotMatch(settings, /CHANGELOG\.md/);
 });
 

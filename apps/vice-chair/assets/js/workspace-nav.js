@@ -55,6 +55,7 @@
           ],
         },
         ["學", "副主席交接課程", "course.html", "vp"],
+        ["版", "系統更新", "system-updates.html"],
         ["設", "系統與個人設定", "settings.html"],
       ],
     },
@@ -169,7 +170,7 @@
     if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
-      script.src=`${src}?v=12`;
+      script.src=`${src}?v=13`;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);

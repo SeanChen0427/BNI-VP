@@ -1,6 +1,34 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.5.0",
+      publishedAt: "2026-09-09",
+      title: "副主席交接教學全面改版，從工作心智圖進入完整實務",
+      level: "normal",
+      audience: "副主席與系統管理員",
+      changes: Object.freeze([
+        "原副主席教學整合為 22 個完整主題，保留 321A、訪談判斷、工作步驟與歷任參考講稿。",
+        "七組互動工作心智圖可逐層展開，搭配全文搜尋、小節捷徑與閱讀紀錄，快速找到需要的做法。",
+        "沿用工作台的左側主選單、上方功能區與品牌配色，手機也能開啟選單與閱讀完整內容。"
+      ]),
+      howTo: "從工作台左側「交接與學習 → 副主席交接教學」，或首頁的「交接與學習」卡片進入。",
+      impact: "首頁學習卡同步新版已讀紀錄；原課程紀錄保留，閱讀完成不會改動會員資料、案件或交接驗收。"
+    }),
+    Object.freeze({
+      version: "1.4.0",
+      publishedAt: "2026-09-08",
+      title: "系統更新獨立成頁，快速查找歷史改動",
+      level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze([
+        "系統設定只保留目前版本與更新入口，完整紀錄移至獨立的「系統更新」頁。",
+        "先顯示最近 10 個版本；最新版本展開，舊版本可點開，按「載入更多」繼續閱讀。",
+        "搜尋功能可查全部歷史的版本、日期與內容，例如地基、月會或投票。"
+      ]),
+      howTo: "從主選單「系統更新」、設定頁「查看更新紀錄」，或首頁版本摘要的「查看完整更新紀錄」進入。",
+      impact: "首頁仍顯示最新版本摘要與 NEW 提示；閱讀歷史不會修改案件或會員資料。"
+    }),
+    Object.freeze({
       version: "1.3.3",
       publishedAt: "2026-09-08",
       title: "主選單閃白修正與地基表單深入教學",
@@ -505,18 +533,22 @@
     updateTrigger();
   }
 
-  function releaseMarkup(release, current = false) {
-    const levelLabel = release.level === "important" ? "重要更新" : "一般更新";
+  function releaseMarkup(release) {
+    const current = release.version === latest.version;
+    const levelLabel = current ? "最新版本" : release.level === "important" ? "重要更新" : "一般更新";
     return `
-      <article class="release-history-item${current ? " current" : ""}">
-        <header>
-          <div><b>v${escapeHtml(release.version)}</b><span>${escapeHtml(levelLabel)}</span></div>
-          <time datetime="${escapeHtml(release.publishedAt)}">${escapeHtml(formattedDate(release.publishedAt))}</time>
-        </header>
-        <h3>${escapeHtml(release.title)}</h3>
-        <ul>${release.changes.map(change => `<li>${escapeHtml(change)}</li>`).join("")}</ul>
-        <p>${escapeHtml(release.impact)}</p>
-      </article>`;
+      <details class="release-history-item${current ? " current" : ""}"${current ? " open" : ""}>
+        <summary>
+          <span class="release-entry-meta"><b>v${escapeHtml(release.version)}</b><span>${escapeHtml(levelLabel)}</span><time datetime="${escapeHtml(release.publishedAt)}">${escapeHtml(formattedDate(release.publishedAt))}</time></span>
+          <span class="release-entry-title">${escapeHtml(release.title)}</span>
+        </summary>
+        <div class="release-entry-body">
+          ${release.audience ? `<p class="release-audience"><b>適用對象：</b>${escapeHtml(release.audience)}</p>` : ""}
+          <ul>${release.changes.map(change => `<li>${escapeHtml(change)}</li>`).join("")}</ul>
+          ${release.howTo ? `<p><b>怎麼使用：</b>${escapeHtml(release.howTo)}</p>` : ""}
+          <p><b>使用提醒：</b>${escapeHtml(release.impact)}</p>
+        </div>
+      </details>`;
   }
 
   function openDialog() {
@@ -556,16 +588,60 @@
     if (latest.level === "important" && !isLatestRead()) openDialog();
   }
 
+  function initCurrentVersion() {
+    const version = $("#currentReleaseVersion");
+    const date = $("#currentReleaseDate");
+    if (version) version.textContent = `v${latest.version}`;
+    if (date) {
+      date.textContent = formattedDate(latest.publishedAt);
+      date.setAttribute("datetime", latest.publishedAt);
+    }
+  }
+
   function initHistory() {
     const history = $("#releaseNotesHistory");
     if (!history) return;
-    history.innerHTML = RELEASES.map((release, index) => releaseMarkup(release, index === 0)).join("");
-    $("#currentReleaseVersion").textContent = `v${latest.version}`;
-    $("#currentReleaseDate").textContent = formattedDate(latest.publishedAt);
+    const search = $("#releaseSearch");
+    const clear = $("#clearReleaseSearch");
+    const more = $("#loadMoreReleases");
+    const count = $("#releaseResultCount");
+    const empty = $("#releaseEmpty");
+    const acknowledge = $("#markReleaseRead");
+    const pageSize = 10;
+    let matches = RELEASES;
+    let shown = 0;
+    function appendPage() {
+      const next = matches.slice(shown, shown + pageSize);
+      history.insertAdjacentHTML("beforeend", next.map(releaseMarkup).join(""));
+      shown += next.length;
+      count.textContent = `已顯示 ${shown} / ${matches.length} 個版本`;
+      empty.hidden = matches.length > 0;
+      more.hidden = shown >= matches.length;
+      if (more.hidden && document.activeElement === more) count.focus({ preventScroll: true });
+    }
+    function filter() {
+      const query = search.value.trim().toLocaleLowerCase();
+      matches = RELEASES.filter(release => [release.version, `v${release.version}`, release.publishedAt, formattedDate(release.publishedAt), release.title, ...release.changes, release.impact, release.audience, release.howTo].join(" ").toLocaleLowerCase().includes(query));
+      shown = 0;
+      history.innerHTML = "";
+      clear.disabled = search.value.length === 0;
+      appendPage();
+    }
+    function updateReadButton() {
+      acknowledge.textContent = isLatestRead() ? "最新版本已讀" : "標記最新版本已讀";
+      acknowledge.disabled = isLatestRead();
+    }
+    search.addEventListener("input", filter);
+    clear.addEventListener("click", () => { search.value = ""; filter(); search.focus(); });
+    more.addEventListener("click", appendPage);
+    acknowledge.addEventListener("click", () => { markLatestRead(); updateReadButton(); });
+    filter();
+    updateReadButton();
   }
 
   function init() {
     initDashboard();
+    initCurrentVersion();
     initHistory();
   }
 

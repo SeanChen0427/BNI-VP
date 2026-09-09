@@ -29,7 +29,7 @@ const catalog=guideContext.window.FulianOnboardingGuides;
 
 test("首頁載入共用領域、角色教學、專屬樣式與導覽引擎",()=>{
   assert.match(index,/core\/onboarding-domain\.js\?v=3/);
-  assert.match(index,/assets\/js\/onboarding-guides\.js\?v=6/);
+  assert.match(index,/assets\/js\/onboarding-guides\.js\?v=7/);
   assert.match(index,/assets\/js\/onboarding\.js\?v=10/);
   assert.match(index,/assets\/css\/onboarding\.css\?v=7/);
   assert.match(index,/data-guide-page="page:index"/);
@@ -58,7 +58,7 @@ test("副主席與委員取得不同步驟，Admin 沒有任何版本",()=>{
 });
 
 test("完整導覽目錄具備固定版本、逐步文案與不重複識別",()=>{
-  const expected={vp:{guides:22,steps:307},committee:{guides:16,steps:197},public:{guides:2,steps:14}};
+  const expected={vp:{guides:23,steps:313},committee:{guides:17,steps:205},public:{guides:2,steps:14}};
   Object.entries(expected).forEach(([role,count])=>{
     const guides=catalog.listGuides(role);
     assert.equal(guides.length,count.guides,role+" 導覽數量不完整");
@@ -86,11 +86,11 @@ test("所有登入後工作頁都有頁面導覽，並由共用選單載入同�
   const workspacePages=[
     "accountability-emails","analysis-review","attendance","case-archive","case-board","case-workflow",
     "departure-form","industry-change-form","member-care","message-templates","midterm-form","monthly-meeting",
-    "new-member-form","renewal-foundations","routine-reminders","settings","terminal-form","useful-links"
+    "new-member-form","renewal-foundations","routine-reminders","settings","system-updates","terminal-form","useful-links"
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=17/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=18/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);
@@ -115,11 +115,11 @@ test("副主席與會員委員頁面內容依權限分流",()=>{
 
 test("課程介面導覽與制度課程內容保持分離",()=>{
   assert.match(course,/data-guide-page="page:course"/);
-  assert.match(course,/onboarding-page-guides\.js\?v=7/);
+  assert.match(course,/onboarding-page-guides\.js\?v=9/);
   const guide=catalog.getGuide("page:course","vp");
   assert.ok(guide.steps.some(step=>step.id==="nav"));
-  assert.ok(guide.steps.some(step=>step.id==="reset"));
-  assert.match(guide.intro.description,/只介紹目錄、進度、續看、切換及重設/);
+  assert.ok(guide.steps.some(step=>step.id==="map"));
+  assert.match(guide.intro.description,/工作心智圖、目錄、搜尋與閱讀紀錄/);
 });
 
 test("月會導覽以完整語意工作區為目標，不再框選零碎輸入欄位",()=>{

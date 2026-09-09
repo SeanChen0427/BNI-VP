@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>系統更新｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/system-updates.css?v=1">
+  <link rel="stylesheet" href="assets/css/release-notes.css?v=2">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=8"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← 回工作台</a>
+    <strong class="brand-title">富聯分會</strong>
+    <div class="session"><span data-auth-name>使用者</span><span data-auth-role>職務</span><button type="button" data-auth-logout>登出</button></div>
+  </header>
+  <main class="updates-page">
+    <header class="updates-heading"><small>持續改善，讓委員工作更順手</small><h1>系統版本與更新</h1><p>查看新功能、修正與使用方式，也可以搜尋過去的改動。</p></header>
+    <section class="updates-current" id="currentRelease" aria-label="目前版本">
+      <div class="release-current"><b id="currentReleaseVersion">v—</b><span>目前版本</span><time id="currentReleaseDate"></time></div>
+      <button type="button" id="markReleaseRead">標記最新版本已讀</button>
+    </section>
+    <section class="updates-history-section" aria-labelledby="historyTitle">
+      <h2 id="historyTitle">更新紀錄</h2>
+      <div class="updates-search" id="releaseSearchForm" role="search" aria-label="搜尋更新紀錄">
+        <label for="releaseSearch">搜尋全部歷史</label>
+        <div><input id="releaseSearch" type="search" placeholder="例如：地基、月會、1.3.3" autocomplete="off" aria-controls="releaseNotesHistory"><button type="button" id="clearReleaseSearch" disabled>清除</button></div>
+        <p>可搜尋版本、日期或內容。點版本標題展開閱讀。</p>
+      </div>
+      <div class="release-history" id="releaseNotesHistory"></div>
+      <p id="releaseEmpty" class="updates-empty" hidden>沒有符合的更新紀錄，請換個關鍵字或按「清除」。</p>
+      <div id="releasePagination" class="updates-pagination"><p id="releaseResultCount" role="status" aria-live="polite" tabindex="-1"></p><button type="button" id="loadMoreReleases" aria-controls="releaseNotesHistory">載入更多</button></div>
+    </section>
+    <p class="updates-history-note">歷史紀錄保留發布當時的說明；目前操作請以系統畫面與操作教學為準。</p>
+    <noscript>請啟用 JavaScript 以查看與搜尋更新紀錄。</noscript>
+  </main>
+  <script src="assets/js/release-notes.js?v=36"></script>
+  <script src="assets/js/workspace-nav.js?v=18"></script>
+</body>
+</html>
