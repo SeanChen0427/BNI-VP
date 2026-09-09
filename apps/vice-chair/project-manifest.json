@@ -85,7 +85,7 @@
     "new-member-form.html": "新會員訪談",
     "industry-change-form.html": "轉換行業別訪談",
     "departure-form.html": "離會訪談",
-    "course.html": "副主席交接教學：22 主題、互動心智圖與系統共用功能區（整合完成，待正式發布）",
+    "course.html": "副主席交接教學：22 主題、互動心智圖與系統共用功能區（v1.5.0 已正式發布）",
     "settings.html": "角色、Admin 年度換屆、帳密、個人 AI 與目前版本入口",
     "login.html": "Supabase Auth 共用帳號登入與姓名選擇",
     "renewal-foundations.html": "續約地基逐期追蹤、既有地基補登、人工提醒與工作坊確認",

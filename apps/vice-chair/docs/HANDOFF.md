@@ -199,4 +199,4 @@
 
 ## 副主席完整交接教材整合版（2026-09-09）
 
-新任自行閱讀以 [完整工作指南](vice-chair-complete-guide.md)為本次整合教材；舊課程深度與新任務架構的逐項去向見 [整合對照](handover-integration-review.md)。22 主題已整合進原功能 `course.html`，採用工作台主選單與上方功能區；`handover-guide.html` 為相容轉址。離線包在總專案 `artifacts/handover-guide/`。本機整合已完成，尚待正式發布。原實務手冊保留作摘要，遇到首次續約期間等差異，依完整稿的來源說明核對。
+新任自行閱讀以 [完整工作指南](vice-chair-complete-guide.md)為本次整合教材；舊課程深度與新任務架構的逐項去向見 [整合對照](handover-integration-review.md)。22 主題已整合進原功能 `course.html`，採用工作台主選單與上方功能區；`handover-guide.html` 為相容轉址。離線包在總專案 `artifacts/handover-guide/`。已於 2026-09-09 以 v1.5.0 正式發布，見 [部署紀錄](DEPLOYMENT_LOG_2026-09-09_VP_COURSE.md)。原實務手冊保留作摘要，遇到首次續約期間等差異，依完整稿的來源說明核對。

@@ -18,7 +18,12 @@
 
 ## 正式發布
 
-待 GitHub Pages 執行完成後追加提交、執行網址與正式資源核對結果。
+- 發布提交：`40ea6f7b61d3973140500711439115b8b6a7e535`。
+- GitHub Pages 執行：[34339128472](https://github.com/SeanChen0427/BNI-VP/actions/runs/34339128472)，結論 `success`。
+- 正式入口：[副主席交接教學](https://seanchen0427.github.io/BNI-VP/course.html)。
+- 正式站 11 個關鍵頁面與資源全部 HTTP 200，逐位元組及 SHA-256 核對均與本次 Pages 產物一致；包括首頁、教學頁、舊網址轉址、系統更新頁、版本說明、心智圖、課程控制、閱讀目錄、兩份整合樣式與首頁程式。
+- `course.html` SHA-256：`02fdfd645766c673273112943326fd0f958b9737bc2637dfa1dd0dadc47e5bff`。
+- 正式驗證只讀取公開前端檔案；未登入或操作任何正式會員案件。
 
 ## 回復
 
