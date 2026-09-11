@@ -35,7 +35,8 @@ test('教學不改輸入，取消／保存／新增下一項與更正原因均�
   const f=fixture();for(const selector of ['#kind','#target','#amendReason','#saveAndAddFoundation','#definitionForm button.primary[type="submit"]','#definitionForm footer [data-close]'])f.element(selector,{value:selector==='#target'?'4':'flexible'});
   const guide=f.api.build(f.scope,'definition');assert.equal(f.elements.get('#target').value,'4');
   assert.ok(guide.steps.some(x=>x.title.includes('修改原因')));assert.ok(guide.steps.some(x=>x.body.includes('取消只放棄尚未保存')));assert.ok(guide.steps.some(x=>x.body.includes('沒有自動保存')));
-  f.api.open(f.scope,'definition',true);assert.equal(f.requests.length,1);assert.equal(f.requests[0][2].automatic,true);
+  assert.equal(f.api.open(f.scope,'definition',true),false);assert.equal(f.requests.length,0);
+  f.api.open(f.scope,'definition');assert.equal(f.requests.length,1);assert.equal(f.requests[0][2].automatic,false);
 });
 test('會員卡只解說已顯示的可用操作，Admin 不載入操作教學',()=>{
   const f=fixture('committee');f.element('summary');f.element('[data-detail]');f.element('[data-record]');
@@ -60,4 +61,13 @@ test('表單導覽留在原生對話框上層，結束時移回並恢復原介�
   assert.match(engine,/contextScope\.scrollTop=uiSnapshot\.contextScroll\.top/);
   assert.match(engine,/document\.body\.append\(tourRoot\);\s+contextScope=null/);
   assert.match(engine,/if\(contextScope===event\.target\)\{event\.preventDefault\(\);pauseTour\(\);\}/);
+});
+
+test('右上角教學中心保留完整操作說明，並依角色顯示設定與管理內容',()=>{
+  const vp=fixture().api.referenceSections(),committee=fixture('committee').api.referenceSections();
+  assert.ok(vp.some(section=>section.entries.some(entry=>entry.title.includes('儲存並新增下一項'))));
+  assert.ok(vp.some(section=>section.entries.some(entry=>entry.title.includes('修改原因'))));
+  assert.ok(committee.some(section=>section.entries.some(entry=>entry.title.includes('會員回覆'))));
+  assert.ok(!committee.some(section=>section.title.includes('新增與調整')));
+  assert.ok(!committee.flatMap(section=>section.entries).some(entry=>entry.title.startsWith('刪除地基')));
 });

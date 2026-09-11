@@ -432,3 +432,22 @@ test("API 刪除逐項生效、排除首頁月會訪談，保留可復原稽核�
   assert.equal(f.rows.get(id).data.startOn, "2026-02-01");
   assert.equal(f.rows.get(otherId).revision, 1);
 });
+
+
+test("會員提醒一次整合全部可查閱地基，保留已完成狀態且不混入其他會員或隱藏內容", () => {
+  const items = [
+    { ...base(), memberId, title: "持續追蹤項目", canReadDetail: true },
+    { ...base(), memberId, title: "已完成項目", status: "achieved", canReadDetail: true },
+    { ...base(), memberId, title: "已刪除內容", deletedAt: "2026-09-01", canReadDetail: true },
+    { ...base(), memberId, title: "無權限內容", canReadDetail: false },
+    { ...base(), memberId: otherId, title: "其他會員內容", canReadDetail: true }
+  ];
+  const before = JSON.stringify(items);
+  const text = domain.memberReminderText(items, memberId, "2026-09-11");
+  assert.match(text, /2 項續約地基/);
+  assert.match(text, /持續追蹤項目/); assert.match(text, /已完成項目/);
+  assert.match(text, /已完成的項目無須重複回覆/);
+  assert.ok(!text.includes("已刪除內容") && !text.includes("無權限內容") && !text.includes("其他會員內容"));
+  assert.equal(domain.memberReminderText(items, "不存在"), "");
+  assert.equal(JSON.stringify(items), before);
+});

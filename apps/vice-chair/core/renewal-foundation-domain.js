@@ -208,6 +208,15 @@
   function reminderText(value) {
     return `${value.memberName} 你好，關心一下這次續約約定的地基進度：\n\n改善項目：${value.title}\n完成標準：${value.criterion}\n約定期限：${displayDeadline(value)}\n\n請回覆目前進度，並提供可確認的完成資料；如有困難，也請提早告訴我們，方便委員協助與安排後續追蹤。謝謝。`;
   }
+  function memberReminderText(items, memberKey, now = new Date()) {
+    const group = groupByMember(items.filter(item => !item.deletedAt && item.canReadDetail !== false)).find(group => group.key === memberKey);
+    if (!group) return "";
+    const sections = group.items.map((item, index) => `${index + 1}. ${item.title}\n完成標準：${item.criterion || "依原續約約定"}\n約定期限：${displayDeadline(item)}\n追蹤狀態：${labels[item.status] || item.status}\n目前進度：${compactProgress(item, now)}`);
+    const closing = group.items.some(item => !resolved(item))
+      ? "請回覆尚在追蹤項目的目前進度，並提供可確認的完成資料；如有困難，也請提早告訴我們，方便委員協助。已完成的項目無須重複回覆，謝謝。"
+      : "以上項目已結束追蹤，提供你核對留存，謝謝。";
+    return `${group.memberName} 你好，整理你目前的 ${group.items.length} 項續約地基與進度：\n\n${sections.join("\n\n")}\n\n${closing}`;
+  }
   function progressText(value, now = new Date()) {
     if (value.kind === "flexible") return cycles(value, now).map(cycle => `${cycle.label}：${cycleProgress(value, cycle)}`).join("；") || "適用期間尚未開始";
     if (value.kind === "visitors") {
@@ -249,5 +258,5 @@
     }
     return [...groups.values()];
   }
-  return { labels, resolved, manager, assigned, canReadDetail, required, day, definition, suggestedText, attention, transition, reminderText, cycles, trackingStartsOn, progressText, summaryText, isWorkshop, isRecurring, metricInfo, cycleReached, compactProgress, groupByMember, displayDeadline };
+  return { labels, resolved, manager, assigned, canReadDetail, required, day, definition, suggestedText, attention, transition, reminderText, memberReminderText, cycles, trackingStartsOn, progressText, summaryText, isWorkshop, isRecurring, metricInfo, cycleReached, compactProgress, groupByMember, displayDeadline };
 });

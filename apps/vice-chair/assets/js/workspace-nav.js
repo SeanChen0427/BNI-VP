@@ -163,7 +163,7 @@
     if(document.querySelector(`link[href^="${href}"]`))return;
     const link=document.createElement("link");
     link.rel="stylesheet";
-    link.href=`${href}?v=8`;
+    link.href=`${href}?v=9`;
     document.head.append(link);
   }
 
@@ -171,7 +171,7 @@
     if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
-      script.src=`${src}?v=15`;
+      script.src=`${src}?v=16`;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);

@@ -203,6 +203,8 @@
     requestAnimationFrame(()=>introDialog.querySelector(".guide-button.primary")?.focus());
   }
 
+  const esc = value => String(value ?? "").replace(/[&<>"']/g, char => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[char]));
+
   function guideCenterMarkup(){
     const guides=availableGuides();
     const rows=guides.map((guide,index)=>{
@@ -214,6 +216,9 @@
         <button type="button" class="guide-button" data-center-guide="${guide.id}">${label}</button>
       </div>`;
     }).join("");
+    const references=(window.FulianFoundationControlGuides?.referenceSections?.()||[]).map(section=>
+      `<details class="guide-reference-section"><summary>${esc(section.title)}</summary>${section.entries.map(entry=>`<article><h3>${esc(entry.title)}</h3><p>${esc(entry.body)}</p></article>`).join('')}</details>`
+    ).join('');
     return`<div class="guide-dialog-shell">
       <div class="guide-dialog-visual">
         <div class="guide-brand-lockup"><span class="guide-brand-mark">富聯</span><span><strong>操作教學中心</strong><small>FULIAN PRODUCT GUIDE</small></span></div>
@@ -224,6 +229,7 @@
         <h2 id="guideCenterTitle">需要時，從這裡繼續</h2>
         <p>系統操作教學與副主席制度課程分開保存。你可以重看目前頁面，或重新認識全站工作入口。</p>
         <div class="guide-center-list">${rows}</div>
+        ${references?`<section class="guide-reference"><h2>續約地基完整操作說明</h2><p>展開需要的主題查看；實際操作時不會自動跳出教學。</p>${references}</section>`:""}
         <div class="guide-dialog-actions"><button type="button" class="guide-button primary" data-center-action="close">關閉</button></div>
       </div>
     </div>`;
@@ -658,7 +664,7 @@
     openContext(guide,scope,{automatic=false}={}){
       if(!scope?.isConnected||!tourRoot.hidden||introDialog.open||centerDialog.open)return false;
       if(!guide?.steps?.length||!guide.roles?.includes(identity.role))return false;
-      if(automatic&&(!config.autoStart||!domain.shouldAutoStart(progress,guide.id,guide.version,isDismissed(guide))))return false;
+      if(automatic)return false;
       const modal=scope.closest("dialog");
       if(modal&&!modal.open)return false;
       contextScope=modal||null;

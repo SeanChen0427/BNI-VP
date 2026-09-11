@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.7.1", publishedAt: "2026-09-11", title: "續約地基操作區移除教學干擾", level: "normal",
+      audience: "副主席與會員委員",
+      changes: Object.freeze([
+        "移除卡片、表單及歷程內的教學按鈕，所有說明統一到右上角「操作教學」。",
+        "功能按鈕直接開啟對應視窗，不再自動播放教學；首次進入新頁面的導覽仍保留。",
+        "複製提醒文字移到姓名旁，一次整理這位夥伴全部可查閱地基、期限與進度。"
+      ]),
+      howTo: "展開各期進度與操作，直接點選所需功能；需要說明時再主動開啟教學。",
+      impact: "調整教學入口與觸發方式，既有追蹤資料、權限及保存流程維持原有規則。"
+    }),
+    Object.freeze({
       version: "1.7.0", publishedAt: "2026-09-11", title: "夥伴多選、會議名單匯出與大表格", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze([

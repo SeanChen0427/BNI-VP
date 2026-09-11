@@ -55,9 +55,9 @@
   ];
   const cardFields=[
     entry('summary','各期進度與操作：展開這一項的明細','每位會員可以有多項地基。這裡展開的是其中一項，顯示各期目標、數量、差額及追蹤人；再次按下可以收合。資料待補要先補正式資料，不能當作零人或未達成。'),
-    entry('[data-detail]','查看歷程：查當初約定與後續處理','開啟後可看設定來源、提醒日期、會員回覆、證據、確認結果及修改前後內容；閱讀不改變狀態。歷程視窗也有逐步教學。'),
+    entry('[data-detail]','查看歷程：查當初約定與後續處理','開啟後可看設定來源、提醒日期、會員回覆、證據、確認結果及修改前後內容；閱讀不改變狀態。需要說明時可從右上角「操作教學」查看。'),
     entry('[data-record]','記錄提醒／進度，或重新開啟','開啟後先選本次動作；選項依主責、陪同、副主席及地基類型決定。已達成或停止時按鈕顯示「重新開啟」，需副主席填原因，按開啟視窗不會立刻變更結果。'),
-    entry('[data-copy]','複製提醒文字：還要自行聯繫會員','只把此項地基摘要放進剪貼簿，不會自動發送或增加提醒次數。貼到正確對話並實際聯繫後，再用「記錄提醒／進度」留下日期、方式與回覆。'),
+
     entry('[data-edit]','調整條件／指派：更正日期、數量或人員','表單會帶入現有設定，填修改原因後才保存。會員、類型、指標與週期鎖定，改這些內容需另建正確項目；改期可能使工作坊需要重新確認。'),
     entry('[data-delete]','刪除地基：先開原因表單，再確認保存','只有副主席可操作。填原因並儲存才會移除這一項；若操作錯誤，可從查看範圍的「已刪除（可復原）」找回。'),
     entry('[data-restore]','復原地基：回到刪除前的狀態與日期','填復原原因並儲存後回到原追蹤範圍。若刪除前已達成，復原仍是已達成，可到全部範圍查看；不一定出現在持續列管。')
@@ -93,14 +93,19 @@
     return{id:`context:foundation:${mode}:${variant}`,version:'1.0.0',title:'續約地基逐步操作',page:'續約地基追蹤',roles:[role],steps};
   }
   function open(scope,mode,automatic=false){
-    if(!scope)return false;
+    if(automatic||!scope)return false;
     return global.FulianOnboarding?.openContext(build(scope,mode),scope,{automatic})||false;
   }
-  document.addEventListener('click',event=>{
-    const button=event.target.closest('[data-foundation-guide]');
-    if(!button)return;
-    const mode=button.dataset.foundationGuide;
-    open(button.closest('dialog,.foundation-condition'),mode);
-  });
-  global.FulianFoundationControlGuides=Object.freeze({open,build});
+  function referenceSections(){
+    const manager=role==='vp';
+    const allowedActions=Object.entries(actions).filter(([key])=>manager||['reminder','note','progress'].includes(key));
+    return [
+      {title:'各項實際操作',entries:[entry('[data-copy-member]','姓名旁的複製提醒文字：一次整理全部地基','複製這位夥伴全部可查閱且未刪除的地基、狀態與進度，包含清單目前篩選未顯示的項目；已完成項目會標示，不要求重複回覆。複製不會自動發送或增加提醒次數。'),...cardFields].filter(row=>manager||!['[data-edit]','[data-delete]','[data-restore]'].includes(row.selector))},
+      ...(manager?[{title:'新增與調整地基：欄位及保存方式',entries:definitions}]:[]),
+      {title:'記錄提醒與進度：本次動作',entries:allowedActions.map(([,body])=>{const [title,...rest]=body.split('：');return {title,body:rest.join('：')};})},
+      {title:'紀錄表單：日期、回覆與證據',entries:recordFields.filter(row=>manager||!['#periodKey','#completedCount','#attendedOn'].includes(row.selector))},
+      {title:'閱讀追蹤歷程',entries:historyFields}
+    ];
+  }
+  global.FulianFoundationControlGuides=Object.freeze({open,build,referenceSections});
 })(window);

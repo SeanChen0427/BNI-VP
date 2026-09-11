@@ -30,8 +30,8 @@ const catalog=guideContext.window.FulianOnboardingGuides;
 test("首頁載入共用領域、角色教學、專屬樣式與導覽引擎",()=>{
   assert.match(index,/core\/onboarding-domain\.js\?v=3/);
   assert.match(index,/assets\/js\/onboarding-guides\.js\?v=8/);
-  assert.match(index,/assets\/js\/onboarding\.js\?v=10/);
-  assert.match(index,/assets\/css\/onboarding\.css\?v=7/);
+  assert.match(index,/assets\/js\/onboarding\.js\?v=11/);
+  assert.match(index,/assets\/css\/onboarding\.css\?v=9/);
   assert.match(index,/data-guide-page="page:index"/);
 });
 
@@ -90,7 +90,7 @@ test("所有登入後工作頁都有頁面導覽，並由共用選單載入同�
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=20/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=21/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);
@@ -115,7 +115,7 @@ test("副主席與會員委員頁面內容依權限分流",()=>{
 
 test("課程介面導覽與制度課程內容保持分離",()=>{
   assert.match(course,/data-guide-page="page:course"/);
-  assert.match(course,/onboarding-page-guides\.js\?v=9/);
+  assert.match(course,/onboarding-page-guides\.js\?v=10/);
   const guide=catalog.getGuide("page:course","vp");
   assert.ok(guide.steps.some(step=>step.id==="nav"));
   assert.ok(guide.steps.some(step=>step.id==="map"));

@@ -546,3 +546,10 @@ body.guide-tour-active{overflow:hidden}
   .guide-card-progress::after{transition:none!important}
   .guide-dialog::backdrop{backdrop-filter:none}
 }
+
+.guide-reference { margin-top: 28px; }
+.guide-reference-section { border-bottom: 1px solid #e4dcd8; padding: 14px 0; }
+.guide-reference-section summary { cursor: pointer; font-weight: 750; color: #7c191f; }
+.guide-reference-section article { margin: 18px 0; }
+.guide-reference-section h3 { font-size: 15px; margin: 0 0 6px; }
+.guide-reference-section p { font-size: 14px; line-height: 1.8; margin: 0; color: #574c48; }
