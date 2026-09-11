@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.7.4", publishedAt: "2026-09-12", title: "查看夥伴每月互動歷程", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze([
+        "夥伴個人資料加入互動歷程，可按月份查看一對一、給出引薦及收到引薦的對象。",
+        "按審計週報展開登錄明細，清楚顯示已匯入週次、缺週及最近匯入時間。",
+        "缺資料與讀取失敗不視為零互動；一對一包含雙方登錄，週報日期不代表實際會面日期。"
+      ]),
+      howTo: "開啟夥伴名錄，點選會員姓名，再切換到「互動歷程」選擇月份與類型。",
+      impact: "歷程依已匯入的審計週報提供，沒有即時更新或成交金額；PALMS 分數與正式會員資料維持原有規則。"
+    }),
+    Object.freeze({
       version: "1.7.3", publishedAt: "2026-09-11", title: "地基常用操作排在前面", level: "normal",
       audience: "副主席與會員委員",
       changes: Object.freeze([

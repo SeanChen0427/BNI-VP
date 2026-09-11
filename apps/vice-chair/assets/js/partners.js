@@ -54,6 +54,7 @@
     $("#memberTitle").textContent=row.name;$("#memberProfession").textContent=row.profession||"專業別尚無資料";
     const group=(label,columns)=>`<section><h3>${escape(label)}</h3><dl class="detail-grid">${columns.map(column=>`<div><dt>${column.label}</dt><dd>${escape(format(row,column))}${row[column.key]!==null&&column.unit?` <small>${column.unit}</small>`:""}</dd></div>`).join("")}</dl></section>`;
     $("#memberDetails").innerHTML=group("會籍資料",D.columns.filter(column=>!column.metric&&!["name","profession"].includes(column.key)))+`<p class="dialog-note">本次在會月數截至 ${C.dateInput()}，依生效日推算；生效日不等於首次出席日。</p>`+group(`${periodName()} · ${periodText(D.period(displaySnapshot,state.period))}`,D.columns.filter(column=>column.metric));
+    window.FulianMemberInteractions.open(row.name,state.period.startsWith("month:")?state.period.slice(6):"");
     $("#memberDialog").showModal();
   }
   async function readApi(path){

@@ -11,6 +11,7 @@
   <script src="core/calendar-domain.js?v=5"></script>
   <script src="core/partner-directory-domain.js?v=2"></script>
   <link rel="stylesheet" href="assets/css/partners.css?v=2">
+  <link rel="stylesheet" href="assets/css/member-interactions.css?v=1">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
   <link rel="stylesheet" href="assets/css/page-hero.css?v=1">
 </head>
@@ -40,12 +41,37 @@
       </section>
     </div>
   </main>
-  <dialog id="memberDialog" aria-labelledby="memberTitle"><div class="dialog-header"><div><small>夥伴資料</small><h2 id="memberTitle"></h2><p id="memberProfession"></p></div><button type="button" id="closeDialog" aria-label="關閉個人資料">×</button></div><div id="memberDetails"></div><p class="dialog-note">會籍與活動資料皆依本期快照；最新異動請至 BNI Connect 核對。</p></dialog>
+  <dialog id="memberDialog" aria-labelledby="memberTitle">
+    <div class="dialog-header"><div><small>夥伴資料</small><h2 id="memberTitle"></h2><p id="memberProfession"></p></div><button type="button" id="closeDialog" aria-label="關閉個人資料">×</button></div>
+    <div class="member-tabs" role="tablist" aria-label="會員資料類別">
+      <button type="button" id="memberOverviewTab" role="tab" aria-selected="true" aria-controls="memberOverviewPanel">會籍與 PALMS</button>
+      <button type="button" id="memberHistoryTab" role="tab" aria-selected="false" aria-controls="memberHistoryPanel" tabindex="-1">互動歷程</button>
+    </div>
+    <section id="memberOverviewPanel" role="tabpanel" aria-labelledby="memberOverviewTab"><div id="memberDetails"></div><p class="dialog-note">會籍與活動資料依所選報表期間；最新異動請至 BNI Connect 核對。</p></section>
+    <section id="memberHistoryPanel" role="tabpanel" aria-labelledby="memberHistoryTab" hidden>
+      <div class="history-controls">
+        <label for="historyMonth">審計月份<select id="historyMonth" disabled><option>讀取月份中…</option></select></label>
+        <label for="historyType">互動類型<select id="historyType"><option value="all">全部互動</option><option value="oneToOne">一對一</option><option value="given">給出引薦</option><option value="received">收到引薦</option></select></label>
+      </div>
+      <p id="historyStatus" role="status" aria-live="polite"></p>
+      <button type="button" id="historyRetry" hidden>重新讀取歷程</button>
+      <div id="historyContent" hidden>
+        <div id="historyCoverage" class="history-coverage"></div>
+        <p class="history-note">以下日期是審計報表週次，並非實際會面或引薦發生日。資料不會即時更新。</p>
+        <h3 class="history-summary-title">已匯入週報中的登錄</h3>
+        <dl id="historySummary" class="history-summary"></dl>
+        <p class="history-note">一對一同時包含本人與對方登錄；登錄方向不代表誰主動邀約。同週同對象的多筆紀錄原樣保留，筆數不等於已確認的實際會面次數，也不取代 PALMS 累計。此處不提供成交金額或成交結果。</p>
+        <p id="historyResultCount" class="history-note" role="status"></p>
+        <div id="historyTimeline"></div>
+      </div>
+    </section>
+  </dialog>
   <dialog id="exportDialog" aria-labelledby="exportTitle"><div class="dialog-header"><h2 id="exportTitle">匯出目前表格</h2><button id="closeExport" type="button" aria-label="關閉匯出">×</button></div><p>依目前篩選、排序及顯示欄位匯出；資料多時自動分頁，每頁保留姓名與條件。</p><div class="export-pagination"><button id="prevExport" type="button">上一頁</button><span id="exportPage" role="status"></span><button id="nextExport" type="button">下一頁</button><button id="downloadExport" type="button">下載這頁 PNG</button></div><div id="exportPreview"></div></dialog>
   <dialog id="copyDialog" aria-labelledby="copyTitle"><div class="dialog-header"><h2 id="copyTitle">複製文字名單</h2><button id="closeCopy" type="button" aria-label="關閉文字名單">×</button></div><p>瀏覽器未允許自動複製，請複製下方已選取的文字。</p><textarea id="copyText" rows="14" readonly aria-label="目前篩選的文字名單"></textarea></dialog>
   <script src="core/partner-export-domain.js?v=1"></script>
   <script src="assets/js/partner-export.js?v=1"></script>
-  <script src="assets/js/partners.js?v=2"></script>
+  <script src="assets/js/member-interactions.js?v=1"></script>
+  <script src="assets/js/partners.js?v=3"></script>
   <script src="assets/js/workspace-nav.js?v=21"></script>
 </body>
 </html>

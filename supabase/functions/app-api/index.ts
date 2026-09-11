@@ -12,6 +12,7 @@ import { rawReportObjectPath } from "./storage-object-key.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
+import { createMemberInteractionsApi } from "../../../apps/vice-chair/services/member-interactions.mjs";
 import {
   buildCaseFeedbackNoticeText,
   buildCaseResultAnnouncementMessage,
@@ -292,6 +293,19 @@ async function reportImports() {
 const partnerReportsApi = createPartnerReportsApi({
   getImports: reportImports,
   downloadReport,
+  getRoster: async () => {
+    const published = await activePublished();
+    if (!Array.isArray(published?.snapshot?.members)) throw Object.assign(new Error("尚無已生效的名錄快照"), { status: 503 });
+    return published.snapshot.members.map((member: any) => member.name);
+  },
+});
+
+const memberInteractionsApi = createMemberInteractionsApi({
+  getImports: reportImports,
+  downloadReport: async (row: any) => {
+    const response = await serviceFetch(`/storage/v1/object/authenticated/${row.storage_bucket}/${row.storage_path}`);
+    return new Uint8Array(await response.arrayBuffer());
+  },
   getRoster: async () => {
     const published = await activePublished();
     if (!Array.isArray(published?.snapshot?.members)) throw Object.assign(new Error("尚無已生效的名錄快照"), { status: 503 });
@@ -6184,6 +6198,7 @@ Deno.serve(async (request) => {
     const context = await authenticate(request, identity);
     let result;
     if (path === "/api/partner-reports") result = await partnerReportsApi(request, url, context);
+    else if (path === "/api/member-interactions") result = await memberInteractionsApi(request, url, context);
     else if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
     else if (path === "/api/renewal-foundations") result = await renewalFoundationsApi(request, context);

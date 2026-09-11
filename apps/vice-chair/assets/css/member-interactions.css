@@ -1,0 +1,132 @@
+.member-tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+.member-tabs [aria-selected="true"] {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.history-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.history-controls label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+}
+.history-controls select {
+  width: 100%;
+  min-height: 44px;
+}
+.history-coverage {
+  padding: 14px 16px;
+  background: #f1f5f3;
+  border-left: 3px solid #497663;
+  border-radius: 4px;
+}
+.history-coverage.incomplete {
+  background: #fff8ea;
+  border-left-color: #a56812;
+}
+.history-coverage p,
+.history-note {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.history-coverage p {
+  margin: 6px 0 0;
+}
+.history-summary-title {
+  font-size: 16px;
+  margin: 22px 0 10px;
+}
+.history-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+.history-summary > div {
+  padding: 12px;
+  background: #f6f7f8;
+  border-radius: 6px;
+}
+.history-summary dt {
+  font-size: 14px;
+  color: var(--muted);
+}
+.history-summary dd {
+  margin: 4px 0 0;
+  font-size: 24px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.history-summary small {
+  font-size: 14px;
+  font-weight: 400;
+}
+.history-week {
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+.history-week summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.history-week summary::before {
+  content: "+";
+}
+.history-week[open] summary::before {
+  content: "−";
+}
+.history-week summary span:first-of-type {
+  flex: 1;
+}
+.history-week ul {
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+.history-event {
+  display: grid;
+  grid-template-columns: 105px minmax(0, 1fr);
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.history-kind {
+  font-size: 14px;
+  color: var(--muted);
+}
+.history-event p {
+  font-size: 14px;
+  color: var(--muted);
+  margin: 4px 0 0;
+  line-height: 1.5;
+}
+@media (max-width: 600px) {
+  .history-controls,
+  .history-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .history-event {
+    grid-template-columns: 80px minmax(0, 1fr);
+    gap: 8px;
+  }
+}
