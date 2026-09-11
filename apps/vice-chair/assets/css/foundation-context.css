@@ -258,3 +258,8 @@
 .foundation-modal footer {
   flex-wrap:wrap;
 }
+
+.history-changes > div { margin: 12px 0; padding: 12px; background: #f6f7fa; border-radius: 8px; overflow-wrap: anywhere; }
+.history-changes dt { font-weight: 700; margin-bottom: 6px; }
+.history-changes dd { margin: 4px 0; white-space: pre-wrap; }
+.history-changes dd span { color: #66778b; }

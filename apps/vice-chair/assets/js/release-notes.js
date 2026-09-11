@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.7.2", publishedAt: "2026-09-11", title: "地基歷程改為清楚的中文變更明細", level: "normal",
+      audience: "副主席與會員委員",
+      changes: Object.freeze([
+        "調整歷程只列有變動的中文欄位與前後內容，移除原始資料及內部代碼。",
+        "地基結束日與表單一致，顯示包含當日在內的日期。",
+        "只有工作坊確認受改期影響時才提示重新核對，並保留原確認內容供查閱。"
+      ]),
+      howTo: "在續約地基追蹤或續約訪談內開啟「查看歷程」，再展開「查看變更明細」。",
+      impact: "歷程更容易閱讀，原有調整原因、操作人、時間及稽核紀錄繼續保留。"
+    }),
+    Object.freeze({
       version: "1.7.1", publishedAt: "2026-09-11", title: "續約地基操作區移除教學干擾", level: "normal",
       audience: "副主席與會員委員",
       changes: Object.freeze([
