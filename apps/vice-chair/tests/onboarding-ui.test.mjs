@@ -29,7 +29,7 @@ const catalog=guideContext.window.FulianOnboardingGuides;
 
 test("首頁載入共用領域、角色教學、專屬樣式與導覽引擎",()=>{
   assert.match(index,/core\/onboarding-domain\.js\?v=3/);
-  assert.match(index,/assets\/js\/onboarding-guides\.js\?v=7/);
+  assert.match(index,/assets\/js\/onboarding-guides\.js\?v=8/);
   assert.match(index,/assets\/js\/onboarding\.js\?v=10/);
   assert.match(index,/assets\/css\/onboarding\.css\?v=7/);
   assert.match(index,/data-guide-page="page:index"/);
@@ -58,7 +58,7 @@ test("副主席與委員取得不同步驟，Admin 沒有任何版本",()=>{
 });
 
 test("完整導覽目錄具備固定版本、逐步文案與不重複識別",()=>{
-  const expected={vp:{guides:23,steps:313},committee:{guides:17,steps:205},public:{guides:2,steps:14}};
+  const expected={vp:{guides:24,steps:324},committee:{guides:18,steps:216},public:{guides:2,steps:14}};
   Object.entries(expected).forEach(([role,count])=>{
     const guides=catalog.listGuides(role);
     assert.equal(guides.length,count.guides,role+" 導覽數量不完整");
@@ -86,11 +86,11 @@ test("所有登入後工作頁都有頁面導覽，並由共用選單載入同�
   const workspacePages=[
     "accountability-emails","analysis-review","attendance","case-archive","case-board","case-workflow",
     "departure-form","industry-change-form","member-care","message-templates","midterm-form","monthly-meeting",
-    "new-member-form","renewal-foundations","routine-reminders","settings","system-updates","terminal-form","useful-links"
+    "new-member-form","partners","renewal-foundations","routine-reminders","settings","system-updates","terminal-form","useful-links"
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=18/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=19/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);

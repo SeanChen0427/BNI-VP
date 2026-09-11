@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#991b1f">
+  <title>夥伴名錄｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=8"></script>
+  <script src="assets/js/supabase-data.js?v=3"></script>
+  <script src="core/calendar-domain.js?v=5"></script>
+  <script src="core/partner-directory-domain.js?v=1"></script>
+  <link rel="stylesheet" href="assets/css/partners.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
+</head>
+<body>
+  <header class="topbar"><a href="index.html">← 返回工作總覽</a><div class="identity"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" data-auth-logout>登出</button></div></header>
+  <main>
+    <section class="hero"><div><p class="eyebrow">富聯分會・會員委員會</p><h1>夥伴名錄</h1><p>查夥伴、看會籍，依你需要的角度整理近況。</p></div><button id="refresh" type="button">重新載入資料</button></section>
+    <p id="loading" role="status">正在讀取本期夥伴資料…</p>
+    <section id="error" class="notice error" role="alert" hidden><h2>暫時無法顯示名錄</h2><p id="errorMessage"></p><button type="button" id="retry">重試</button></section>
+    <div id="content" hidden>
+      <section class="summary" aria-label="本期資料摘要"><article><small>本期名錄</small><strong id="memberCount">—</strong><span>位夥伴</span></article><article><small>未來 90 天到期</small><strong id="dueCount">—</strong><span>依本期會籍資料</span></article><article class="period-card"><small id="periodTitle">半年 PALMS</small><strong id="periodLabel">—</strong><span id="snapshotTime">—</span></article></section>
+      <details class="source-note"><summary>資料期間與使用說明</summary><div id="sourceDetails"></div><p>會籍、名單及半年／一年數據取自目前已生效的正式分析快照。這些報表完成審閱、發布並生效後，重新載入即可看到新一期；單月數據則直接讀取該月份最新的已驗證匯入報表。會籍報表的獨立更新時間目前未提供；快照更新時間不代表所有欄位都更新至當天。最新會籍與續約結果請至 BNI Connect 核對。</p><p>「本次在會月數」依最近入會／復會生效日至今日推算；生效日不等於實際首次出席日。活動數據是所選期間的累計，新加入夥伴的參與期間可能較短。提供／收到引薦各為內部與外部筆數合計，培訓採 PALMS 積分。</p></details>
+      <section class="controls" aria-label="搜尋、篩選與排序">
+        <div class="filter-grid"><label class="search-field">搜尋夥伴<input id="search" type="search" placeholder="姓名或專業別，可用空白分隔關鍵字" autocomplete="off"></label><label>專業別<select id="profession"><option value="">全部專業別</option></select></label><label>會籍到期<select id="expiry"><option value="all">全部日期</option><option value="month">本月到期</option><option value="30">未來 30 天</option><option value="90">未來 90 天</option><option value="past">報表日期已過・待核對</option><option value="missing">到期日尚無資料</option></select></label><label>活動資料期間<select id="period"><option value="half">半年 PALMS</option><option value="annual">一年 PALMS</option></select></label></div>
+        <div class="view-bar"><div class="presets" aria-label="常用欄位"><span>常用檢視</span><button type="button" data-preset="overview">總覽</button><button type="button" data-preset="membership">會籍</button><button type="button" data-preset="interaction">交流</button><button type="button" data-preset="attendance">出席</button></div><button id="reset" type="button" class="text-button">重設檢視與篩選</button></div>
+        <div class="sort-bar"><label>排序欄位<select id="sort"></select></label><label>排列方向<select id="direction"><option value="asc">由少到多／由早到晚</option><option value="desc">由多到少／由晚到早</option></select></label><span>也可點表頭切換排序；無資料固定置底。</span></div>
+        <details class="advanced"><summary>進階篩選與自選欄位</summary><div class="filter-grid"><label>到期日起<input id="from" type="date"></label><label>到期日迄<input id="to" type="date"></label><label>活動數值篩選<select id="metric"><option value="">不限制</option></select></label><div class="range"><label>最少<input id="min" type="number" min="0" step="any" placeholder="不限"></label><label>最多<input id="max" type="number" min="0" step="any" placeholder="不限"></label></div></div><fieldset><legend>顯示欄位（姓名固定顯示）</legend><div id="columnChoices" class="column-choices"></div></fieldset></details>
+      </section>
+      <div class="results-bar"><p id="resultCount" role="status" aria-live="polite"></p><p>點姓名查看個人詳情</p></div>
+      <p id="filterWarning" class="notice" role="alert" hidden></p>
+      <p id="monthlyNotice" class="notice" role="status" hidden></p>
+      <p id="periodWarning" class="notice" hidden>這份快照尚未提供所選 PALMS 的完整起訖日期，因此不顯示該期間的活動數字。請待資料補齊後重新載入。</p>
+      <div class="table-scroll" tabindex="0" role="region" aria-label="夥伴資料表，可左右捲動"><table><caption class="sr-only">本期夥伴名錄，可依表頭排序</caption><thead id="tableHead"></thead><tbody id="tableBody"></tbody></table></div>
+      <section id="empty" class="empty" hidden><h2>沒有符合條件的夥伴</h2><p>可調整搜尋、日期或數值範圍。</p><button type="button" id="clearFilters">清除篩選</button></section>
+    </div>
+  </main>
+  <dialog id="memberDialog" aria-labelledby="memberTitle"><div class="dialog-header"><div><small>夥伴資料</small><h2 id="memberTitle"></h2><p id="memberProfession"></p></div><button type="button" id="closeDialog" aria-label="關閉個人資料">×</button></div><div id="memberDetails"></div><p class="dialog-note">會籍與活動資料皆依本期快照；最新異動請至 BNI Connect 核對。</p></dialog>
+  <script src="assets/js/partners.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=19"></script>
+</body>
+</html>

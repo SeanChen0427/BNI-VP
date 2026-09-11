@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-09-09",
+  "updated": "2026-09-11",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -68,7 +68,9 @@
     "memberDirectoryLoader": "assets/js/member-directory.js",
     "productionApiBridge": "assets/js/supabase-data.js",
     "localPreviewApi": "preview-server.mjs",
-    "renewalFoundationTracking": "core/renewal-foundation-domain.js"
+    "renewalFoundationTracking": "core/renewal-foundation-domain.js",
+    "partnerDirectoryView": "core/partner-directory-domain.js",
+    "partnerMonthlyReports": "services/partner-reports.mjs"
   },
   "pages": {
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",
@@ -90,7 +92,8 @@
     "login.html": "Supabase Auth 共用帳號登入與姓名選擇",
     "renewal-foundations.html": "續約地基逐期追蹤、既有地基補登、人工提醒與工作坊確認",
     "system-updates.html": "使用者版更新紀錄、全文搜尋與分批載入歷史",
-    "handover-guide.html": "舊閱讀版網址相容入口，保留章節錨點導向 course.html"
+    "handover-guide.html": "舊閱讀版網址相容入口，保留章節錨點導向 course.html",
+    "partners.html": "夥伴名錄：會籍、單月／半年／一年 PALMS、自選欄位、搜尋、篩選與排序（v1.6.0）"
   },
   "dataContinuity": {
     "formalOperationalSource": "Supabase",

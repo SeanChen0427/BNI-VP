@@ -86,6 +86,7 @@
         {id:"reminders",section:"主選單",target:'[data-guide-id="nav.reminders"]',title:"常態通知",body:"管理會員委員會群的固定通知與發送排程，也能查看投遞結果。這是副主席管理入口，實際發送前仍有頁面內確認。",roles:VP_ONLY,fact:{label:"資料影響",text:"進入頁面不會發送訊息；按下正式發送功能才會影響群組。"},reveal:"sidebar"},
         {id:"foundations",section:"主選單",target:'[data-guide-id="nav.renewal-foundations"]',title:"續約地基追蹤",body:"持續追蹤續約時約定的來賓、培訓或工作坊目標。同會員的多項條件集中顯示；副主席可補登以前已有的地基，受指派人員可記錄提醒與回覆。",reveal:"sidebar"},
         {id:"monthly-meeting",section:"主選單",target:'[data-guide-id="nav.monthly-meeting"]',title:"會員委員會月會",body:"準備與保存每月會員委員會會議資料，包含出席、關懷、續約與工作分工；歷史月會也從同一頁查閱。",reveal:"sidebar"},
+        {id:"partners",section:"主選單",target:'[data-guide-id="nav.partners"]',title:"夥伴名錄",body:"查會籍與夥伴活動數據，可選單月、半年或一年，自己勾選欄位並排序。",reveal:"sidebar"},
         {id:"member-care",section:"主選單",target:'[data-guide-id="nav.member-care"]',title:"會員關懷儀表板",body:"查看分析核心同步的會員燈號、趨勢與關懷提示，再從需要關注的項目安排後續工作。系統只呈現分析結果，不會在此重算規則。",reveal:"sidebar"},
         {id:"resources",section:"資源與管理",target:'[data-guide-id="nav.resources"]',title:"常用資源",body:"展開常用文稿與外部連結。副主席會看到待寄當責信及文稿範本；會員委員只會看到其角色可用的連結。",fact:{label:"權限",text:"不同角色看到的子項目不同。"},reveal:"sidebar"},
         {id:"accountability",section:"資源與管理",target:'[data-guide-id="nav.accountability"]',title:"當責信待寄",body:"集中檢查符合提醒條件但尚未人工寄送的當責信，能複製文案、開啟 Email 並留下寄送紀錄。",roles:VP_ONLY,fact:{label:"注意",text:"進入清單不會寄信，正式寄送仍由你人工確認。"},reveal:"sidebar"},

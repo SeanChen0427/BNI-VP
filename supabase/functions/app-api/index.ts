@@ -11,6 +11,7 @@ import "../../../apps/vice-chair/core/annual-handover-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
+import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
 import {
   buildCaseFeedbackNoticeText,
   buildCaseResultAnnouncementMessage,
@@ -287,6 +288,16 @@ function expectedAuditWeeks(start: string, end: string) {
 async function reportImports() {
   return db("report_imports?select=*&order=imported_at.desc");
 }
+
+const partnerReportsApi = createPartnerReportsApi({
+  getImports: reportImports,
+  downloadReport,
+  getRoster: async () => {
+    const published = await activePublished();
+    if (!Array.isArray(published?.snapshot?.members)) throw Object.assign(new Error("尚無已生效的名錄快照"), { status: 503 });
+    return published.snapshot.members.map((member: any) => member.name);
+  },
+});
 
 function reportCategory(row: any) {
   const metadata = row?.metadata || {};
@@ -6172,7 +6183,8 @@ Deno.serve(async (request) => {
     const identity = url.searchParams.get("identity") || bodyForIdentity?.identity || "";
     const context = await authenticate(request, identity);
     let result;
-    if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
+    if (path === "/api/partner-reports") result = await partnerReportsApi(request, url, context);
+    else if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
     else if (path === "/api/renewal-foundations") result = await renewalFoundationsApi(request, context);
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);

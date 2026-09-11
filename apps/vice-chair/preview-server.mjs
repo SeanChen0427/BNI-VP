@@ -8,6 +8,7 @@ import {createCipheriv,createDecipheriv,randomBytes} from "node:crypto";
 import {buildBniAnalysisSnapshot,parsePalmsReport} from "./bni-bridge.mjs";
 import {analysisDraftApi,analysisSnapshotsApi} from "./services/analysis-draft.mjs";
 import {memberDepartureApi} from "./services/member-departure.mjs";
+import {createPartnerReportsApi} from "./services/partner-reports.mjs";
 import {taipeiDay} from "../bni-analysis/engine/time.mjs";
 
 const require=createRequire(import.meta.url),monthlyMeetingDomain=require("./core/monthly-meeting-domain.js");
@@ -328,9 +329,28 @@ async function staticFile(res,filePath,allowedRoot){
     res.writeHead(404,{"content-type":"text/plain; charset=utf-8"});res.end("Not found");
   }
 }
+const localPartnerReports=createPartnerReportsApi({
+  getImports:async()=>{
+    const directory=path.join(bniRoot(),"data","monthly");
+    const names=await readdir(directory).catch(error=>error.code==="ENOENT"?[]:Promise.reject(error));
+    const imports=[];
+    for(const name of names.filter(name=>name.endsWith(".xls"))){
+      const file=path.join(directory,name),report=parsePalmsReport(await readFile(file,"utf8")),info=await stat(file);
+      imports.push({id:name,report_type:"monthly_palms",period_start:report.periodStart,period_end:report.periodEnd,storage_path:file,imported_at:info.mtime.toISOString()});
+    }
+    return imports;
+  },
+  downloadReport:row=>readFile(row.storage_path,"utf8"),
+  getRoster:async()=>(await buildBniAnalysisSnapshot({bniRoot:bniRoot()})).members.map(member=>member.name),
+});
 const server=http.createServer(async(req,res)=>{
   const url=new URL(req.url,"http://127.0.0.1"),isApi=url.pathname.startsWith("/api/");
   if(isApi&&!trustedLocalRequest(req))return json(res,403,{message:"本機 API 僅允許由 localhost 使用，禁止透過公開隧道存取"});
+  if(url.pathname==="/api/partner-reports"){
+    const identity=url.searchParams.get("identity")||"";
+    try{return json(res,200,await localPartnerReports(req,url,{role:validIdentity(identity)?identityRole(identity):""}))}
+    catch(error){return json(res,error.status||500,{message:error.message})}
+  }
   if(url.pathname==="/api/company")return companyLookup(url,res);
   if(url.pathname==="/api/bni-analysis")return bniAnalysis(res);
   if(url.pathname==="/api/bni-monthly-attendance")return attendanceMonthly(url,res);
