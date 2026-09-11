@@ -1,6 +1,16 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.7.3", publishedAt: "2026-09-11", title: "地基常用操作排在前面", level: "normal",
+      audience: "副主席與會員委員",
+      changes: Object.freeze([
+        "「查看歷程」移到記錄與調整操作之後、「刪除地基」之前。",
+        "追蹤頁與續約訪談的按鈕順序同步，常用操作更容易找到。"
+      ]),
+      howTo: "展開「各期進度與操作」，即可依新順序使用按鈕。",
+      impact: "調整按鈕排列，各角色可用的功能與紀錄保持原有規則。"
+    }),
+    Object.freeze({
       version: "1.7.2", publishedAt: "2026-09-11", title: "地基歷程改為清楚的中文變更明細", level: "normal",
       audience: "副主席與會員委員",
       changes: Object.freeze([
