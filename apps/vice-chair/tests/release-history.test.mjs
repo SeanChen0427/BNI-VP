@@ -49,7 +49,7 @@ test('搜尋全部歷史而非已載入十筆，支援日期、大小寫、無�
   assert.equal(ui.get('clearReleaseSearch').disabled,true);
   assert.equal(ui.get('releaseEmpty').hidden,true);
   assert.equal(ui.document.activeElement,ui.get('releaseSearch'));
-  assert.equal(ui.get('currentReleaseVersion').textContent,'v1.7.4');
+  assert.equal(ui.get('currentReleaseVersion').textContent,'v1.7.5');
 });
 test('只按明確已讀按鈕才保存提示，三角色可閱讀且已讀狀態隔離',()=>{
   const storage=new Map();

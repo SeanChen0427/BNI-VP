@@ -187,7 +187,7 @@
       committee:"你可依分工完成點名、核對公告，並以記錄人身分完成第一層確認。",
       steps:[
         s("meeting","例會設定",'[data-guide-id="attendance.meeting-date"]',"選擇本次例會日期","日期決定目前編輯與保存的週次；切換前先留意頁首儲存狀態。"),
-        s("history-session","例會設定",'[data-guide-id="attendance.history-session"]',"載入已保存的歷史週次","選擇歷史日期會切換到該週紀錄，適合查閱或依權限更正；先確認目前草稿已保存。"),
+        s("history-session","例會設定",'[data-guide-id="attendance.history-session"]',"選擇最近週次或查歷史","下拉選單保留最近 8 個已保存週次；較早資料請按「查歷史」依年月選擇，查完可按「回到本週」。切換前會先保存編輯中的草稿。"),
         s("primary-recorder","例會設定",'[data-guide-id="attendance.primary-recorder"]',"指定主要紀錄委員","請選擇實際負責核對的人員；主要紀錄委員負責第一層確認。"),
         s("assistant-recorder","例會設定",'[data-guide-id="attendance.assistant-recorder"]',"指定協助點名委員","有共同點名者時選擇實際協作者，沒有則保持未選；不會改變主要紀錄人的確認責任。"),
         s("speech","例會設定",'[data-guide-id="attendance.speech-seconds"]',"設定會員分享秒數","公告預覽會使用此數字，但它不影響出席計分。"),

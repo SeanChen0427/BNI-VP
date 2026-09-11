@@ -9,6 +9,7 @@ import "../../../apps/vice-chair/core/accountability-email-domain.js";
 import "../../../apps/vice-chair/core/message-template-domain.js";
 import "../../../apps/vice-chair/core/annual-handover-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
+import { loadAttendanceHistory } from "./attendance-history.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
@@ -1481,12 +1482,13 @@ async function sendLineAttendance(meetingDate: string, context: Context) {
 
 async function attendanceState(meetingDate: string, context: Context) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(meetingDate)) throw new Error("例會日期格式不正確");
-  const [baseline, memberRows, provisionalRows, peopleRows, sessions] = await Promise.all([
+  const [baseline, memberRows, provisionalRows, peopleRows, sessions, selectedSessions] = await Promise.all([
     latestAttendancePalms(),
     db("members?status=eq.active&select=id,profession,people!inner(id,display_name)&order=created_at.asc"),
     db("provisional_members?status=eq.pending_palms&select=id,display_name,profession,joined_on&order=registered_at.asc"),
     db("people?status=eq.active&select=id,display_name"),
-    db("attendance_sessions?select=*&order=meeting_date.desc&limit=30"),
+    loadAttendanceHistory(db),
+    db(`attendance_sessions?meeting_date=eq.${meetingDate}&select=*&limit=1`),
   ]);
   const officialMembers = memberRows.map((row: any) => ({
     id: row.id,
@@ -1510,7 +1512,7 @@ async function attendanceState(meetingDate: string, context: Context) {
   const provisionalById = new Map(provisionalMembers.map((member: any) => [member.id, member]));
   const memberByAttendanceId = new Map(members.map((member: any) => [member.attendanceId, member]));
   const people = new Map(peopleRows.map((person: any) => [person.id, person.display_name]));
-  const currentSession = sessions.find((session: any) => session.meeting_date === meetingDate) || null;
+  const currentSession = selectedSessions[0] || null;
   const currentRecords = currentSession
     ? await db(`attendance_records?session_id=eq.${currentSession.id}&select=*&order=created_at.asc`)
     : [];

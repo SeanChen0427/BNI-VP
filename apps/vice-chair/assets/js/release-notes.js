@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.7.5", publishedAt: "2026-09-12", title: "點名歷史按年月輕鬆查找", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze([
+        "常用選單保留最近 8 個已保存週次，較早紀錄可按年份、月份查找。",
+        "新增「回到本週」，歷史紀錄仍完整保留，草稿與已確認狀態清楚標示。",
+        "修正較早週次無法載入的問題，切換前會先保存編輯中的草稿。"
+      ]),
+      howTo: "進入每週點名與出席公告，使用最近週次選單；查找更早日期時按「查歷史」，選擇年份、月份及該月週次。",
+      impact: "改善查找與切換操作，保留既有點名紀錄、確認權限及 PALMS 計分規則。"
+    }),
+    Object.freeze({
       version: "1.7.4", publishedAt: "2026-09-12", title: "查看夥伴每月互動歷程", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze([

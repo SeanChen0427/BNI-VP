@@ -10,6 +10,10 @@
   let members=[];
   let rows=[];
   let timer=null;
+  let pendingSave=null;
+  let draftDirty=false;
+  let dateLoading=false;
+  let activeDate="";
   let palmsReady=false;
   let palmsPeriod="最新 PALMS 尚未載入";
   let confirmed=false;
@@ -106,13 +110,15 @@ ${groupedLines("缺席",absenceTotal)}
   function applyPermissions(){
     const box=$("#vpConfirmed"),label=$("#vpConfirmLabel"),note=$("#vpPermissionNote"),reopen=$("#reopenWeek");
     if(!canFinalConfirm()&&box.checked)box.checked=false;
-    box.disabled=!canFinalConfirm()||confirmed;
+    box.disabled=!canFinalConfirm()||confirmed||dateLoading;
     reopen.hidden=!(confirmed&&canFinalConfirm());
+    reopen.disabled=dateLoading;
     label.classList.toggle("permission-locked",!canFinalConfirm());
     note.textContent=confirmed?(canFinalConfirm()?"可重新開啟修改":"本週已確認"):canFinalConfirm()?"副主席權限已開啟":"僅副主席可操作";
     $$("[data-save], [data-bulk], #clearWeek").forEach(node=>{
       if(node.id==="loginUser")return;
-      node.disabled=confirmed;
+      node.disabled=node.id==="meetingDate"?dateLoading:confirmed||dateLoading;
+      if(node.id==="vpConfirmed")node.disabled ||= !canFinalConfirm();
     });
   }
   function renderRows(){
@@ -132,14 +138,65 @@ ${groupedLines("缺席",absenceTotal)}
       scheduleSave();
     }));
   }
+  function sortedHistory(){return [...history].sort((a,b)=>b.meetingDate.localeCompare(a.meetingDate))}
+  function historyOptions(items){return items.map(item=>`<option value="${escapeHtml(item.meetingDate)}">${escapeHtml(item.meetingDate)}・${item.status==="confirmed"?"已確認":"草稿"}</option>`).join("")}
+  function renderArchive(){
+    const year=$("#historyYear"),month=$("#historyMonth"),select=$("#historyMonthSession");
+    const selectedYear=year.value,selectedMonth=month.value;
+    const dates=sortedHistory();
+    const years=[...new Set(dates.map(item=>item.meetingDate.slice(0,4)))];
+    year.innerHTML=years.map(value=>`<option value="${value}">${value} 年</option>`).join("");
+    if(years.includes(selectedYear))year.value=selectedYear;
+    const months=[...new Set(dates.filter(item=>item.meetingDate.startsWith(`${year.value}-`)).map(item=>item.meetingDate.slice(5,7)))];
+    month.innerHTML=months.map(value=>`<option value="${value}">${Number(value)} 月</option>`).join("");
+    if(months.includes(selectedMonth))month.value=selectedMonth;
+    const items=dates.filter(item=>item.meetingDate.startsWith(`${year.value}-${month.value}-`));
+    select.innerHTML=`<option value="">選擇該月週次</option>${historyOptions(items)}`;
+    if(items.some(item=>item.meetingDate===activeDate))select.value=activeDate;
+    year.disabled=month.disabled=select.disabled=dateLoading||!dates.length;
+    $("#historySummary").textContent=dates.length?`${year.value} 年 ${Number(month.value)} 月共 ${items.length} 筆紀錄・完整歷史共 ${dates.length} 筆，均保留可查閱。`:"尚無已保存週次。開始點名並保存後，紀錄會顯示在這裡。";
+  }
+  function currentWeekDate(){
+    const today=calendar.dateInput();
+    const weekday=new Date(`${today}T00:00:00Z`).getUTCDay();
+    const start=calendar.shiftDayKey(today,-((weekday+6)%7));
+    const end=calendar.shiftDayKey(start,6);
+    return sortedHistory().find(item=>item.meetingDate>=start&&item.meetingDate<=end)?.meetingDate||today;
+  }
   function renderHistory(){
     const select=$("#historySession");
-    select.innerHTML=`<option value="">選擇已保存週次</option>${history.map(item=>`<option value="${item.meetingDate}">${item.meetingDate}・${item.status==="confirmed"?"已確認":"草稿"}</option>`).join("")}`;
-    const date=$("#meetingDate").value;
-    if(history.some(item=>item.meetingDate===date))select.value=date;
+    const recent=sortedHistory().slice(0,8);
+    select.innerHTML=`<option value="">選擇最近已保存週次</option>${historyOptions(recent)}`;
+    if(recent.some(item=>item.meetingDate===activeDate))select.value=activeDate;
+    $("#historyCurrent").textContent=`目前查看：${activeDate||$("#meetingDate").value}${confirmed?"・已確認":"・草稿"}`;
+    renderArchive();
   }
+  async function switchDate(date){
+    $("#meetingDate").value=activeDate;
+    if(dateLoading||!calendar.dateInput(date)||date===activeDate){renderHistory();return}
+    dateLoading=true;
+    update();
+    clearTimeout(timer);timer=null;
+    try{
+      while(pendingSave)await pendingSave;
+      if(draftDirty&&!await saveDraft()){
+        toast("草稿尚未保存成功，已保留目前週次，請稍後再試。");
+        return;
+      }
+      await loadDate(date);
+    }finally{
+      dateLoading=false;
+      renderRows();
+      renderHistory();
+      update();
+    }
+  }
+
   function update(){
     applyPermissions();
+    $$("#historySession, #toggleHistory, #returnCurrentWeek").forEach(node=>node.disabled=dateLoading);
+    $$("#historyYear, #historyMonth, #historyMonthSession").forEach(node=>node.disabled=dateLoading||!history.length);
+    if(dateLoading)$$("#memberRows input, #reopenWeek").forEach(node=>node.disabled=true);
     const weeklyLate=rows.filter(currentLate),weeklyProxy=rows.filter(row=>row.proxy),weeklyAbsence=rows.filter(currentAbsence);
     $("#totalCount").textContent=rows.length;
     $("#count630").textContent=rows.filter(row=>row.at630).length;
@@ -155,7 +212,7 @@ ${groupedLines("缺席",absenceTotal)}
     });
     const ready=palmsReady&&$("#recorderConfirmed").checked&&$("#vpConfirmed").checked&&!confirmed;
     const state=$("#sendState"),button=$("#confirmWeek");
-    button.disabled=!ready;
+    button.disabled=!ready||dateLoading;
     state.className=`send-state${confirmed?" sent":ready?" ready":""}`;
     state.querySelector("span").textContent=confirmed
       ?"本週紀錄已確認並鎖定"
@@ -165,6 +222,7 @@ ${groupedLines("缺席",absenceTotal)}
           ?"雙重確認完成，可以鎖定本週紀錄"
           :"尚未達到確認條件";
     renderLineState();
+    if(dateLoading)$("#sendLineAnnouncement").disabled=true;
   }
 
   function lineTime(value){
@@ -218,7 +276,7 @@ ${groupedLines("缺席",absenceTotal)}
   }
   function payload(){
     return{
-      meetingDate:$("#meetingDate").value,
+      meetingDate:activeDate||$("#meetingDate").value,
       primaryRecorder:$("#primaryRecorder").value,
       assistantRecorder:$("#assistantRecorder").value,
       speechSeconds:$("#speechSeconds").value,
@@ -234,25 +292,36 @@ ${groupedLines("缺席",absenceTotal)}
     return snapshot;
   }
   async function saveDraft(){
-    if(confirmed)return;
+    if(confirmed)return true;
+    if(pendingSave)await pendingSave;
     const snapshot=saveLocalDraft();
+    draftDirty=false;
     $("#saveState").textContent="正在保存至 Supabase…";
-    try{
-      await api("POST",{action:"save-draft",...snapshot});
-      $("#saveState").textContent="草稿與日期紀錄已保存";
-      $("#saveTime").textContent=`Supabase 最後保存 ${calendar.formatTaipeiTime(new Date())}`;
-    }catch(error){
-      $("#saveState").textContent="Supabase 保存失敗";
-      $("#saveTime").textContent=`本機草稿已保留・${error.message}`;
-    }
-    update();
+    const operation=(async()=>{
+      try{
+        await api("POST",{action:"save-draft",...snapshot});
+        history=[...history.filter(item=>item.meetingDate!==snapshot.meetingDate),{meetingDate:snapshot.meetingDate,status:"draft"}];
+        renderHistory();
+        $("#saveState").textContent="草稿與日期紀錄已保存";
+        $("#saveTime").textContent=`Supabase 最後保存 ${calendar.formatTaipeiTime(new Date())}`;
+        return true;
+      }catch(error){
+        draftDirty=true;
+        $("#saveState").textContent="Supabase 保存失敗";
+        $("#saveTime").textContent=`本機草稿已保留・${error.message}`;
+        return false;
+      }
+    })();
+    pendingSave=operation;
+    try{return await operation}finally{if(pendingSave===operation)pendingSave=null;update()}
   }
   function scheduleSave(){
     if(confirmed)return;
     storedAnnouncement="";
+    draftDirty=true;
     $("#saveState").textContent="編輯中…";
     clearTimeout(timer);
-    timer=setTimeout(saveDraft,650);
+    timer=setTimeout(()=>{timer=null;saveDraft()},650);
     update();
   }
   function applyTotals(state){
@@ -271,11 +340,16 @@ ${groupedLines("缺席",absenceTotal)}
     $("#palmsPeriod").textContent=palmsPeriod;
   }
   async function loadDate(date){
-    clearTimeout(timer);
+    clearTimeout(timer);timer=null;
+    dateLoading=true;
+    update();
     $("#saveState").textContent="正在讀取 Supabase 週次…";
     $("#saveTime").textContent=date;
     try{
       const state=await api("GET",null,date);
+      activeDate=date;
+      $("#meetingDate").value=date;
+      draftDirty=false;
       members=state.members||[];
       applyTotals(state);
       history=state.history||[];
@@ -300,12 +374,14 @@ ${groupedLines("缺席",absenceTotal)}
       palmsReady=false;
       palmsPeriod=`PALMS／週次讀取失敗：${error.message}`;
       $("#palmsPeriod").textContent=palmsPeriod;
-      rows=members.map(defaultState);
+      $("#meetingDate").value=activeDate||date;
       lineState={visible:isLeadership(),configured:false,discoveredTargets:[]};
       renderRows();
       $("#saveState").textContent="資料載入失敗";
       $("#saveTime").textContent=error.message;
     }
+    dateLoading=false;
+    renderRows();
     update();
   }
   async function migrateConfirmedLocalHistory(){
@@ -411,7 +487,7 @@ ${groupedLines("缺席",absenceTotal)}
     await migrateConfirmedLocalHistory();
     await loadDate($("#meetingDate").value);
     $$("[data-save]").forEach(element=>{
-      if(element.id==="meetingDate")element.addEventListener("change",()=>loadDate(element.value));
+      if(element.id==="meetingDate")element.addEventListener("change",()=>switchDate(element.value));
       else{
         element.addEventListener("change",scheduleSave);
         element.addEventListener("input",scheduleSave);
@@ -419,9 +495,24 @@ ${groupedLines("缺席",absenceTotal)}
     });
     $("#historySession").onchange=event=>{
       if(!event.target.value)return;
-      $("#meetingDate").value=event.target.value;
-      loadDate(event.target.value);
+      switchDate(event.target.value);
     };
+    $("#historyMonthSession").onchange=event=>{if(event.target.value)switchDate(event.target.value)};
+    $("#historyYear").onchange=renderArchive;
+    $("#historyMonth").onchange=renderArchive;
+    $("#toggleHistory").onclick=()=>{
+      const panel=$("#historyArchive"),button=$("#toggleHistory");
+      panel.hidden=!panel.hidden;
+      button.setAttribute("aria-expanded",String(!panel.hidden));
+      button.textContent=panel.hidden?"查歷史":"收起歷史";
+      if(!panel.hidden){
+        $("#historyYear").value=activeDate.slice(0,4);
+        renderArchive();
+        $("#historyMonth").value=activeDate.slice(5,7);
+        renderArchive();
+      }
+    };
+    $("#returnCurrentWeek").onclick=()=>switchDate(currentWeekDate());
     $$("[data-bulk]").forEach(button=>button.onclick=()=>{
       if(confirmed)return;
       const type=button.dataset.bulk;
