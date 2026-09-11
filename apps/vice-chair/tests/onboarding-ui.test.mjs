@@ -90,7 +90,7 @@ test("所有登入後工作頁都有頁面導覽，並由共用選單載入同�
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=19/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=20/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);

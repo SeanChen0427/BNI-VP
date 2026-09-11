@@ -1,7 +1,7 @@
 {
   "schema": "fulian.product-version-policy.v1",
   "legacyThrough": "1.0.25",
-  "previousVersion": "1.5.0",
-  "currentVersion": "1.6.0",
+  "previousVersion": "1.6.0",
+  "currentVersion": "1.7.0",
   "changeType": "feature"
 }

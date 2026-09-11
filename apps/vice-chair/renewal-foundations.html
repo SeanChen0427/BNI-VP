@@ -7,6 +7,7 @@
   <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
   <link rel="stylesheet" href="assets/css/renewal-foundations.css?v=4">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
+  <link rel="stylesheet" href="assets/css/page-hero.css?v=1">
   <script src="assets/js/supabase-config.js?v=1"></script>
   <script src="assets/js/auth.js?v=8"></script>
   <script src="assets/js/supabase-data.js?v=3"></script>
@@ -16,7 +17,7 @@
 <body>
   <header class="topbar"><a href="index.html">← 回工作台</a><strong>富聯分會</strong><div><span data-auth-name>使用者</span>・<span data-auth-role>職務</span> <button data-auth-logout>登出</button></div></header>
   <main>
-    <section class="hero"><div><small>RENEWAL FOLLOW-UP</small><h1>續約地基追蹤</h1><p>新約定在續約訪談中設定；使用系統前已有的約定，可由副主席在此補登並接續追蹤。</p></div><button class="primary" id="createFoundation" hidden>＋ 新增一項地基</button><button class="primary" id="importLegacyFoundation" hidden>＋ 補登既有地基</button></section>
+    <section class="hero workspace-hero"><div><small>RENEWAL FOLLOW-UP</small><h1>續約地基追蹤</h1><p>新約定在續約訪談中設定；使用系統前已有的約定，可由副主席在此補登並接續追蹤。</p></div><button class="primary" id="createFoundation" hidden>＋ 新增一項地基</button><button class="primary" id="importLegacyFoundation" hidden>＋ 補登既有地基</button></section>
     <p class="notice">續約訪談結案後仍持續追蹤。達成結果須人工確認；期限已過會提示檢視，正式處置依委員會與董事顧問流程辦理。</p>
     <div id="pageMessage" role="status" aria-live="polite"></div>
     <section class="summary" aria-label="追蹤摘要"><article><span>持續列管</span><b id="activeCount">—</b></article><article><span>需要跟進</span><b id="attentionCount">—</b></article><article><span>尚無提醒紀錄</span><b id="unremindedCount">—</b></article><article><span>已確認達成</span><b id="achievedCount">—</b></article></section>
@@ -63,6 +64,6 @@
   <dialog id="detailDialog" aria-labelledby="detailTitle"><header><h2 id="detailTitle">地基與追蹤歷程</h2><button type="button" data-close aria-label="關閉">×</button></header><button type="button" data-foundation-guide="detail">？ 歷程閱讀教學</button><div id="detailContent"></div></dialog>
   <script src="assets/js/foundation-control-guides.js?v=1"></script>
   <script src="assets/js/renewal-foundations.js?v=8"></script>
-  <script src="assets/js/workspace-nav.js?v=19"></script>
+  <script src="assets/js/workspace-nav.js?v=20"></script>
 </body>
 </html>

@@ -2,15 +2,16 @@
   if(!window.FulianAuth?.can("view"))return;
   const D=window.FulianPartnerDirectoryDomain,C=window.FulianCalendarDomain,$=selector=>document.querySelector(selector);
   const escape=value=>String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
-  const preferenceKey="fulian-partner-view-v1",numeric=new Intl.NumberFormat("zh-TW",{maximumFractionDigits:2});
+  const preferenceKey="fulian-partner-view-v2",numeric=new Intl.NumberFormat("zh-TW",{maximumFractionDigits:2});
   let saved={};try{saved=JSON.parse(localStorage.getItem(preferenceKey)||"{}")}catch{}
   let state=D.preferences(saved),snapshot=null,displaySnapshot=null,allRows=[],generation=0,busy=false,monthlyData=null,catalogError="";
-  const filterIds=["search","profession","expiry","from","to","metric","min","max"];
+  let selected=new Set(),currentResult=[],currentColumns=[];
+  const filterIds=["expiry","from","to","metric","min","max"];
   const periodName=()=>state.period.startsWith("month:")?`${state.period.slice(6)} 單月 PALMS`:state.period==="annual"?"一年 PALMS":"半年 PALMS";
   const periodText=period=>period?`${period.start} 至 ${period.end}`:"尚未提供資料期間";
   const timeText=value=>C.formatTaipeiTimestamp(value,{year:true})||"未提供";
   function savePreferences(){try{localStorage.setItem(preferenceKey,JSON.stringify(D.preferences(state)))}catch{}}
-  function filters(){return Object.fromEntries(filterIds.map(id=>[id,$(`#${id}`).value]))}
+  function filters(){return {...Object.fromEntries(filterIds.map(id=>[id,$(`#${id}`).value])),selected:[...selected]}}
   function format(row,column){const value=row[column.key];return value===null||value===""?"尚無資料":column.type==="number"?numeric.format(value):String(value)}
   function notice(message){$("#monthlyNotice").hidden=!message;$("#monthlyNotice").textContent=message}
   function syncControls(){
@@ -20,7 +21,7 @@
     $("#min").disabled=$("#max").disabled=!$("#metric").value;
   }
   function render(){
-    syncControls();if(!displaySnapshot||busy)return;
+    syncControls();currentResult=[];updateExportButtons();if(!displaySnapshot||busy)return;
     allRows=D.rows(displaySnapshot,state.period);
     const options={...filters(),sort:state.sort,direction:state.direction};
     const invalidDates=options.from&&options.to&&options.from>options.to;
@@ -29,6 +30,8 @@
     $("#filterWarning").textContent=invalidDates?"到期日起日不能晚於迄日，請調整範圍。":invalidNumbers?"最少值不能大於最多值，請調整範圍。":"";
     const result=invalidDates||invalidNumbers?[]:D.query(allRows,options);
     const visible=D.columns.filter(column=>state.columns.includes(column.key));
+    currentResult=result;currentColumns=visible;updateExportButtons();
+    $("#filterSummary").textContent=criteria().join(" · ");
     $("#tableHead").innerHTML=`<tr>${visible.map(column=>`<th scope="col" aria-sort="${state.sort===column.key?(state.direction==="asc"?"ascending":"descending"):"none"}"><button type="button" data-sort="${column.key}">${column.label}<span aria-hidden="true">${state.sort===column.key?(state.direction==="asc"?" ↑":" ↓"):" ↕"}</span></button></th>`).join("")}</tr>`;
     $("#tableBody").innerHTML=result.map(row=>`<tr>${visible.map(column=>{
       if(column.key==="name")return `<th scope="row"><button class="member-name" type="button" data-member="${escape(row.name)}">${escape(row.name)}</button></th>`;
@@ -62,7 +65,7 @@
     if(month)query.set("month",month);return `/api/partner-reports?${query}`;
   }
   async function selectPeriod(){
-    const ticket=++generation;busy=true;monthlyData=null;displaySnapshot=null;
+    const ticket=++generation;busy=true;monthlyData=null;displaySnapshot=null;currentResult=[];updateExportButtons();
     $("#memberDialog").close();$(".table-scroll").hidden=true;$("#empty").hidden=true;$("#periodWarning").hidden=true;$("#filterWarning").hidden=true;
     $("#resultCount").textContent="正在讀取所選期間…";$("#periodTitle").textContent=periodName();$("#periodLabel").textContent="讀取中…";$("#snapshotTime").textContent="";notice("");
     try{
@@ -79,7 +82,7 @@
     }
   }
   async function load(){
-    const ticket=++generation;busy=true;snapshot=null;displaySnapshot=null;allRows=[];$("#memberDialog").close();
+    const ticket=++generation;busy=true;currentResult=[];updateExportButtons();snapshot=null;displaySnapshot=null;allRows=[];$("#memberDialog").close();
     $("#loading").hidden=false;$("#content").hidden=true;$("#error").hidden=true;$("#refresh").disabled=true;
     try{
       const [analysis,months]=await Promise.allSettled([readApi("/api/bni-analysis"),readApi(reportUrl())]);
@@ -91,10 +94,7 @@
       else catalogError="單月月份清單暫時無法取得，可按「重新載入資料」重試；半年與一年資料仍可查閱。";
       $("#period").innerHTML='<option value="half">半年 PALMS</option><option value="annual">一年 PALMS</option>'+catalog.map(item=>`<option value="month:${item.month}">${item.month} 單月 PALMS</option>`).join("");
       if(state.period.startsWith("month:")&&!catalog.some(item=>`month:${item.month}`===state.period)){state.period="half";catalogError=catalogError||"先前選擇的月份目前無可用報表，已切回半年 PALMS。"}
-      const professions=[...new Set(snapshot.members.map(member=>String(member.profession||"")).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant"));
-      const previousProfession=$("#profession").value;
-      $("#profession").innerHTML='<option value="">全部專業別</option>'+professions.map(value=>`<option>${escape(value)}</option>`).join("");
-      if(professions.includes(previousProfession))$("#profession").value=previousProfession;
+      renderPicker();
       $("#sourceDetails").innerHTML=`<p>半年 PALMS：${escape(periodText(D.period(snapshot,"half")))}</p><p>一年 PALMS：${escape(periodText(D.period(snapshot,"annual")))}</p><p>名錄快照更新：${escape(timeText(snapshot.source?.modifiedAt))}</p><p>單月 PALMS 直接讀取已驗證匯入的該月報表，無須等待分析發布；同月份以最新匯入版本為準。切換月份只改變活動數據，會籍與名單維持目前快照。</p>`;
       $("#content").hidden=false;syncControls();await selectPeriod();
     }catch(error){$("#error").hidden=false;$("#errorMessage").textContent=error.message||"請稍後重試"}
@@ -110,10 +110,37 @@
   $("#tableBody").onclick=event=>{const button=event.target.closest("[data-member]");if(button)showMember(button.dataset.member)};
   $("#columnChoices").onchange=()=>{state.columns=["name",...[...$("#columnChoices").querySelectorAll("input:checked")].map(input=>input.value)];render();savePreferences()};
   document.querySelectorAll("[data-preset]").forEach(button=>button.onclick=()=>{state.columns=[...D.presets[button.dataset.preset]];render();savePreferences()});
-  function clearFilters(){filterIds.forEach(id=>$(`#${id}`).value=id==="expiry"?"all":"");render()}
+  function clearFilters(){selected.clear();$("#search").value="";renderPicker();filterIds.forEach(id=>$(`#${id}`).value=id==="expiry"?"all":"");render()}
   $("#clearFilters").onclick=clearFilters;
   $("#reset").onclick=()=>{state=D.preferences();clearFilters();syncControls();selectPeriod()};
   $("#closeDialog").onclick=()=>$("#memberDialog").close();
   $("#refresh").onclick=load;$("#retry").onclick=load;
+  function updateExportButtons(){for(const id of ["copyResults","exportImage"])$("#"+id).disabled=busy||!currentResult.length}
+  function criteria(){
+    const f=filters(),items=[selected.size?`已選夥伴：${[...selected].join("、")}`:"全部夥伴",periodName()];
+    if(f.expiry!=="all")items.push($("#expiry").selectedOptions[0].textContent);
+    if(f.from||f.to)items.push(`到期日：${f.from||"不限"} 至 ${f.to||"不限"}`);
+    if(f.metric&&(f.min!==""||f.max!=="")){const c=D.columns.find(c=>c.key===f.metric);items.push(`${c.label}：${f.min===""?"不限":f.min}–${f.max===""?"不限":f.max} ${c.unit}`)}
+    return items;
+  }
+  function renderPicker(){
+    const text=$("#search").value.trim().toLocaleLowerCase("zh-TW");
+    const matches=(snapshot?.members||[]).filter(m=>(m.name+" "+(m.profession||"")).toLocaleLowerCase("zh-TW").includes(text));
+    $("#partnerOptions").innerHTML=matches.length?matches.map(m=>`<button type="button" data-pick="${escape(m.name)}" aria-pressed="${selected.has(m.name)}"><span>${selected.has(m.name)?"✓ ":""}${escape(m.name)}</span><small>${escape(m.profession||"")}</small></button>`).join(""):"<p>沒有符合的夥伴</p>";
+    $("#selectedPartners").innerHTML=[...selected].map(name=>`<button type="button" data-remove="${escape(name)}" aria-label="移除 ${escape(name)}">${escape(name)} <span aria-hidden="true">×</span></button>`).join("");
+  }
+  function pickerOpen(open){$("#partnerOptions").hidden=!open;$("#search").setAttribute("aria-expanded",String(open));if(open)renderPicker()}
+  $("#search").onfocus=()=>pickerOpen(true);$("#search").onclick=()=>pickerOpen(true);$("#search").oninput=()=>pickerOpen(true);
+  $("#search").onkeydown=event=>{if(event.key==="Escape")pickerOpen(false);if(event.key==="ArrowDown"){event.preventDefault();pickerOpen(true);$("#partnerOptions button")?.focus()}};
+  $("#partnerOptions").onclick=event=>{event.stopPropagation();const name=event.target.closest("[data-pick]")?.dataset.pick;if(!name)return;selected.has(name)?selected.delete(name):selected.add(name);$("#search").value="";renderPicker();render();$("#search").focus({preventScroll:true})};
+  $("#selectedPartners").onclick=event=>{const name=event.target.closest("[data-remove]")?.dataset.remove;if(!name)return;selected.delete(name);renderPicker();render()};
+  document.addEventListener("click",event=>{if(!event.target.closest(".partner-picker"))pickerOpen(false)});
+  document.addEventListener("keydown",event=>{if(event.key==="Escape"){pickerOpen(false);if(!document.querySelector("dialog[open]"))setExpanded(false)}});
+  function setExpanded(expanded){const panel=$("#resultsPanel");panel.classList.toggle("expanded",expanded);document.body.classList.toggle("table-expanded",expanded);$("#expandTable").textContent=expanded?"收回表格":"展開表格";$("#expandTable").setAttribute("aria-expanded",String(expanded));if(expanded){panel.setAttribute("role","dialog");panel.setAttribute("aria-modal","true");$(".topbar").inert=true;for(const child of $("#content").children)if(child!==panel)child.inert=true;$(".hero").inert=true;$("#expandTable").focus()}else{panel.removeAttribute("role");panel.removeAttribute("aria-modal");$(".topbar").inert=false;for(const child of $("#content").children)child.inert=false;$(".hero").inert=false}}
+  $("#expandTable").onclick=()=>setExpanded(!$("#resultsPanel").classList.contains("expanded"));
+  function exportModel(){return window.FulianPartnerExportDomain.build({columns:currentColumns,rows:currentResult.map(row=>currentColumns.map(c=>format(row,c))),meta:[periodName()+"："+periodText(D.period(displaySnapshot,state.period)),...criteria().slice(0,1),...criteria().slice(2),`共 ${currentResult.length} 位；依${D.columns.find(c=>c.key===state.sort).label}${state.direction==="asc"?"升冪":"降冪"}排列`,`名錄快照更新：${timeText(snapshot.source?.modifiedAt)}`,...(monthlyData?[`單月匯入：${timeText(monthlyData.importedAt)}`]:[]),"會籍採目前快照；活動依所選報表期間。"]})}
+  $("#exportImage").onclick=()=>{if(currentResult.length&&!busy)window.FulianPartnerExport.show(exportModel())};
+  $("#copyResults").onclick=async()=>{if(!currentResult.length||busy)return;const model=exportModel();try{await navigator.clipboard.writeText(model.text);$("#exportStatus").textContent=`已複製 ${model.rows.length} 位夥伴的文字名單`}catch{$("#copyText").value=model.text;$("#copyDialog").showModal();$("#copyText").select()}};
+  $("#closeCopy").onclick=()=>$("#copyDialog").close();
   syncControls();load();
 })();

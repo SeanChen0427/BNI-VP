@@ -171,7 +171,7 @@
     if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
-      script.src=`${src}?v=14`;
+      script.src=`${src}?v=15`;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);

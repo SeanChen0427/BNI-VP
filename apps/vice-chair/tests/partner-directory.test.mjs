@@ -83,3 +83,24 @@ test("單月索引與實際期間或姓名矛盾時停止，不返回錯誤數�
   await assert.rejects(build([row("one","2026-09-03")],xml().replaceAll("2026-08","2026-07"))({method:"GET"},url,{role:"vp"}),/期間不一致/);
   await assert.rejects(build([row("one","2026-09-03")],xml(["測試甲","測 試 甲"]))({method:"GET"},url,{role:"vp"}),/姓名缺漏或重複/);
 });
+
+test("多選夥伴採聯集，再套用活動篩選，沒有選人時顯示全部",()=>{
+  const rows=D.rows(snapshot(),"half",now);
+  assert.deepEqual(D.query(rows,{selected:["測試甲","測 試 乙"],metric:"oneToOne",max:"5"}).map(r=>r.name),["測試乙"]);
+  assert.equal(D.query(rows,{selected:[]}).length,3);
+  assert.deepEqual(D.preferences().columns,["name","oneToOne","given","received","visitors","education","amount"]);
+});
+const E=require("../core/partner-export-domain.js");
+test("匯出只包含所選欄位與已排序結果，保留期間條件、零及缺資料",()=>{
+  const model=E.build({columns:[D.columns[0],D.columns.find(c=>c.key==="visitors")],rows:[["測試乙","0"],["測試甲","尚無資料"]],meta:["一年 PALMS：2025-09-01 至 2026-08-31","來賓：0–3 位"]});
+  assert.match(model.text,/2025-09-01 至 2026-08-31/);assert.match(model.text,/來賓：0–3 位/);
+  assert.ok(model.text.indexOf("測試乙")<model.text.indexOf("測試甲"));assert.match(model.text,/來賓（位）：0/);
+  assert.doesNotMatch(model.text,/專業別|會籍到期日|undefined/);assert.equal(model.pages.length,1);
+  assert.throws(()=>E.build({columns:[D.columns[0]],rows:[]}),/沒有可匯出/);
+});
+test("長名單與寬表格自動分頁，所有欄位和每位姓名都保留",()=>{
+  const columns=D.columns.slice(0,15),rows=Array.from({length:35},(_,r)=>columns.map((c,i)=>i?String(r*100+i):`測試${r}`));
+  const model=E.build({columns,rows});assert.equal(model.pages.length,9);
+  assert.ok(model.pages.every(p=>p.columns[0].key==="name"&&p.rows.length<=16&&p.columns.length<=7));
+  for(let row=0;row<35;row++)for(let col=1;col<15;col++)assert.ok(model.pages.some(p=>p.columns.some(c=>c.key===columns[col].key)&&p.rows.some(r=>r[0]===`測試${row}`&&r.includes(String(row*100+col)))));
+});

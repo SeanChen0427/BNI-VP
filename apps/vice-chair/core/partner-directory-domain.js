@@ -30,7 +30,7 @@
     membership:["name","profession","expiryDate","recentActivation","tenureMonths"],
     interaction:["name","profession","oneToOne","given","received","visitors","education","amount"],
     attendance:["name","profession","attendance","absence","late","sick","substitutes"],
-    overview:["name","profession","expiryDate","oneToOne","given","visitors","education"],
+    overview:["name","oneToOne","given","received","visitors","education","amount"],
   });
   const normalize=value=>String(value??"").normalize("NFKC").replace(/\s+/gu,"").toLocaleLowerCase("zh-TW");
   const number=value=>typeof value!=="number"&&typeof value!=="string"||value===null||String(value).trim()===""||!Number.isFinite(Number(value))?null:Number(value);
@@ -68,10 +68,12 @@
       return row;
     });
   }
-  function query(rows,{search="",profession="",expiry="all",from="",to="",metric="",min="",max="",sort="expiryDate",direction="asc"}={},now=new Date()){
+  function query(rows,{search="",profession="",selected=[],expiry="all",from="",to="",metric="",min="",max="",sort="expiryDate",direction="asc"}={},now=new Date()){
     const tokens=String(search).trim().split(/\s+/u).filter(Boolean).map(normalize);
     const minValue=number(min),maxValue=number(max),metricValid=columns.some(column=>column.metric&&column.key===metric);
+    const selectedNames=new Set(selected.map(normalize));
     const filtered=rows.filter(row=>{
+      if(selectedNames.size&&!selectedNames.has(normalize(row.name)))return false;
       if(!tokens.every(token=>normalize(row.name+row.profession).includes(token)))return false;
       if(profession&&row.profession!==profession)return false;
       const days=row.expiryDate?calendar.daysUntil(row.expiryDate,now):null;
