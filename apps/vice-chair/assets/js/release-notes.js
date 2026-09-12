@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.1", publishedAt: "2026-09-12", title: "課程與夥伴名錄移至資源區", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["將培訓課程查詢與夥伴名錄移到資源區，首頁與各頁主選單同步調整。"]),
+      howTo: "展開主選單，在下方資源區直接開啟「培訓課程查詢」或「夥伴名錄」。",
+      impact: "調整入口分類，原有查詢功能與使用權限維持一致。"
+    }),
+    Object.freeze({
       version: "1.8.0", publishedAt: "2026-09-12", title: "培訓課程查詢與官方課表同步", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze([

@@ -23,9 +23,7 @@
         ["總", "工作總覽", "index.html"],
         ["案", "會員案件", "case-board.html"],
         ["基", "續約地基追蹤", "renewal-foundations.html"],
-        ["課", "培訓課程查詢", "training-catalog.html"],
         ["檔", "結案資料", "case-board.html#closed", "vp"],
-        ["人", "夥伴名錄", "partners.html"],
         ["關", "會員關懷儀表板", "member-care.html"],
         ["析", "月度分析審閱", "analysis-review.html", "vp"],
         ["會", "會員委員會月會", "monthly-meeting.html"],
@@ -46,6 +44,8 @@
     {
       label: "資源與設定",
       items: [
+        ["課", "培訓課程查詢", "training-catalog.html"],
+        ["人", "夥伴名錄", "partners.html"],
         {
           key: "common-resources",
           icon: "常",
