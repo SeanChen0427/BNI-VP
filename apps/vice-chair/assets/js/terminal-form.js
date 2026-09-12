@@ -23,7 +23,7 @@ let averages = { givenIn: 0, givenOut: 0, receivedIn: 0, receivedOut: 0, amount:
 let currentMember = members[0];
 let renewalMetricsSnapshot = null;
 let renewalMetricsLoading = false;
-let saveTimer;
+let saveTimer,terminalTrainingPicker;
 
 const metricDefs = [
   {
@@ -190,7 +190,7 @@ function selectMember(name, preserve=false) {
 }
 
 function serialize() {
-  const out = {};
+  const out = {trainingSelections:terminalTrainingPicker?.serialize()||{}};
   $$('[data-save]').forEach(el => {
     if (el.type === "radio") { if (el.checked) out[`radio:${el.name}`] = el.value; }
     else if (el.type === "checkbox") out[el.id] = el.checked;
@@ -207,6 +207,7 @@ function restoreFields(data){
     else if (el.type === "checkbox" && data[el.id] !== undefined) el.checked = data[el.id];
     else if (data[el.id] !== undefined) el.value = data[el.id];
   });
+  terminalTrainingPicker?.restore(data.trainingSelections);
 }
 function restore(data) {
   if (!data) return;
@@ -420,6 +421,7 @@ async function downloadWord() {
 
 async function init() {
   await window.FulianCaseStateStore.ready;
+  terminalTrainingPicker=window.FulianTrainingPicker.mount([["mspUp","msp_up"],["mspDown","msp_down"]]);
   $("#memberList").innerHTML = members.map(m=>`<option value="${m.name}">${m.profession}</option>`).join("");
   $("#sectionNav").innerHTML = [["basic","基本資料"],["snapshot","數據快照"],["palms","PALMS 貢獻"],["experience","會員經驗"],["agreement","制度與總結"]].map(([id,t])=>`<a href="#${id}">${t}</a>`).join("");
   renderExperienceQuestions();

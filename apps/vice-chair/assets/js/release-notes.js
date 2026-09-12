@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.2", publishedAt: "2026-09-12", title: "訪談表單直接選擇培訓場次", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["新會員的 MSP 上／下與交流座談會、續約訪談的 MSP 日期，可從官方場次選單直接帶入。", "草稿保存所選場次；官方改期或暫未列出時提示確認，仍保留手動填日期。"]),
+      howTo: "在新會員或續約訪談的培訓區選擇官方場次，日期會自動填好，並隨草稿保存。",
+      impact: "選課用於訪談安排，不等於完成報名或培訓；正式 Word 仍依原表單輸出日期。"
+    }),
+    Object.freeze({
       version: "1.8.1", publishedAt: "2026-09-12", title: "課程與夥伴名錄移至資源區", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["將培訓課程查詢與夥伴名錄移到資源區，首頁與各頁主選單同步調整。"]),

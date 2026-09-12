@@ -122,3 +122,5 @@
 - `training_sync_state`：今年＋明年同步範圍、成功／失敗時間、筆數與執行租約。
 - 三表均由 service role 經受保護 API 存取。三角色可查詢，副主席／Admin 可手動同步；資料庫 RPC 原子更新並保留歷史。
 - 每日台北 06:00 由專用 `training-catalog-cron` 執行，不使用 LINE Bot。詳細契約與復原索引見 [培訓課程庫](training-catalog.md)。
+
+新會員／續約訪談的 `task_case_states.draft.trainingSelections` 以既有日期欄位 ID 為鍵，值為官方場次 `{id,title,start_at,end_at,category}` 快照；與原日期值一起透過既有案件權限同步。舊草稿可無此欄位，改期不自動改寫草稿，詳見 [培訓課程庫](training-catalog.md)。

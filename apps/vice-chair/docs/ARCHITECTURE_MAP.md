@@ -135,3 +135,5 @@ vendor/        第三方瀏覽器套件
 `training-catalog.html` → 既有登入／Supabase transport → `app-api/api/training-catalog` → 官方課程、異動與同步狀態三表。名稱搜尋、期間篩選與台北時間由 `core/training-catalog-domain.js`、`core/calendar-domain.js` 共用。
 
 每日台北 06:00 的專用 `training-catalog-cron` 與手動更新引用同一份 `_shared/training-catalog-sync.mjs`；不耦合 LINE 發送、不重算 PALMS，也不寫會員完成紀錄。部署與資料契約見 [培訓課程庫](training-catalog.md)。
+
+新會員／續約表單透過共用 `assets/js/training-picker.js` 讀取課表，`core/training-selection-domain.js` 處理選課及異動比較，沿用案件草稿同步保存場次快照；不新增正式資料來源或排程。

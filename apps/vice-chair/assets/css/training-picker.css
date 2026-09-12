@@ -1,0 +1,45 @@
+.layout > form {
+  min-width: 0;
+}
+.training-picker {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #d9e2e0;
+  border-radius: 12px;
+  background: #f8fbfa;
+}
+.training-picker label {
+  min-width: 0;
+}
+.training-picker select {
+  width: 100%;
+  min-width: 0;
+  text-overflow: ellipsis;
+}
+.training-picker-note {
+  margin: 0;
+  color: #536561;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.training-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+}
+.training-picker-actions button {
+  padding: 8px 12px;
+  border: 1px solid #5c7971;
+  border-radius: 8px;
+  color: #234f42;
+  background: #fff;
+  cursor: pointer;
+}
+.training-picker-actions [hidden] {
+  display: none;
+}
