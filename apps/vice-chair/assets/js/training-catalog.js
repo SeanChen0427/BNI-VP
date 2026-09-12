@@ -41,7 +41,7 @@
     }
     const firstImport=(data?.events||[]).map(event=>event.first_seen_at).filter(Boolean).sort()[0];
     const changes=(data?.changes||[]).filter(change=>change.change_kind!=="new"||change.after_event.first_seen_at!==firstImport).slice(0,12);
-    $("#courseChanges").innerHTML=changes.length?changes.map(change=>`<details class="change-item"><summary><time>${esc(calendar.formatTaipeiTimestamp(change.changed_at,{year:true}))}</time><b>${esc(change.after_event.title)}</b>${esc(kindLabels[change.change_kind]||"課程異動")}</summary>${change.before_event?`<p>原場次：<del>${esc(domain.eventTime(change.before_event))}</del></p>`:""}<p>目前：${esc(domain.eventTime(change.after_event))}</p>${change.before_event?.title!==change.after_event.title?`<p>原名稱：${esc(change.before_event?.title)}</p>`:""}${change.change_kind==="missing"?"<p>暫未在官方課表找到，不代表已取消。</p>":""}</details>`).join(""):"<p>目前沒有已記錄的課程異動。</p>";
+    $("#courseChanges").innerHTML=changes.length?changes.map(change=>`<details class="change-item"><summary><time>${esc(calendar.formatTaipeiTimestamp(change.changed_at,{year:true}))}</time><b>${esc(change.after_event.title)}</b>${esc(kindLabels[change.change_kind]||"課程異動")}</summary>${change.before_event?`<p>原場次：<del>${esc(domain.eventTime(change.before_event))}</del></p>`:""}<p>目前：${esc(domain.eventTime(change.after_event))}</p>${change.before_event&&change.before_event.title!==change.after_event.title?`<p>原名稱：${esc(change.before_event?.title)}</p>`:""}${change.change_kind==="missing"?"<p>暫未在官方課表找到，不代表已取消。</p>":""}</details>`).join(""):"<p>目前沒有已記錄的課程異動。</p>";
   }
   async function load(sync=false){
     if(busy)return;busy=true;loadFailed=false;
