@@ -23,6 +23,7 @@
         ["總", "工作總覽", "index.html"],
         ["案", "會員案件", "case-board.html"],
         ["基", "續約地基追蹤", "renewal-foundations.html"],
+        ["課", "培訓課程查詢", "training-catalog.html"],
         ["檔", "結案資料", "case-board.html#closed", "vp"],
         ["人", "夥伴名錄", "partners.html"],
         ["關", "會員關懷儀表板", "member-care.html"],
@@ -171,7 +172,7 @@
     if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
-      script.src=`${src}?v=16`;
+      script.src=`${src}?v=17`;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);

@@ -1,0 +1,42 @@
+// Run against an isolated in-memory PostgreSQL engine; never a production URL.
+// PGLITE_MODULE_PATH=/absolute/path/to/pglite/dist/index.js node scripts/verify-training-catalog-sql.mjs
+import assert from "node:assert/strict";
+import {readFile} from "node:fs/promises";
+import {pathToFileURL} from "node:url";
+if(!process.env.PGLITE_MODULE_PATH)throw new Error("Provide PGLITE_MODULE_PATH for isolated SQL validation");
+const {PGlite}=await import(pathToFileURL(process.env.PGLITE_MODULE_PATH).href);
+const db=new PGlite();
+await db.exec("create role anon; create role authenticated; create role service_role; create schema private;");
+await db.exec(await readFile(new URL("../supabase/migrations/20260912100000_training_catalog.sql",import.meta.url),"utf8"));
+const year=Number((await db.query("select extract(year from now() at time zone 'Asia/Taipei') as y")).rows[0].y);
+const row=(id,month=9)=>({id,title:`測試課程 ${id}`,start_at:`${year}-${String(month).padStart(2,"0")}-20T05:30:00Z`,end_at:`${year}-${String(month).padStart(2,"0")}-20T09:00:00Z`,description:"",source_url:"https://bnikaohsiung.com.tw/zh-TW/eventdetails?eventId=test",category:"other"});
+const claim=async()=>{
+  await db.exec("update training_sync_state set last_attempt_at=now()-interval '6 minutes'");
+  return (await db.query("select edge_claim_training_sync('manual') as token")).rows[0].token;
+};
+const complete=async(token,rows)=>(await db.query("select edge_complete_training_sync($1,$2,$3) as result",[token,[year,year+1],JSON.stringify(rows)])).rows[0].result;
+let token=await claim();
+assert.equal((await db.query("select edge_claim_training_sync('scheduled') as token")).rows[0].token,null);
+assert.equal((await complete(token,[row(1),row(2)])).new,2);
+assert.equal((await complete(await claim(),[row(1),row(2)])).changed,0);
+assert.equal((await db.query("select count(*) as n from training_event_changes")).rows[0].n,2);
+assert.equal((await complete(await claim(),[row(1,10),row(2)])).changed,1);
+let history=(await db.query("select before_event,after_event from training_event_changes where change_kind='changed'")).rows[0];
+assert.ok(history.before_event.start_at.includes('-09-'));assert.ok(history.after_event.start_at.includes('-10-'));
+assert.equal((await complete(await claim(),[row(1,10)])).missing,1);
+assert.equal((await db.query("select source_status from training_events where id=2")).rows[0].source_status,"missing");
+assert.equal((await complete(await claim(),[row(1,10),row(2)])).restored,1);
+token=await claim();await assert.rejects(complete(token,[]),/Unexpected drop/);
+assert.equal((await db.query("select count(*) as n from training_events where source_status='published'")).rows[0].n,2);
+await db.query("select edge_fail_training_sync($1,'test failure')",[token]);
+assert.ok((await db.query("select last_success_at from training_sync_state")).rows[0].last_success_at);
+token=await claim();await assert.rejects(complete("00000000-0000-0000-0000-000000000000",[row(1)]),/Stale sync/);
+await db.query("select edge_fail_training_sync($1,'test failure')",[token]);
+token=await claim();await assert.rejects(complete(token,[row(1),{...row(2),title:""}]),/check constraint/);
+assert.equal((await db.query("select revision from training_events where id=1")).rows[0].revision,2,"整筆交易回滾");
+await db.exec("set role authenticated");
+await assert.rejects(db.query("select * from training_events"),/permission denied/);
+await assert.rejects(db.query("select edge_claim_training_sync('manual')"),/permission denied/);
+await db.exec("reset role");
+await db.close();
+console.log("課表 SQL 驗證通過：首次匯入、冪等、改期、缺漏、恢復、異常下降、租約、整筆回滾及權限。");

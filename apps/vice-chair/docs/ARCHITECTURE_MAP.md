@@ -129,3 +129,9 @@ vendor/        第三方瀏覽器套件
 ```
 
 是否改用 React＋TypeScript 屬未來技術評估；在資料模型與測試未穩定前，不做整套重寫，也不影響目前正式服務。
+
+## 官方培訓課程查詢
+
+`training-catalog.html` → 既有登入／Supabase transport → `app-api/api/training-catalog` → 官方課程、異動與同步狀態三表。名稱搜尋、期間篩選與台北時間由 `core/training-catalog-domain.js`、`core/calendar-domain.js` 共用。
+
+每日台北 06:00 的專用 `training-catalog-cron` 與手動更新引用同一份 `_shared/training-catalog-sync.mjs`；不耦合 LINE 發送、不重算 PALMS，也不寫會員完成紀錄。部署與資料契約見 [培訓課程庫](training-catalog.md)。

@@ -1,6 +1,17 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.0", publishedAt: "2026-09-12", title: "培訓課程查詢與官方課表同步", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze([
+        "新增培訓課程查詢，可搜尋課名，快速切換本月、下月、未來 12 個月及今年／明年全年。",
+        "支援指定月份與自訂起訖日期，搜尋會保留所選期間。",
+        "官方課表每日同步今年與明年，保留課程異動前後資訊；副主席與 Admin 可立即更新。"
+      ]),
+      howTo: "從主選單開啟「培訓課程查詢」，輸入課名並選擇期間。點官方課程詳情查看地點、資格及報名資訊。",
+      impact: "課表不代表已報名或完成培訓。同步失敗保留原資料；官方暫未列出的場次標示待確認。"
+    }),
+    Object.freeze({
       version: "1.7.5", publishedAt: "2026-09-12", title: "點名歷史按年月輕鬆查找", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze([

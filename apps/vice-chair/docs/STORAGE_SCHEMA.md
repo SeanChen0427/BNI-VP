@@ -114,3 +114,11 @@
 - `committee_meetings.care_summary.foundationSnapshot`：保存當次月會需要跟進的必要進度；由後端建立，已結案不跟隨新報表改寫。訪談草稿的 `renewalFoundationSnapshot` 與正式 Word 保留該次訪談文字快照。
 
 規格見 [續約地基追蹤](renewal-foundation-tracking.md)。
+
+## 官方培訓課程庫（2026-09-12）
+
+- `training_events`：官方活動 ID、名稱、起訖時間、來源連結、分類、版本及觀測狀態；不含會員報名或出席。
+- `training_event_changes`：新增、改期／資訊變更、暫未列出與恢復的前後快照。
+- `training_sync_state`：今年＋明年同步範圍、成功／失敗時間、筆數與執行租約。
+- 三表均由 service role 經受保護 API 存取。三角色可查詢，副主席／Admin 可手動同步；資料庫 RPC 原子更新並保留歷史。
+- 每日台北 06:00 由專用 `training-catalog-cron` 執行，不使用 LINE Bot。詳細契約與復原索引見 [培訓課程庫](training-catalog.md)。

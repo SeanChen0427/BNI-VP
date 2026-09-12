@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>培訓課程查詢｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/useful-links.css?v=1">
+  <link rel="stylesheet" href="assets/css/training-catalog.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=8"></script>
+  <script src="assets/js/supabase-data.js?v=3"></script>
+  <script src="core/calendar-domain.js?v=3"></script>
+  <script src="core/training-catalog-domain.js?v=1"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a href="index.html">← 回工作台</a>
+    <div class="brand-title"><strong>富聯分會</strong><span>培訓課程查詢</span></div>
+    <div class="session"><span data-auth-name>使用者</span><b data-auth-role>職務</b><button type="button" data-auth-logout>登出</button></div>
+  </header>
+  <main>
+    <section class="hero catalog-hero">
+      <div><span>TRAINING CALENDAR</span><h1>培訓課程查詢</h1><p>找到適合的課程，把學習時間先安排好。</p></div>
+      <a class="official-link" href="https://www.bnitraining.com/html/memberLogin" target="_blank" rel="noopener noreferrer">前往官方報名 ↗</a>
+    </section>
+    <section class="catalog-tools" aria-label="課程搜尋與篩選">
+      <form id="searchForm" role="search"><label for="courseSearch">想找哪一門課？</label><div class="search-row"><input type="search" id="courseSearch" placeholder="輸入課名，例如 MSP 下、一對一、交流座談會" autocomplete="off"><button type="submit" class="primary">搜尋課程</button></div><p>預設查詢未來 12 個月；課名搜尋可搭配月份、全年或自訂日期。</p></form>
+      <div class="quick-periods" id="periods" aria-label="查詢期間">
+        <button type="button" data-period="this-month">本月</button><button type="button" data-period="next-month">下個月</button><button type="button" data-period="upcoming" aria-pressed="true">未來 12 個月</button><button type="button" data-period="this-year">今年全年</button><button type="button" data-period="next-year">明年全年</button>
+      </div>
+      <div class="filter-row"><label>課程類別<select id="category"><option value="">全部培訓／活動</option></select></label><label>指定月份<input type="month" id="courseMonth"></label><button type="button" id="clearFilters">清除篩選</button></div>
+    <details class="custom-period"><summary>自訂日期範圍</summary><div class="filter-row"><label>開始日期<input type="date" id="rangeFrom"></label><label>結束日期（含當日）<input type="date" id="rangeThrough"></label><button type="button" id="applyRange">套用日期</button></div><p id="rangeError" role="alert" hidden></p></details>
+    </section>
+    <div class="sync-bar"><div><span class="sync-dot" aria-hidden="true"></span><span id="syncStatus" role="status">正在讀取課表…</span></div><button type="button" id="reloadCatalog">重新整理</button><button type="button" id="syncCatalog" hidden>立即更新官方課表</button></div>
+    <p id="catalogError" class="catalog-error" role="alert" hidden></p>
+    <div class="catalog-layout">
+      <section aria-labelledby="resultsTitle"><header class="results-header"><div><small id="rangeLabel">未來 12 個月</small><h2 id="resultsTitle">課程場次 <span id="resultCount">—</span></h2></div><span>台北時間</span></header><div id="courseResults" aria-live="polite"><div class="empty-state">正在整理課程場次…</div></div></section>
+      <aside class="catalog-aside"><section><h2>近期課表異動</h2><p>改期與官方資料變化，集中在這裡查看。</p><div id="courseChanges">正在讀取…</div></section><section class="catalog-note"><h3>選課小提醒</h3><p>課表涵蓋官方已公布的今年與明年場次。報名資格、地點與名額請以官方詳情為準。</p><p>此處查詢課程，不代表已報名或完成培訓。</p><a href="https://bnikaohsiung.com.tw/zh-TW/events" target="_blank" rel="noopener noreferrer">開啟官方行事曆 ↗</a></section></aside>
+    </div>
+  </main>
+  <script src="assets/js/training-catalog.js?v=1"></script>
+  <script src="assets/js/workspace-nav.js?v=22"></script>
+</body>
+</html>

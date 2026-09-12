@@ -10,6 +10,7 @@ import "../../../apps/vice-chair/core/message-template-domain.js";
 import "../../../apps/vice-chair/core/annual-handover-domain.js";
 import { rawReportObjectPath } from "./storage-object-key.mjs";
 import { loadAttendanceHistory } from "./attendance-history.mjs";
+import { createTrainingCatalogApi } from "../_shared/training-catalog-sync.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
@@ -6187,6 +6188,7 @@ async function committeeBoardApi(request: Request, context: Context) {
   throw new Error("不支援的留言板操作");
 }
 
+const trainingCatalogApi = createTrainingCatalogApi({ db });
 const renewalFoundationsApi = createRenewalFoundationsApi({ db, taskDirectory, taskSource: TASK_SOURCE, measure: createFoundationMeasurements({ reportImports, reportCategory, downloadReport }) });
 
 Deno.serve(async (request) => {
@@ -6203,6 +6205,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/member-interactions") result = await memberInteractionsApi(request, url, context);
     else if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
+    else if (path === "/api/training-catalog") result = await trainingCatalogApi(request, context);
     else if (path === "/api/renewal-foundations") result = await renewalFoundationsApi(request, context);
     else if (path === "/api/committee-meetings") result = await committeeMeetingsApi(request, context);
     else if (path === "/api/new-member-registration") result = await newMemberRegistrationApi(request, context);
