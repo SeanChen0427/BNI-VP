@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.3", publishedAt: "2026-09-14", title: "修正未完成工作無法刪除", level: "normal",
+      audience: "副主席與系統管理員",
+      changes: Object.freeze(["修正新建或未完成工作因指派歷程保護而刪除失敗的問題。", "刪除工作後仍保留原有指派歷程；已結案案件持續受保護。"]),
+      howTo: "在工作總覽找到誤建工作，點「編輯」後選「刪除工作」，確認後即可移除。",
+      impact: "保留歷程內容、操作人與時間；已結案案件無法刪除。"
+    }),
+    Object.freeze({
       version: "1.8.2", publishedAt: "2026-09-12", title: "訪談表單直接選擇培訓場次", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["新會員的 MSP 上／下與交流座談會、續約訪談的 MSP 日期，可從官方場次選單直接帶入。", "草稿保存所選場次；官方改期或暫未列出時提示確認，仍保留手動填日期。"]),
