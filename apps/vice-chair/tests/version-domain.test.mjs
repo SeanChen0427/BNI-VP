@@ -45,11 +45,11 @@ test("混合發布採影響最高的變更類型", () => {
   assert.throws(() => nextProductVersion("1.0.25", "marketing"), /未知的版本變更類型/);
 });
 
-test("目前 v1.8.4 修正點名未勾選漏列缺席", () => {
+test("目前 v1.8.5 補充信用證申請表下載", () => {
   const validation = validateReleaseTransition(releaseState);
   assert.equal(validation.valid, true);
-  assert.equal(releaseState.currentVersion, "1.8.4");
-  assert.equal(releaseState.previousVersion, "1.8.3");
+  assert.equal(releaseState.currentVersion, "1.8.5");
+  assert.equal(releaseState.previousVersion, "1.8.4");
   assert.equal(releaseState.changeType, "fix");
 });
 
@@ -86,7 +86,7 @@ test("版本預覽指令會從目前正式版本計算下一版", () => {
     { cwd: projectRoot, encoding: "utf8" }
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /目前：v1\.8\.4/);
+  assert.match(result.stdout, /目前：v1\.8\.5/);
   assert.match(result.stdout, /分類：feature → minor/);
   assert.match(result.stdout, /下一版：v1\.9\.0/);
 });
