@@ -43,7 +43,7 @@
         <div class="section-head"><span>02</span><div><h2>會員點名</h2><p>橫向滑動可查看儀容與備註；資料會即時反映到公告預覽</p></div></div>
         <div class="bulk-tools" data-guide-id="attendance.bulk-tools"><button type="button" data-bulk="at630">全選06:30</button><button type="button" data-bulk="at700">全選07:00</button><button type="button" data-bulk="speech">全選已完成簡報</button><button type="button" data-bulk="appearance">全選儀容與畫面</button><button type="button" id="clearWeek">清除本週狀態</button></div>
         <div class="table-scroll" data-guide-id="attendance.roster-table"><table class="attendance-table"><thead><tr><th>會員姓名</th><th>06:30</th><th>07:00</th><th>遲到</th><th>早退</th><th>代理</th><th>缺席</th><th><span id="speechHeader">25秒</span></th><th>名牌</th><th>PIN章</th><th>西裝</th><th>開畫面</th><th>備註</th></tr></thead><tbody id="memberRows"></tbody></table></div>
-        <div class="table-note"><b>判定原則</b><span>06:30與07:00人數差異不自動判定遲到；代理與缺席的最終認定以主要紀錄委員確認為準。</span></div>
+        <div class="table-note"><b>判定原則</b><span>未勾完成簡報且無代理者（含全部未勾選）會列入本週缺席；點名中請持續補勾，公告前由主要紀錄委員與副主席核對確認。06:30與07:00人數差異不自動判定遲到。</span></div>
       </section>
 
       <aside class="preview-column">
@@ -53,7 +53,7 @@
     </div>
   </main>
   <div id="toast"></div>
-  <script src="core/attendance-domain.js?v=1"></script>
+  <script src="core/attendance-domain.js?v=2"></script>
   <script src="assets/js/attendance.js?v=13"></script>
   <script src="assets/js/workspace-nav.js?v=23"></script>
 </body>

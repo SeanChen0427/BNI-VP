@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.4", publishedAt: "2026-09-15", title: "修正點名未勾選時漏列缺席", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["未完成會員簡報且沒有代理的人，包含整列全部未勾選，會列入本週缺席與公告累計。", "點名表補上判定說明，補勾完成簡報或代理後，預覽會即時更新。"]),
+      howTo: "重新整理每週點名頁，核對缺席名單及累計，再完成委員與副主席確認。已鎖定的週次如需更正，請先重新開啟。",
+      impact: "保留已確認的歷史公告快照；正式出缺席仍以 PALMS 為準。"
+    }),
+    Object.freeze({
       version: "1.8.3", publishedAt: "2026-09-14", title: "修正未完成工作無法刪除", level: "normal",
       audience: "副主席與系統管理員",
       changes: Object.freeze(["修正新建或未完成工作因指派歷程保護而刪除失敗的問題。", "刪除工作後仍保留原有指派歷程；已結案案件持續受保護。"]),

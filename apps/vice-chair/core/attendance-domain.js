@@ -4,9 +4,10 @@
   root.FulianAttendanceDomain=api;
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
   function isOperationalAbsence(record={}){
+    // 未完成簡報且無代理即列作業缺席，包含整列未勾選的會員。
+    // 到會勾選只記錄兩個時間點的人數，不是缺席判定的前提。
     return Boolean(record.absent)
-      || (Boolean(record.at630||record.present_0630||record.at700||record.present_0700)
-        && !Boolean(record.proxy)
+      || (!Boolean(record.proxy)
         && !Boolean(record.speech||record.presentation_completed));
   }
 
