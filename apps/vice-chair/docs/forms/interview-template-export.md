@@ -2,7 +2,7 @@
 
 更新：2026-09-18。來源：Sean 現行決策、所提供的中心區空白 Word。
 
-目前狀態：五種表單的本機程式已改為原公版填值，四份私密模板已安裝。正式網站尚未部署此變更；不得把本機完成描述為線上已生效。
+目前狀態：v1.8.6 已於 2026-09-18 部署至正式 GitHub Pages，Supabase app-api v87 已啟用四份私密模板。線上檔案與私密物件雜湊、匿名拒絕已驗證；登入後三角色端到端驗證仍待有效登入憑證或明確授權。部署證據見 `../DEPLOYMENT_LOG_2026-09-18_INTERVIEW_TEMPLATES.md`。
 
 ## 模板對應
 
@@ -32,7 +32,7 @@
 
 `GET /api/interview-template?type=new|industry|midterm|renewal|departure` 只允許已登入的 admin、vp、committee。路徑由白名單模板 ID 產生，不接受任意檔案路徑；前後端均核對 SHA-256。正式 Edge API 使用 Auth context；本機沿用既有 localhost 限制與 identity 檢查，不提供公開隧道。
 
-正式部署使用 `form-templates` 私密 bucket，物件名為 `{templateId}.json`，不提供 authenticated 的直接 Storage 讀寫 policy；只由驗證登入後的 Edge API 透過服務端連線讀取。`supabase/migrations/20260918090000_private_form_templates.sql` 已準備，尚未套用。
+正式部署使用 `form-templates` 私密 bucket，物件名為 `{templateId}.json`，不提供 authenticated 的直接 Storage 讀寫 policy；只由驗證登入後的 Edge API 透過服務端連線讀取。`supabase/migrations/20260918090000_private_form_templates.sql` 已於此次發布套用並記錄版本。
 
 ## 更新與部署順序
 
@@ -53,7 +53,7 @@
 
 ## 已保存舊版訪談的公版副本（2026-09-18）
 
-來源：Sean 現行決策。本機功能已完成，尚未部署。
+來源：Sean 現行決策。此功能已隨 v1.8.6 部署；發布驗證狀態見本文開頭。
 
 - 副主席／Admin 在案件回饋／投票頁及結案資料頁，只要五類案件已有實際保存的訪談附件，且附件未帶系統公版產檔標記，就能看見「產生中心區公版副本」。包含訪談已完成、正在回饋或投票、等待董顧／公告及已結案案件，不再要求結案。沒有保存附件、特定會員關懷及新公版產物不顯示。
 - 五種新產物於 ZIP comment 記錄 `fulian.regional-template.v1` 與模板 ID，不改動可見內容與其他 OOXML 部件。判斷不靠檔名或上線日期；版本升級後也不為已有公版檔顯示按鈕。標記是格式提示，不是數位簽章；外部 Word 重新儲存可能移除標記，手動上傳無標記公版仍可能顯示按鈕。
