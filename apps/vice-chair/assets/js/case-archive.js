@@ -146,11 +146,11 @@
       const file = await files.getCaseFile({ caseId, indexedDb: indexedDB });
       if (!file) {
         $("#wordName").textContent = state.wordName || "尚未找到 Word";
-        $("#wordStatus").textContent = "此瀏覽器沒有保存附件；可能是在其他裝置完成，或附件已被清除。";
+        $("#wordStatus").textContent = "未取得保存附件；請確認連線或原案件附件是否完整。";
         return;
       }
       $("#wordName").textContent = file.name || state.wordName || "訪談紀錄.docx";
-      $("#wordStatus").textContent = "已找到此瀏覽器保存的正式附件";
+      $("#wordStatus").textContent = "已取得保存的正式附件";
       button.disabled = false;
       button.onclick = () => {
         const url = URL.createObjectURL(file);
@@ -161,9 +161,16 @@
         setTimeout(() => URL.revokeObjectURL(url), 1500);
         toast("已開始下載保存檔");
       };
+      return file;
     } catch (error) {
       $("#wordStatus").textContent = `附件讀取失敗：${error.message}`;
     }
+  }
+
+  async function setupTemplateCopy(task,state,draft,file) {
+    await window.FulianTemplateCopyPanel.mount({
+      getOptions:async()=>({task,state,draft,file,role:session.role}),toast
+    });
   }
 
   async function init() {
@@ -215,7 +222,8 @@
     $("#activityLog").innerHTML = log.length
       ? log.map(item => `<li><i></i><div><b>${esc(item.text)}</b><span>${esc(item.time || "")}</span></div></li>`).join("")
       : '<li class="empty-record">沒有保存案件歷程</li>';
-    await loadWord(state);
+    const file=await loadWord(state);
+    await setupTemplateCopy(task,state,draft,file);
   }
 
   init();

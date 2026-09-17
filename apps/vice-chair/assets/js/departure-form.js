@@ -30,19 +30,14 @@ function save(){localStorage.setItem(KEY,JSON.stringify(serialize()));$("#saveSt
 function bind(){$$('[data-save]').forEach(el=>{const handler=()=>{$("#saveState").textContent="儲存中…";clearTimeout(timer);timer=setTimeout(save,300)};el.addEventListener("input",handler);el.addEventListener("change",handler)})}
 function questionResult(q){const[, ,id,type,extra]=q;if(type==="text")return answer(id)||"（未填寫）";if(type==="check")return`${$("#trademarkUnderstood").checked?"■":"□"} 會員已了解`;const value=radio(id),suffix=extra?`\n補充：${answer(extra)||"未填寫"}`:"";return`${mark(value,"是")} 是　${mark(value,"否")} 否${suffix}`}
 async function downloadWord(){
-  if(typeof docx==="undefined"){toast("Word 元件尚未載入，請重新整理後再試");return}
+  if(!window.FulianInterviewTemplate){toast("中心區模板元件尚未載入，請重新整理後再試");return}
   departureCompletion.begin();
-  const{Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,BorderStyle,AlignmentType,PageOrientation}=docx,font="Arial Unicode MS",fontSpec={ascii:font,hAnsi:font,eastAsia:font,cs:font};
-  const run=(text,options={})=>new TextRun({text:String(text??""),font:fontSpec,size:options.size||21,bold:!!options.bold,color:options.color,break:options.break});
-  const para=(text="",options={})=>new Paragraph({alignment:options.align,spacing:{before:options.before||0,after:options.after===undefined?100:options.after,line:300},children:String(text).split("\n").flatMap((line,i)=>[i?run("",{break:1}):null,run(line,options)].filter(Boolean))});
-  const borders={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
-  const cell=(label,value)=>new TableCell({width:{size:50,type:WidthType.PERCENTAGE},margins:{top:90,bottom:90,left:100,right:100},children:[new Paragraph({children:[run(label,{bold:true}),run(value||"（未填寫）")]})]});
-  const meta=new Table({width:{size:100,type:WidthType.PERCENTAGE},borders,rows:[new TableRow({children:[cell("分會名稱：","富聯"),cell("會員姓名：",member.name)]}),new TableRow({children:[cell("專業類別：",member.profession),cell("離會日期：",answer("departureDate"))]}),new TableRow({children:[cell("訪談人員：",[answer("interviewer"),answer("companion")].filter(Boolean).join("、")),cell("訪談日期：",answer("interviewDate"))]})]});
-  const children=[new Paragraph({alignment:AlignmentType.RIGHT,children:[run("V.2.1",{bold:true,size:19})]}),new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:220},children:[run("離會訪談表",{bold:true,size:32,color:"A91419"})]}),meta];
-  questions.forEach(q=>{children.push(para(`${q[0]}. ${q[1]}`,{bold:true,before:140}),para(questionResult(q)))});
-  children.push(para(`主席簽名：${answer("presidentSignature")||"____________________"}`,{before:220}),para(`副主席簽名：${answer("vicePresidentSignature")||"____________________"}`),para(`董事顧問簽名：${answer("directorSignature")||"____________________"}`),para(`文件確認日期：${answer("signatureDate")||"____________________"}`));
-  const documentFile=new Document({styles:{default:{document:{run:{font:fontSpec,size:21},paragraph:{spacing:{line:300}}}}},sections:[{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.PORTRAIT},margin:{top:700,right:700,bottom:700,left:700}}},children}]});
-  const blob=await Packer.toBlob(documentFile),fileName=`離會訪談表-${safe(member.name)}-${stamp()}.docx`;
+  let blob,fileName;
+  try{
+    ({blob,fileName}=await window.FulianInterviewTemplate.generate({type:"departure",applicant:member.name,draft:{...serialize(),counselor:answer("interviewer")},context:{profession:member.profession}}));
+  }catch(error){
+    departureCompletion.failure({error});toast(error.message);return;
+  }
   try{
     await window.FulianCaseFiles.saveGeneratedWord({caseId:departureTaskId,caseType:"departure",blob,fileName,sourceLabel:"離會訪談表單",domain:window.FulianCaseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});
     departureCompletion.success({blob,fileName,caseId:departureTaskId,memberName:member.name});

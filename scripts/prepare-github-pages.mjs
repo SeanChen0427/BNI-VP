@@ -9,6 +9,8 @@ const outputRoot = path.join(repositoryRoot, 'dist', 'github-pages');
 const browserServices = [
   'case-files.js',
   'interview-completion.js',
+  'interview-template.js',
+  'archive-template-copy.js',
   'test-data-reset.js',
 ];
 const forbiddenExtensions = new Set(['.xls', '.xlsx', '.csv', '.env', '.key', '.enc']);
@@ -83,6 +85,8 @@ for (const required of [
   'index.html',
   'login.html',
   'assets/js/auth.js',
+  'core/interview-template-domain.js',
+  'services/interview-template.js',
   'assets/js/supabase-config.js',
   'assets/js/supabase-data.js',
   'assets/images/fulian-favicon.png',

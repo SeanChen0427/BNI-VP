@@ -45,6 +45,7 @@
     let lastFile=null;
 
     function begin(){
+      lastFile=null;
       button.disabled=true;
       button.textContent="正在完成並產生 Word…";
       panel.hidden=true;
@@ -75,7 +76,7 @@
       button.disabled=false;
       button.textContent="重試完成訪談並產生 Word";
       panel.dataset.tone="warning";
-      panel.innerHTML=`<div class="completion-icon" aria-hidden="true">!</div><div class="completion-copy"><small>SAVE INCOMPLETE</small><h2>尚未完成案件保存</h2><p>Word 已產生${blob?"並下載":""}，但附件或案件階段未成功保存。請不要關閉頁面，確認後再次按下完成。</p><p class="completion-error">${escapeHtml(error?.message||"案件保存失敗")}</p>${lastFile?`<div class="completion-actions"><button type="button" data-redownload>再次下載 Word</button></div>`:""}</div>`;
+      panel.innerHTML=`<div class="completion-icon" aria-hidden="true">!</div><div class="completion-copy"><small>SAVE INCOMPLETE</small><h2>尚未完成案件保存</h2><p>${blob?"Word 已產生並下載，但附件或案件階段未成功保存。":"Word 尚未產生，案件尚未完成。"}請不要關閉頁面，確認後再次按下完成。</p><p class="completion-error">${escapeHtml(error?.message||"案件保存失敗")}</p>${lastFile?`<div class="completion-actions"><button type="button" data-redownload>再次下載 Word</button></div>`:""}</div>`;
       panel.hidden=false;
       const redownload=panel.querySelector("[data-redownload]");
       if(redownload)redownload.onclick=()=>lastFile&&triggerDownload(lastFile.blob,lastFile.fileName);

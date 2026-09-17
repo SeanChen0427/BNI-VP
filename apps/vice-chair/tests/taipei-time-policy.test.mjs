@@ -33,17 +33,17 @@ test("使用台北日期工具的頁面都先載入共用日曆核心",async()=>
   const pages={
     "../index.html":"assets/js/work-planner.js?v=13",
     "../member-care.html":"assets/js/member-care.js?v=8",
-    "../case-workflow.html":"assets/js/case-workflow.js?v=31",
+    "../case-workflow.html":"assets/js/case-workflow.js?v=32",
     "../analysis-review.html":"assets/js/analysis-review.js?v=11",
-    "../terminal-form.html":"assets/js/terminal-form.js?v=13",
+    "../terminal-form.html":"assets/js/terminal-form.js?v=14",
     "../monthly-meeting.html":"assets/js/monthly-meeting.js?v=20",
     "../attendance.html":"assets/js/attendance.js?v=13",
     "../case-board.html":"assets/js/case-board.js?v=16",
-    "../new-member-form.html":"assets/js/new-member-form.js?v=10",
-    "../industry-change-form.html":"assets/js/industry-change-form.js?v=8",
-    "../departure-form.html":"assets/js/departure-form.js?v=6",
+    "../new-member-form.html":"assets/js/new-member-form.js?v=11",
+    "../industry-change-form.html":"assets/js/industry-change-form.js?v=9",
+    "../departure-form.html":"assets/js/departure-form.js?v=7",
     "../settings.html":"assets/js/settings.js?v=19",
-    "../midterm-form.html":"assets/js/midterm-form.js?v=9"
+    "../midterm-form.html":"assets/js/midterm-form.js?v=10"
   };
   for(const [page,script] of Object.entries(pages)){
     const html=await read(page);

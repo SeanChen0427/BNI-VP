@@ -31,7 +31,8 @@
     "changeHistory": "CHANGELOG.md",
     "deploymentLog": "docs/DEPLOYMENT_LOG_2026-09-04_ANNUAL_HANDOVER.md",
     "renewalFoundationTracking": "docs/renewal-foundation-tracking.md",
-    "completeHandoverGuide": "docs/vice-chair-complete-guide.md"
+    "completeHandoverGuide": "docs/vice-chair-complete-guide.md",
+    "interviewTemplateExport": "docs/forms/interview-template-export.md"
   },
   "domainOwners": {
     "caseStageAndStorageKeys": "core/case-domain.js",

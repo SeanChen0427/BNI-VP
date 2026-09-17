@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.6", publishedAt: "2026-09-18", title: "訪談文件套用中心區公版", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["新會員、轉換行業別、期中、續約與離會訪談 Word，改用中心區公版填入訪談內容。", "已保存舊版 Word 的案件，包含回饋中、投票中及已結案，副主席與 Admin 可另下載公版副本；原附件與流程紀錄保留。"]),
+      howTo: "新訪談依原流程產生 Word；舊版文件可在案件工作台或結案頁點「產生中心區公版副本」。",
+      impact: "副本標示待核對；缺漏資料不猜補，請對照原件後提交。已使用公版的文件不顯示副本按鈕。"
+    }),
+    Object.freeze({
       version: "1.8.5", publishedAt: "2026-09-15", title: "信用證申請表下載與流程說明", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["常用連結新增信用證申請表 PDF 下載、資格條件與申請流程，離會訪談及交接教學也有捷徑。", "離會前向中心區申請，繳交申請表與佐證並辦理離會手續；由執董判定，核准後中心區回覆正式文件。"]),

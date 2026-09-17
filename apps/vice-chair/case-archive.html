@@ -16,9 +16,10 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/case-archive.css?v=1">
+  <link rel="stylesheet" href="assets/css/case-archive.css?v=3">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
   <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
+  <link rel="stylesheet" href="assets/css/template-copy-panel.css?v=1">
 </head>
 <body>
   <header class="topbar">
@@ -45,8 +46,14 @@
         <div class="section-head"><span>02</span><div><h2>正式訪談 Word</h2><p>重新取得當次結案保存的正式檔案</p></div></div>
         <div class="file-row">
           <span class="word-icon">W</span>
-          <div><strong id="wordName">尚未找到 Word</strong><small id="wordStatus">正在檢查本機附件</small></div>
+          <div><strong id="wordName">尚未找到 Word</strong><small id="wordStatus">正在讀取保存附件</small></div>
           <button id="downloadWord" type="button" disabled>下載保存檔</button>
+        </div>
+        <div id="templateCopyPanel" class="template-copy" hidden>
+          <h3>舊版訪談公版副本</h3>
+          <p id="templateCopyNotice" role="status"></p>
+          <p>另外下載待核對副本，原附件、回饋、投票及案件進度保持原樣。</p>
+          <button id="generateTemplateCopy" type="button" disabled>產生中心區公版副本</button>
         </div>
       </section>
 
@@ -77,7 +84,11 @@
   <div id="toast"></div>
   <script src="services/case-files.js?v=6"></script>
   <script src="assets/js/vote-result-image.js?v=1"></script>
-  <script src="assets/js/case-archive.js?v=6"></script>
+  <script src="core/interview-template-domain.js?v=2"></script>
+  <script src="services/interview-template.js?v=2"></script>
+  <script src="services/archive-template-copy.js?v=2"></script>
+  <script src="assets/js/template-copy-panel.js?v=1"></script>
+  <script src="assets/js/case-archive.js?v=8"></script>
   <script src="assets/js/workspace-nav.js?v=23"></script>
   <script src="assets/js/renewal-foundation-case-link.js?v=1"></script>
 </body>

@@ -41,51 +41,21 @@ function safeFileName(text){return text.replace(/[\\/:*?"<>|]/g,"-").trim()}
 function answer(id){return $(id)?.value.trim()||""}
 function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>t.classList.remove("show"),2200)}
 async function downloadWord(){
-  if(typeof docx==="undefined"){toast("Word 元件尚未載入，請重新整理後再試");return}
+  if(!window.FulianInterviewTemplate){toast("中心區模板元件尚未載入，請重新整理後再試");return}
   let foundationSnapshot;
-  try { foundationSnapshot = await window.FulianFoundationInterview.capture(); }
+  try {
+    foundationSnapshot = await window.FulianFoundationInterview.capture();
+    localStorage.setItem(KEY,JSON.stringify({...data(),renewalFoundationSnapshot:foundationSnapshot}));
+    await window.FulianCaseStateStore.flush();
+  }
   catch(error) { toast(`地基核對失敗：${error.message}`); return; }
   midtermCompletion.begin();
-  const{Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,BorderStyle,AlignmentType,PageOrientation,ShadingType}=docx;
-  const font="Arial Unicode MS",fontSpec={ascii:font,hAnsi:font,eastAsia:font,cs:font};
-  const run=(text,opts={})=>new TextRun({text:String(text??""),font:fontSpec,size:opts.size||22,bold:!!opts.bold,color:opts.color});
-  const para=(text="",opts={})=>new Paragraph({alignment:opts.align,spacing:{before:opts.before||0,after:opts.after===undefined?100:opts.after,line:320},children:[run(text,opts)]});
-  const noBorders={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
-  const metaCell=(label,value)=>new TableCell({width:{size:50,type:WidthType.PERCENTAGE},margins:{top:100,bottom:100,left:120,right:120},children:[new Paragraph({children:[run(label,{bold:true}),run(value||"（未填寫）")]})]});
-  const meeting=$("#meetingDate").value?midtermCalendar.formatTaipeiTimestamp($("#meetingDate").value,{year:true}):"（未填寫）";
-  const meta=new Table({width:{size:100,type:WidthType.PERCENTAGE},borders:noBorders,rows:[
-    new TableRow({children:[metaCell("會談日期：",meeting),metaCell("分會：","富聯")]}),
-    new TableRow({children:[metaCell("會員姓名：",member.name),metaCell("專業別：",member.profession)]}),
-    new TableRow({children:[metaCell("輔導專員：",$("#counselor").value),metaCell("陪訪專員：",answer("#companionCounselor"))]})
-  ]});
-  const m=member.metrics;
-  const performance=[
-    ["缺席次數",m.absence,"0",""],["代理人次數",m.substitutes,"",""],["遲到次數",m.late,"",""],
-    ["會員提供的業務引薦數",m.givenIn+m.givenOut,"39",`內：${m.givenIn}　外：${m.givenOut}`],
-    ["會員收到的業務引薦數",m.receivedIn+m.receivedOut,"",`內：${m.receivedIn}　外：${m.receivedOut}`],
-    ["成交金額",money(m.amount),"",""],["邀請的來賓人數",m.visitors,"2",""],["培訓分數",m.education,"6",""],["一對一會面次數",m.oneToOne,"52",""]
-  ];
-  const cell=(text,header=false)=>new TableCell({shading:header?{fill:"A91419",type:ShadingType.CLEAR}:undefined,margins:{top:90,bottom:90,left:100,right:100},children:[para(text,{bold:header,color:header?"FFFFFF":undefined,after:0})]});
-  const performanceTable=new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[
-    new TableRow({tableHeader:true,children:[cell("過去六個月副主席報告",true),cell("會員表現",true),cell("紅綠燈標準\n70分",true),cell("備註",true)]}),
-    ...performance.map(r=>new TableRow({children:r.map(x=>cell(x))}))
-  ]});
-  const children=[
-    new Paragraph({alignment:AlignmentType.RIGHT,children:[run("V.4　：20241126",{size:18})]}),
-    new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:240},children:[run("363 會員留任計畫－期中輔導（GROW）",{size:32,bold:true,color:"A91419"})]}),
-    meta,para(`PALMS 表計算週期：${period()}`,{bold:true,before:160}),
-    para(`個人紅綠燈：${member.score} 分・${light(member.score)}（紅綠燈標準：70 分）`,{bold:true}),performanceTable
-  ];
-  grow.forEach(section=>{
-    children.push(para(section.label,{bold:true,size:27,color:"A91419",before:240}));
-    section.questions.forEach((question,index)=>{
-      children.push(para(`${index+1}. ${question}`,{bold:true}),para(answer(`#${section.id}_${index}`)||"（未填寫）",{color:"333333",after:180}));
-    });
-  });
-  children.push(para("續約地基追蹤與本次檢視",{bold:true}),...foundationSnapshot.split("\n").map(line=>para(line)));
-  children.push(para("總結與建議",{bold:true,size:27,color:"A91419",before:240}),para(answer("#summary")||"（未填寫）"),para(`輔導專員：${$("#counselor").value}`),para(`陪訪專員：${answer("#companionCounselor")||"（無）"}`));
-  const wordDocument=new Document({styles:{default:{document:{run:{font:fontSpec,size:22},paragraph:{spacing:{line:320}}}}},sections:[{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.PORTRAIT},margin:{top:720,right:720,bottom:720,left:720}}},children}]});
-  const blob=await Packer.toBlob(wordDocument),fileName=`363留員計畫-期中輔導-${safeFileName(member.name)}-${fileDateStamp()}.docx`;
+  let blob,fileName;
+  try{
+    ({blob,fileName}=await window.FulianInterviewTemplate.generate({type:"midterm",applicant:member.name,draft:{...data(),counselor:answer("#counselor")},context:{profession:member.profession,metrics:member.metrics,score:member.score,light:light(member.score),palmsPeriod:period()}}));
+  }catch(error){
+    midtermCompletion.failure({error});toast(error.message);return;
+  }
   try{
     await window.FulianCaseFiles.saveGeneratedWord({caseId:midtermTaskId,caseType:"midterm",blob,fileName,sourceLabel:"期中輔導表單",domain:window.FulianCaseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});
     midtermCompletion.success({blob,fileName,caseId:midtermTaskId,memberName:member.name});

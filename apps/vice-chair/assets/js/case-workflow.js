@@ -599,6 +599,11 @@ function scheduleSave(){$("#saveState").textContent="儲存中…";clearTimeout(
 
 async function storeWord(file){await window.FulianCaseFiles.saveGeneratedWord({caseId:CASE_ID,caseType:sourceTask?.type||"",blob:file,fileName:file.name,sourceLabel:"案件流程頁",domain:caseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});state=loadState();}
 async function getWord(){return window.FulianCaseFiles.getCaseFile({caseId:CASE_ID,indexedDb:indexedDB});}
+async function refreshTemplateCopy(){
+  await window.FulianTemplateCopyPanel.mount({
+    getOptions:async()=>({task:sourceTask,state:loadState(),draft:caseDomain.readDraft(localStorage,sourceTask)||{},role:authSession.role,file:await getWord()}),toast
+  });
+}
 
 function bindEvents(){
   $$('[data-save]').forEach(node=>{node.addEventListener("change",scheduleSave);node.addEventListener("input",scheduleSave);});
@@ -657,7 +662,7 @@ function bindEvents(){
   };
   $("#advisorStatus").addEventListener("change",markAdvisorDirty);
   $("#advisorNote").addEventListener("input",markAdvisorDirty);
-  $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
+  $("#wordFile").addEventListener("change",async event=>{const file=event.target.files[0];if(!file)return;try{await storeWord(file);render();await refreshTemplateCopy();toast("Word 已保存至 Supabase Private Storage")}catch(error){toast(error.message||"Word 保存失敗")}});
   $("#downloadWord").addEventListener("click",async()=>{const file=await getWord();if(!file)return toast("目前只有示範檔名，請先上傳真實 Word");const url=URL.createObjectURL(file),a=document.createElement("a");a.href=url;a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);});
   $("#copyFeedbackNotice").addEventListener("click",async()=>{
     if(!isVp()||!state.wordSaved||state.closed)return;
@@ -858,6 +863,7 @@ async function init(){
   try{$("#downloadWord").disabled=!(await getWord());}catch{$("#downloadWord").disabled=true;}
   bindEvents();
   render();
+  await refreshTemplateCopy();
 }
 
 init();

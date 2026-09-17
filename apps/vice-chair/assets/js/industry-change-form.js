@@ -59,28 +59,17 @@ function officialResult(q){if(q.type==="understood")return`${check(q.id)} 已了
 function relationValue(id){const selected=answer(`#${id}`);return selected==="其他"?(answer(`#${id}Other`)||"其他（未填寫）"):selected}
 function extraText(type){if(type==="arrivalTime")return`承諾到場時間：${answer("#arrivalTime")||"未填寫"}`;if(type==="proxy")return`代理人姓名：${answer("#proxyName")||"未填寫"}　關係：${relationValue("proxyRelation")||"未填寫"}`;if(type==="msp")return`MSP（上）：${answer("#mspUpDate")||"未填寫"}　MSP（下）：${answer("#mspDownDate")||"未填寫"}`;if(type==="session")return`新會員交流座談會：${answer("#sessionDate1")||"未填寫"}／${answer("#sessionDate2")||"未填寫"}`;if(type==="organization")return`組織名稱：${answer("#organizationName")||"未填寫"}　參與方式／角色：${answer("#organizationRole")||"未填寫"}`;if(type==="guests")return`觀禮者一：${answer("#guest1Name")||"未填寫"}（${relationValue("guest1Relation")||"關係未填"}）　觀禮者二：${answer("#guest2Name")||"未填寫"}（${relationValue("guest2Relation")||"關係未填"}）`;return""}
 async function downloadWord(){
-  if(typeof docx==="undefined"){toast("Word元件尚未載入，請重新整理後再試");return}
+  if(!window.FulianInterviewTemplate){toast("公版產檔元件尚未載入，請重新整理後再試");return}
   industryCompletion.begin();
-  const{Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,WidthType,BorderStyle,AlignmentType,PageOrientation,ShadingType}=docx,font="Arial Unicode MS",fontSpec={ascii:font,hAnsi:font,eastAsia:font,cs:font};
-  const run=(text,opts={})=>new TextRun({text:String(text??""),font:fontSpec,size:opts.size||21,bold:!!opts.bold,color:opts.color});
-  const para=(text="",opts={})=>new Paragraph({alignment:opts.align,spacing:{before:opts.before||0,after:opts.after===undefined?90:opts.after,line:300},children:[run(text,opts)]});
-  const noBorders={top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
-  const metaCell=(label,value)=>new TableCell({width:{size:50,type:WidthType.PERCENTAGE},margins:{top:90,bottom:90,left:110,right:110},children:[new Paragraph({children:[run(label,{bold:true}),run(value||"（未填寫）")]})]});
-  const meeting=answer("#meetingDate")?industryCalendar.formatTaipeiTimestamp(answer("#meetingDate"),{year:true}):"（未填寫）";
-  const meta=new Table({width:{size:100,type:WidthType.PERCENTAGE},borders:noBorders,rows:[new TableRow({children:[metaCell("訪談地址：",answer("#meetingPlace")),metaCell("會談時間：",meeting)]}),new TableRow({children:[metaCell("會員姓名：",currentApplicant.name),metaCell("原專業別：",currentApplicant.profession)]}),new TableRow({children:[metaCell("申請轉換專業別：",answer("#profession")||"未填寫"),metaCell("分會：","富聯")]}),new TableRow({children:[metaCell("訪談者：",answer("#leadInterviewer")),metaCell("陪訪：",[answer("#companionInterviewer"),answer("#secondCompanion")].filter(Boolean).join("、"))]})]});
-  const children=[new Paragraph({alignment:AlignmentType.RIGHT,children:[run("V8.2　：20251022",{size:18})]}),new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:220},children:[run("高屏區會員訪談表－轉換行業別",{size:32,bold:true,color:"A91419"})]}),meta,
-    para("1. 請清楚表明主要從事的業務、產品與服務內容，與同業不同的優勢或個人優勢，有何代表性客戶與成功見證？",{bold:true,before:160}),para(`主要業務、產品與服務：${answer("#businessContent")||"（未填寫）"}`),para(`優勢：${answer("#advantages")||"（未填寫）"}`),para(`代表性客戶：${answer("#representativeClients")||"（未填寫）"}`),para(`成功見證：${answer("#successStories")||"（未填寫）"}`),
-    para(`2. 所申請的專業類別是全職或兼職？${answer("#employmentType")||"未填寫"}　年資：${answer("#experienceYears")||"未填寫"}年。`,{bold:true}),
-    para("3. 請提供所屬專業類別必需的執照或證照，例如醫生證、執業許可證、技術師證照或特許行業批准函等。",{bold:true}),para(answer("#licenses")||"（未填寫）"),para(`公司統編：${answer("#taxId")||"未填寫"}　公司名稱：${answer("#companyName")||"未填寫"}　公司資本額：${answer("#capital")||"未填寫"}　成立時間：${answer("#establishedDate")||"未填寫"}`)
-  ];
-  goalQuestions.forEach(q=>children.push(para(`${q.no}. ${q.title}`,{bold:true}),para(answer(`#${q.id}`)||"（未填寫）")));
-  [...commitmentQuestions,...trainingQuestions,...networkQuestions].forEach(q=>{children.push(para(`${q.no}. ${q.title}`,{bold:true}),para(officialResult(q)));const extra=extraText(q.extra);if(extra)children.push(para(extra));if(q.policy)children.push(para(`總政策四：${check("policyFourUnderstood")} 已了解`))});
-  children.push(para("25. 您還想了解BNI的哪方面事項或其他資訊？",{bold:true}),para(answer("#otherQuestions")||"（未填寫）"),para("26. 分會相關規定備註說明：",{bold:true}),para(answer("#chapterNotes")||"（未填寫）"),para("20個商務名單",{bold:true,size:26,color:"A91419",before:220}));
-  const tableCell=(text,header=false)=>new TableCell({shading:header?{fill:"A91419",type:ShadingType.CLEAR}:undefined,margins:{top:80,bottom:80,left:90,right:90},children:[para(text,{bold:header,color:header?"FFFFFF":undefined,after:0})]});
-  children.push(new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:[new TableRow({tableHeader:true,children:[tableCell("編號",true),tableCell("姓名",true),tableCell("行業別",true)]}),...Array.from({length:20},(_,i)=>new TableRow({children:[tableCell(i+1),tableCell(answer(`#contactName${i+1}`)),tableCell(answer(`#contactIndustry${i+1}`))]}))]}));
-  children.push(para(`入會申請人：${answer("#applicantSignature")||"____________________"}`,{before:180}),para(`見證人（訪談者）：${answer("#witness1")||"________________"}／${answer("#witness2")||"________________"}／${answer("#witness3")||"________________"}`),para(`日期：${answer("#signatureDate")||"____________________"}`));
-  const wordDocument=new Document({styles:{default:{document:{run:{font:fontSpec,size:21},paragraph:{spacing:{line:300}}}}},sections:[{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.PORTRAIT},margin:{top:650,right:650,bottom:650,left:650}}},children}]});
-  const blob=await Packer.toBlob(wordDocument),fileName=`高屏區會員訪談表-轉換行業別-${safeFileName(currentApplicant.name)}-${fileDateStamp()}.docx`;
+  let blob,fileName;
+  try{
+    const draft={...serialize(),leadInterviewer:answer("#leadInterviewer")};
+    ({blob,fileName}=await window.FulianInterviewTemplate.generate({type:"industry",applicant:currentApplicant.name,draft}));
+  }catch(error){
+    industryCompletion.failure({error});
+    toast(error.message||"中心區公版產檔失敗，請稍後重試");
+    return;
+  }
   try{
     await window.FulianCaseFiles.saveGeneratedWord({caseId:industryTaskId,blob,fileName,sourceLabel:"轉換行業別訪談表單",domain:window.FulianCaseDomain,storage:localStorage,indexedDb:indexedDB,FileClass:File});
     industryCompletion.success({blob,fileName,caseId:industryTaskId,memberName:currentApplicant.name});

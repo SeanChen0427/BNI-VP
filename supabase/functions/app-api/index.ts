@@ -13,6 +13,7 @@ import { loadAttendanceHistory } from "./attendance-history.mjs";
 import { createTrainingCatalogApi } from "../_shared/training-catalog-sync.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
+import { createInterviewTemplateApi } from "../../../apps/vice-chair/services/interview-template-api.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
 import { createMemberInteractionsApi } from "../../../apps/vice-chair/services/member-interactions.mjs";
 import {
@@ -6188,6 +6189,7 @@ async function committeeBoardApi(request: Request, context: Context) {
   throw new Error("不支援的留言板操作");
 }
 
+const interviewTemplateApi = createInterviewTemplateApi({ loadTemplate: async (name: string) => (await serviceFetch(`/storage/v1/object/authenticated/form-templates/${name}`)).text() });
 const trainingCatalogApi = createTrainingCatalogApi({ db });
 const renewalFoundationsApi = createRenewalFoundationsApi({ db, taskDirectory, taskSource: TASK_SOURCE, measure: createFoundationMeasurements({ reportImports, reportCategory, downloadReport }) });
 
@@ -6220,6 +6222,7 @@ Deno.serve(async (request) => {
     else if (path === "/api/annual-handover") result = await annualHandoverApi(request, context);
     else if (path === "/api/case-states") result = await caseStatesApi(request, context);
     else if (path === "/api/task-file") result = await taskFileApi(request, url, context);
+    else if (path === "/api/interview-template") result = await interviewTemplateApi(request, url, context);
     else if (path === "/api/company") result = await companyApi(url);
     else if (path === "/api/test-data-reset") result = await testResetApi(request, context);
     else if (path === "/api/line-groups") result = await lineGroupsApi(request, context);

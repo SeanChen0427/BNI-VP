@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="assets/css/case-workflow-extra.css?v=8">
   <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
   <link rel="stylesheet" href="assets/css/mobile-polish.css?v=1">
+  <link rel="stylesheet" href="assets/css/template-copy-panel.css?v=1">
 </head>
 <body>
   <header class="topbar">
@@ -65,6 +66,12 @@
             <div><strong id="wordName">尚未保存 Word</strong><span id="wordStatus">尚未保存訪談 Word</span></div>
             <label class="file-button">選擇 Word<input id="wordFile" type="file" accept=".doc,.docx,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"></label>
             <button id="downloadWord" class="ghost" disabled>下載保存檔</button>
+          </div>
+          <div id="templateCopyPanel" class="template-copy" hidden>
+            <h3>舊版訪談公版副本</h3>
+            <p id="templateCopyNotice" role="status"></p>
+            <p>另外下載待核對副本，原附件、回饋、投票及案件進度保持原樣。</p>
+            <button id="generateTemplateCopy" type="button" disabled>產生中心區公版副本</button>
           </div>
           <div class="notice-compose feedback-notice-compose">
             <div><b>委員回饋通知</b><small>選擇群組並複製完整文案；貼到 LINE 後，Bot 會用免費 Reply 回覆免登入回饋圖卡。</small></div>
@@ -187,7 +194,11 @@
   </main>
   <div id="toast"></div>
   <script src="assets/js/vote-result-image.js?v=1"></script>
-  <script src="assets/js/case-workflow.js?v=31"></script>
+  <script src="core/interview-template-domain.js?v=2"></script>
+  <script src="services/interview-template.js?v=2"></script>
+  <script src="services/archive-template-copy.js?v=2"></script>
+  <script src="assets/js/template-copy-panel.js?v=1"></script>
+  <script src="assets/js/case-workflow.js?v=32"></script>
   <script src="assets/js/workspace-nav.js?v=23"></script>
   <script src="assets/js/renewal-foundation-case-link.js?v=1"></script>
 </body>

@@ -336,7 +336,7 @@ function completionMissingFields() {
 }
 
 async function downloadWord() {
-  if(typeof docx==="undefined"){toast("Word 元件尚未載入，請重新整理後再試");return}
+  if(!window.FulianInterviewTemplate){toast("中心區模板元件尚未載入，請重新整理後再試");return}
   const missing=completionMissingFields();
   if(missing.length){
     const preview=missing.slice(0,3).map(item=>item.label).join("、");
@@ -347,67 +347,19 @@ async function downloadWord() {
     return;
   }
   let foundationSnapshot;
-  try { foundationSnapshot = await window.FulianFoundationInterview.capture(); }
+  try {
+    foundationSnapshot = await window.FulianFoundationInterview.capture();
+    localStorage.setItem(STORE_KEY,JSON.stringify({...serialize(),renewalFoundationSnapshot:foundationSnapshot}));
+    await window.FulianCaseStateStore.flush();
+  }
   catch(error) { toast(`地基核對失敗：${error.message}`); return; }
   terminalCompletion.begin();
-  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, BorderStyle, AlignmentType, PageOrientation, ShadingType } = docx;
-  const m = currentMember.metrics, fp = window.formPeriods;
-  const font = "Arial Unicode MS", fontSpec = {ascii:font,hAnsi:font,eastAsia:font,cs:font};
-  const run = (text, opts={}) => new TextRun({text, font:fontSpec, size: opts.size || 22, bold: !!opts.bold, color: opts.color});
-  const para = (text="", opts={}) => new Paragraph({alignment:opts.align, spacing:{before:opts.before||0,after:opts.after===undefined?100:opts.after,line:320}, children:[run(text,opts)]});
-  const answerPara = (id) => para(answer(`#${id}`) || "（未填寫）", {color:"333333",after:180});
-  const boxLine = (name, low, high) => `${mark(radioValue(name),"low")} ${low}\n${mark(radioValue(name),"high")} ${high}`;
-  const noBorders = {top:{style:BorderStyle.NONE},bottom:{style:BorderStyle.NONE},left:{style:BorderStyle.NONE},right:{style:BorderStyle.NONE},insideHorizontal:{style:BorderStyle.NONE},insideVertical:{style:BorderStyle.NONE}};
-  const cell = (label,value,width) => new TableCell({width:{size:width,type:WidthType.PERCENTAGE},margins:{top:100,bottom:100,left:120,right:120},children:[new Paragraph({children:[run(label,{bold:true}),run(value)]})]});
-  const meta = new Table({width:{size:100,type:WidthType.PERCENTAGE},borders:noBorders,rows:[
-    new TableRow({children:[cell("會談日期：",terminalCalendar.formatTaipeiTimestamp($("#meetingDate").value,{year:true}),50),cell("分會：","富聯",50)]}),
-    new TableRow({children:[cell("會員姓名：",currentMember.name,50),cell("專業別：",currentMember.profession+"（需與續約申請表相符）",50)]}),
-    new TableRow({children:[cell("輔導專員：",$("#counselor").value,50),cell("陪訪專員：",answer("#companionCounselor"),50)]})
-  ]});
-  const avgRows = [
-    ["分會平均提供引薦數",`內：${averages.givenIn}　外：${averages.givenOut}`,"分會平均收到引薦數",`內：${averages.receivedIn}　外：${averages.receivedOut}`],
-    ["分會平均引薦金額",money(averages.amount),"分會平均來賓人數",`${averages.visitors} 人`],
-    ["分會平均一對一",`${averages.oneToOne} 次`,"分會平均遲到次數",`${averages.late} 次`],
-    ["分會平均代理人次數",`${averages.substitutes} 次`,"分會平均教育培訓積分",`${averages.education} 分`]
-  ];
-  const avgTable = new Table({width:{size:100,type:WidthType.PERCENTAGE},rows:avgRows.map(r=>new TableRow({children:r.map((x,i)=>new TableCell({width:{size:i%2?24:26,type:WidthType.PERCENTAGE},shading:i%2?undefined:{fill:"F4E8E8",type:ShadingType.CLEAR},margins:{top:90,bottom:90,left:100,right:100},children:[para(x,{bold:i%2===0,after:0})]}))}))});
-  const children = [
-    new Paragraph({alignment:AlignmentType.RIGHT,children:[run("V1.3　：20251114",{size:18})]}),
-    new Paragraph({alignment:AlignmentType.CENTER,spacing:{after:240},children:[run("363 會員留任計畫－終期輔導",{size:34,bold:true,color:"A91419"})]}),meta,
-    para(`1. 個人紅綠燈 ${currentMember.score} 分 ${trafficLight(currentMember.score)[0]}。`,{bold:true,before:160}),
-    para(`　 個人紅綠燈計算週期（6個月）${periodLabel(fp.trafficStart,fp.end)}`),
-    para(`2. PALMS 表計算週期 ${periodLabel(fp.palmsStart,fp.end)}`,{bold:true}),avgTable,
-    para("備註：PALMS表計算週期為第一年續約會員從啟動月份到續約時的PALMS表。第二年起會員續約，依據續約時往前推12個月的PALMS表。分會平均數值為分會總數／人數。",{size:19,color:"666666"}),
-    para(`3. 您過去在分會提供引薦次數：內部 ${m.givenIn} 單＋外部 ${m.givenOut} 單＝共 ${m.givenIn+m.givenOut} 單。`,{bold:true}),
-    para(boxLine("givenCompare","若低於分會平均，什麼原因？我們能幫忙您什麼？","若高於分會平均，可以分享一個成功的經驗？")),answerPara("referralsGivenAnswer"),
-    para(`4. 您過去在分會收到引薦次數：內部 ${m.receivedIn} 單＋外部 ${m.receivedOut} 單＝共 ${m.receivedIn+m.receivedOut} 單。`,{bold:true}),
-    para(boxLine("receivedCompare","若低於分會平均，什麼原因？我們能幫忙您什麼？","若高於分會平均，可以分享一個成功的經驗？")),answerPara("referralsReceivedAnswer"),
-    para(`在過去的一年裡，您有從收到引薦中得到您要的引薦業務或人脈嗎？ ${mark(radioValue("receivedBenefit"),"yes")} 有　${mark(radioValue("receivedBenefit"),"no")} 沒有`),
-    para(`5. 您過去在分會給出的引薦金額：${money(m.amount)}。`,{bold:true}),
-    para(`${$("#amountCompareLow").checked?"■":"□"} 若低於100萬，什麼原因？我們能幫忙您什麼？\n${$("#amountCompareHigh").checked?"■":"□"} 若高於400萬，可以分享一個成功的經驗？`),answerPara("referralAmountAnswer"),
-    para(`6. 您過去在分會邀請來賓人數：${m.visitors} 人。`,{bold:true}),
-    para(boxLine("visitorCompare","若低於分會平均，什麼原因？我們能幫忙您什麼？","若高於分會平均，可以分享一個成功的經驗？")),answerPara("visitorsAnswer"),
-    para(`7. 您過去在分會一對一次數：${m.oneToOne} 次。`,{bold:true}),
-    para(boxLine("oneToOneCompare","若低於分會平均，什麼原因？我們能幫忙您什麼？","若高於分會平均，可以分享一個成功的經驗？")),answerPara("oneToOneAnswer"),
-    para(`在過去的一年裡，您有從一對一會面得到您要的引薦業務或人脈嗎？ ${mark(radioValue("oneToOneBenefit"),"yes")} 有　${mark(radioValue("oneToOneBenefit"),"no")} 沒有`),
-    para(`8. 您過去在分會遲到 ${m.late} 次，您有早退嗎？${m.early} 次。`,{bold:true}),para("在過去的一年裡，你經常遲到或早退的原因是？你願意做出改變嗎？你改變的第一步是什麼？"),answerPara("attendanceAnswer"),
-    para(`9. 您過去在分會教育培訓積分：${m.education} 分。`,{bold:true}),para(`${$("#educationCompare").checked?"■":"□"} 若低於分會平均，什麼原因？是否願意參加工作坊提升商務引薦品質？ ${mark(radioValue("workshopWilling"),"yes")} 是　${mark(radioValue("workshopWilling"),"no")} 否`),answerPara("educationAnswer"),
-    para("10. 在過去的一年裡，你曾擔任領導職位是？",{bold:true}),para("是否願意擔任領導團隊幹部？您願意擔任的職務是什麼？"),answerPara("leadershipAnswer")
-  ];
-  const officialById = Object.fromEntries(experienceDefs.map(([no,id,title])=>[id,[no,title]]));
-  for(const id of ["chapterFeeling","bniBenefit","midtermGoal","midtermSummary","businessSatisfaction","nextActions"]){const [no,title]=officialById[id];children.push(para(`${no}. ${title}`,{bold:true}),answerPara(`${id}Answer`));if(id==="businessSatisfaction"&&answer("#satisfactionScore"))children.push(para(`滿意度：${answer("#satisfactionScore")} 分`));}
-  children.push(
-    para(`17. 本人同意於副主席公告續約完成後，兩個月內完成MSP（上）或（下）其中一堂培訓。${$("#mspUnderstood").checked?"■":"□"} 已了解`,{bold:true}),
-    para(`培訓日期－MSP（上）：${answer("#mspUp")||"　　　　"}／MSP（下）：${answer("#mspDown")||"　　　　"}`),
-    para(`簽名：${answer("#memberSignature")||"_____________________"}`),para("18. 分會相關地基備註說明：",{bold:true}),answerPara("chapterNotes"),para("本會員續約地基與追蹤快照",{bold:true}),...foundationSnapshot.split("\n").map(line=>para(line)),
-    para("19. 您對分會有什麼具體的建議（請重點陳述）？",{bold:true}),answerPara("chapterSuggestionAnswer"),
-    para("20. 了解會員委員會有同意會員續約、謝絕會員續約或會員有條件續約的權力。（一旦會員委員會做出不予續約決定，分會董事顧問有權確保訪談流程無瑕疵，才能做此不予續約決定）。",{bold:true}),para(`${$("#policyUnderstood").checked?"■":"□"} 已了解`),
-    para("審核會員貢獻的評估條件如下：",{bold:true}),para("(a) 未能帶來足夠數量的合格業務引薦和來賓\n(b) 未參加會議或經常遲到／早退\n(c) 未能展現出足夠的職業素養或始終準備不足\n(d) 拒絕擔任分會領導職位\n(e) 未能遵守某項政策、方針或道德規範"),
-    para("訪談人總結和建議",{bold:true,size:26,color:"A91419",before:200}),answerPara("summary"),
-    para(`會員（親簽）：${answer("#memberSignature")||"_____________________"}`),para(`訪談人：${$("#interviewer").value}`),para(`陪訪專員：${answer("#companionCounselor")}`),para("意見：",{bold:true}),answerPara("interviewerOpinion")
-  );
-  const wordDocument = new Document({styles:{default:{document:{run:{font:fontSpec,size:22},paragraph:{spacing:{line:320}}}}},sections:[{properties:{page:{size:{width:11906,height:16838,orientation:PageOrientation.PORTRAIT},margin:{top:720,right:720,bottom:720,left:720}}},children}]});
-  const blob = await Packer.toBlob(wordDocument),fileName=`363留員計畫-終期輔導-${safeFileName(currentMember.name)}-${fileDateStamp()}.docx`;
+  let blob,fileName;
+  try{
+    ({blob,fileName}=await window.FulianInterviewTemplate.generate({type:"renewal",applicant:currentMember.name,draft:{...serialize(),counselor:answer("#counselor")},context:{profession:currentMember.profession,metrics:currentMember.metrics,averages,score:currentMember.score,light:trafficLight(currentMember.score)[0],trafficPeriod:periodLabel(window.formPeriods.trafficStart,window.formPeriods.end),palmsPeriod:periodLabel(window.formPeriods.palmsStart,window.formPeriods.end)}}));
+  }catch(error){
+    terminalCompletion.failure({error});toast(error.message);return;
+  }
   try{
     await saveWordToCase(blob,fileName);
     terminalCompletion.success({blob,fileName,caseId:terminalTaskId,memberName:currentMember.name});
