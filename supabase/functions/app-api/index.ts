@@ -1,6 +1,7 @@
 import { parsePalmsText, parseExpiryText, parseTenureText } from "../../../apps/bni-analysis/engine/parse-reports.mjs";
 import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysis/engine/audit.mjs";
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
+import { resolveRenewalCaseCompletions } from "../../../apps/bni-analysis/engine/renewal-case-completions.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
 import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/calendar-domain.js";
@@ -3098,11 +3099,13 @@ async function loadEngineSources(reportMonth = "") {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
-  const [renewalRows, activeMemberRows, midtermRows, promotedRows] = await Promise.all([
+  const [renewalRows, activeMemberRows, midtermRows, promotedRows, renewalCaseRows, renewalHistoryRows] = await Promise.all([
     db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
     db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=in.(pending,in_progress,completed)&select=id,member_id,title,status,created_at,due_at,completed_at,source_reference&order=created_at.desc"),
     db("provisional_members?status=eq.promoted&select=display_name,promoted_at"),
+    db("cases?type=eq.renewal&select=id,type,member_id,stage,completed_at,created_at,analysis_snapshot_id&order=created_at.asc"),
+    db("analysis_snapshots?is_published=eq.true&select=id,is_published,published_at,snapshot&order=published_at.desc"),
   ]);
   const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
   const renewalCompletions = (renewalRows || []).map((row: any) => ({
@@ -3113,6 +3116,10 @@ async function loadEngineSources(reportMonth = "") {
     source: row.source,
     confirmedAt: row.confirmed_at,
   })).filter((row: any) => row.name);
+  const caseRenewals = resolveRenewalCaseCompletions({
+    cases: renewalCaseRows, snapshots: renewalHistoryRows, members: activeMemberRows, asOf: taipeiDay(),
+  });
+  renewalCompletions.push(...caseRenewals.completions);
   const midtermCompletions = (midtermRows || []).filter((row: any) => row.status === "completed" && row.completed_at).map((row: any) => ({
     name: renewalNames.get(row.member_id) || String(row.title || "").replace(/\s+/g, ""),
     completedAt: row.completed_at,
@@ -3143,6 +3150,8 @@ async function loadEngineSources(reportMonth = "") {
     };
   }).filter((row: any) => row.name && row.fields.length);
   const sources = [half, monthlyRow, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
+  // A closed/reopened case also invalidates a previously reviewed draft.
+  sources.push({ path: "System/renewal-case-closures", sha256: (await sha256Text(JSON.stringify(caseRenewals))).slice(0, 12), modifiedAt: null });
   return {
     engine: buildAnalysisFromParsed({
       palms: halfReport,
@@ -3153,6 +3162,7 @@ async function loadEngineSources(reportMonth = "") {
       auditMonth: combineAuditWeeks(audits),
       auditMonthName: expectedMonth.month,
       renewalCompletions,
+      renewalCaseEvidence: caseRenewals,
       midtermCompletions,
       midtermTasks,
       officialSyncPending,
@@ -3188,7 +3198,7 @@ async function analysisSnapshotApi(request: Request, context: Context) {
   return snapshot;
 }
 
-const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告，結尾標注本報告為草稿，需副主席確認後才正式發佈。";
+const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告；Mentor 一律寫「導師」，續約提醒依引擎採系統案件結案與當次週期排除，不等待中心區同步。黃燈升綠建議必須引用引擎 monthlyActions 的本月引薦、一對一、培訓明確數量（含正常參與），不得只寫維持正常參與；只有 attendanceBlocksGreen 為真才能建議來賓或成交金額，並引用 attendanceReason 說明缺席扣分、基本三項全滿的最高總分與距 70 分缺口。結構性洞察應挑選審計對帳與觀察中值得提出的證據，附可能原因與具體關懷方向，不得留空或指控。結尾標注本報告為草稿，需副主席確認後才正式發佈。";
 
 async function currentDraft() {
   const published = await latestPublished();
@@ -3285,6 +3295,7 @@ async function analysisDraftApi(request: Request, context: Context) {
     const completionId = String(body.completionId || "");
     const confirmation = (draft.engine?.renewalConfirmations || []).find((item: any) => item.id === completionId);
     if (!confirmation) throw Object.assign(new Error("這筆完成紀錄已更新，請重新整理草稿後再操作"), { status: 409 });
+    if (confirmation.source === "case-closed") throw Object.assign(new Error("此提醒依系統續約案件結案排除；如需恢復，請依案件流程重新開案後重新產出分析"), { status: 409 });
     await db(`membership_renewal_completions?id=eq.${encodeURIComponent(completionId)}&revoked_at=is.null`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Prefer: "return=minimal" },

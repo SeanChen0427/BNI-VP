@@ -109,7 +109,7 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
     const detail = `${zeroItems ? `${zeroItems}｜` : ""}引薦 ${m.metrics.refPerWeek.toFixed(2)}/週・一對一 ${m.metrics.otoPerWeek.toFixed(2)}/週`;
     const action = officialPending
       ? "先採新會員寬容追蹤；不以登錄日推算會齡，待官方報告同步後再判定期中時點"
-      : nm ? "指派 Mentor，追蹤融入而非究責分數" : "深度關懷面談：了解活躍度下滑原因";
+      : nm ? "指派 導師，追蹤融入而非究責分數" : "深度關懷面談：了解活躍度下滑原因";
     return `<div class="card red"><div class="t">${esc(m.name)}｜${m.total} 分 ${m.light === "red" ? "紅燈" : "黑燈"}${chip}</div><div class="d">${detail}</div><div class="action">${action}</div></div>`;
   }).join("\n    ");
 
@@ -127,33 +127,23 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
   // 黃燈突圍
   const cardsData = {};
   const breakthroughRows = engine.yellowBreakthroughs.map((b) => {
-    const chips = [];
-    const steps = [];
-    let running = b.total;
-    for (const option of b.cheapestPath) {
-      running += option.pointsGain;
-      if (option.extraActions === 0) {
-        chips.push(`<span class="chip okc">${esc(ITEM_LABEL[option.item])}維持正常參與</span>→ ${running}`);
-        steps.push(`${ITEM_LABEL[option.item]}維持正常參與即可（自然達標）`);
-      } else {
-        chips.push(`<span class="chip warn">${esc(pathChipText(option))}</span>→ ${running}`);
-        steps.push(`${ITEM_LABEL[option.item]}再多 ${option.extraActions} ${ITEM_UNIT[option.item] || ""}`.trim());
-      }
-    }
-    if (!b.pathCoversGap && b.alternatives.length) {
-      for (const alt of b.alternatives.filter((a) => a.pointsGain > 0)) {
-        chips.push(`<span class="chip info">${esc(altChipText(alt))}</span>`);
-        steps.push(alt.condition);
-      }
-    }
+    const actions = b.monthlyActions;
+    const steps = actions ? [`本月一對一 ${actions.oneToOne} 次`, `提供引薦 ${actions.referral} 筆`, `培訓再補 ${actions.education} 分`] : b.cheapestPath.map(option => pathChipText(option));
+    const extra = b.additionalActions;
+    const extraNote = extra ? `其中正常參與之外：一對一 +${extra.oneToOne} 次、引薦 +${extra.referral} 筆；培訓 0 表示依現值不需加補。` : "";
+    const actionText = steps.join("、");
+    const reason = b.attendanceReason || "";
+    const alternativeText = b.alternatives.map(a => a.condition).join("＋");
+    const workload = b.highWorkload ? "需求量較多，可拆成每週目標；不因此改推來賓或交易。" : "";
     cardsData[b.name] = {
       score: b.total,
-      steps: steps.length ? steps : ["維持正常參與（每週一對一 2 次、引薦 1.5 筆）"],
-      result: b.pathCoversGap || b.alternatives.length ? "70 分・升綠" : `目標 ${b.total + 5}–70 分`,
-      note: "缺席與培訓以現值計；滾出月份的變動會使分數自動調整（估算）",
+      steps: [...steps, ...(reason ? [reason] : []), ...(alternativeText ? [alternativeText] : [])],
+      result: b.pathCoversGap ? "估算可達 70 分以上" : b.attendanceBlocksGreen ? "三項補滿仍受缺席扣分限制" : "依列出數量追蹤",
+      note: "含本月正常參與：每週一對一2次、引薦1.5筆；缺席、培訓、來賓及交易以現值計，滾出月份變動須重估。",
     };
-    const requirement = chips.length ? chips.join("；") : "維持正常參與即可";
+    const requirement = [actionText, b.pathCoversGap ? "→ 估算可達 70 分以上" : reason, extraNote, alternativeText, workload].filter(Boolean).map(esc).join("；");
     return `<tr><td class="name">${esc(b.name)}</td><td>${dot("yellow")}${b.total}</td><td>${requirement}</td><td><button class="dl" onclick="dlCard('${esc(b.name)}')">下載 PNG</button></td></tr>`;
+
   }).join("\n    ");
 
   // 結構性洞察
@@ -167,6 +157,19 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
     }).filter(Boolean).join("；");
     return `<div class="card amber"><div class="t">${esc(idle.name)}｜綠燈空轉 ${member ? dot(member.light) + member.total : ""}</div><div class="d">${esc(parts)}</div><div class="action">關懷時確認參與品質，帳面健康不等於真實收穫</div></div>`;
   }).join("\n    ");
+
+  // Selected audit evidence makes structural insights actionable even when no green-idle cards exist.
+  const concentration = auditAll.filter(o => o.families.includes("B"));
+  const concentrationTop = [...concentration].sort((a, b) => {
+    const percent = o => Math.max(0, ...o.evidence.flatMap(e => [...e.matchAll(/([\d.]+)%/g)].map(m => Number(m[1]))));
+    return percent(b) - percent(a);
+  }).slice(0, 3);
+  const outputSignals = auditAll.filter(o => o.families.includes("D"));
+  const structuralCards = [
+    concentration.length ? { title: "引薦合作是否過度集中", detail: `${concentration.length}／${active} 位現任出現集中度觀察；${concentrationTop.map(o => o.name + "：" + o.evidence.join("；")).join("。 ")}`, action: "選擇上述合作組合，確認需求是否匹配、引薦後續及實際收穫；固定合作可能合理，不以集中度判定資料不實。" } : null,
+    outputSignals.length ? { title: "互動量與成交回報的落差", detail: outputSignals.map(o => o.name + "：" + o.evidence.join("；")).join("。 "), action: "先了解產業成交週期、對接需求與是否尚未回報，再決定導師支持；不只要求增加一對一次數。" } : null,
+    !concentration.length && !outputSignals.length ? { title: "本期審計整體觀察", detail: engine.audit ? `共 ${engine.audit.totals.events} 筆逐週事件，未出現集中度或量大零產出的重點訊號。` : "本期未提供審計資料。", action: "依既有關懷追蹤實際收穫；未提供審計時不推測互動情況。" } : null,
+  ].filter(Boolean).map(item => `<div class="card amber"><div class="t">${esc(item.title)}</div><div class="d">${esc(item.detail)}</div><div class="action">${esc(item.action)}</div></div>`).join("\n");
 
   // 期中關懷與新會員
   const midtermCards = engine.lifecycle.midterm.map((m) => {
@@ -184,7 +187,7 @@ export function renderDashboard({ engine, aiReview = null, version = null, publi
   const newCards = engine.lifecycle.newMembers.map((m) => {
     const member = byName.get(m.name);
     const healthy = member && member.light === "green";
-    return `<div class="card${healthy ? "" : " red"}"><div class="t">${esc(m.name)} ${member ? dot(member.light) : ""}${m.total} <span class="chip${healthy ? " okc" : ""}">${healthy ? "適應良好" : "新會員"}</span></div><div class="d">${esc(m.startDate || "")} 入會・在會 <b>${m.weeks} 週</b>｜引薦 ${member ? member.metrics.refPerWeek.toFixed(2) : "—"}/週・一對一 ${member ? member.metrics.otoPerWeek.toFixed(2) : "—"}/週（新會員偏低屬正常）</div><div class="action">${healthy ? "維持觀察即可" : "指派 Mentor，兩週後檢查一對一是否啟動"}</div></div>`;
+    return `<div class="card${healthy ? "" : " red"}"><div class="t">${esc(m.name)} ${member ? dot(member.light) : ""}${m.total} <span class="chip${healthy ? " okc" : ""}">${healthy ? "適應良好" : "新會員"}</span></div><div class="d">${esc(m.startDate || "")} 入會・在會 <b>${m.weeks} 週</b>｜引薦 ${member ? member.metrics.refPerWeek.toFixed(2) : "—"}/週・一對一 ${member ? member.metrics.otoPerWeek.toFixed(2) : "—"}/週（新會員偏低屬正常）</div><div class="action">${healthy ? "維持觀察即可" : "指派 導師，兩週後檢查一對一是否啟動"}</div></div>`;
   }).join("\n    ");
 
   const aiSection = aiReview ? `
@@ -275,7 +278,7 @@ footer{border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font
   <div class="stat${dueNow.length ? " alert" : ""}"><div class="n">${dueNow.length}</div><div class="l">本週續約截止</div></div>
   <div class="stat${weakWarn.length ? " watch" : ""}"><div class="n">${weakWarn.length}</div><div class="l">續約審查預警</div></div>
   <div class="stat${auditObs.length ? " watch" : ""}"><div class="n">${auditObs.length}</div><div class="l">審計觀察（校準期）</div></div>
-  <div class="stat${d.red + d.black ? " alert" : ""}"><div class="n">${d.red + d.black}</div><div class="l">紅燈會員</div></div>
+  <div class="stat${d.red + d.black ? " alert" : ""}"><div class="n">${d.red + d.black}</div><div class="l">紅／黑燈會員</div></div>
   <div class="stat${openAlerts.length ? " alert" : ""}"><div class="n">${openAlerts.length}</div><div class="l">行業別開放警示</div></div>
 </div>
 
@@ -297,21 +300,23 @@ ${pendingSyncSection}
 </section>
 
 <section>
-  <div class="sec-h"><h2>燈號關懷</h2><span class="badge red">紅燈 ${d.red + d.black}</span><span class="badge gray">黃燈 ${d.yellow}</span></div>
+  <div class="sec-h"><h2>燈號關懷</h2><span class="badge red">紅燈 ${d.red}</span><span class="badge gray">黑燈 ${d.black}</span><span class="badge gray">黃燈 ${d.yellow}</span></div>
   ${redCards ? `<div class="cards">\n    ${redCards}\n  </div>` : '<div class="banner">本期無紅燈或黑燈會員。</div>'}
 </section>
 
 <section>
   <div class="sec-h"><h2>黃燈突圍計算</h2><span class="badge gray">${engine.yellowBreakthroughs.length} 位</span><span class="badge gray">估算</span></div>
-  <div class="sec-note">6 個月滾動窗估算。<b>假設 ${actionMonth} 月正常參與：每週一對一 2 次＋引薦 1.5 筆</b>。表列「還差多少」為正常參與之外需額外多做的量。來賓與交易預設不列入個人要求（分會層級處理），缺口不可控時列為替代補分路徑（藍色標示，門檻為窗口累計值）；缺席與培訓以現值計，滾出月份的變動會使分數自動調整。</div>
+  <div class="sec-note">6 個月滾動窗估算，本月按 4 週計。表列本月需完成的一對一、提供引薦與培訓，已包含每週一對一 2 次、引薦 1.5 筆的正常參與。只有缺席扣分使三項補滿仍無法升綠，才列來賓或交易補分方案與原因。缺席、培訓、來賓及交易以現值計；滾出月份變動須重新估算。</div>
   <table>
-    <tr><th>會員</th><th>目前</th><th>正常參與之外還差多少（最省路徑 → 70 綠燈）</th><th>提醒卡</th></tr>
+    <tr><th>會員</th><th>目前</th><th>本月需完成的明確數量（含正常參與，估算）</th><th>提醒卡</th></tr>
     ${breakthroughRows || '<tr><td colspan="4">本期無黃燈會員</td></tr>'}
   </table>
 </section>
 
 <section>
-  <div class="sec-h"><h2>結構性洞察</h2></div>
+  <div class="sec-h"><h2>結構性洞察</h2><span class="badge gray">審計重點・校準期非結論</span></div>
+  <div class="sec-note">從本期審計選取值得討論的合作模式與成果差距，作為分會層級支持方向。</div>
+  <div class="cards">${structuralCards}</div>
   <div class="banner" style="margin-bottom:12px">
     <b>${structuralItems ? `${structuralItems}為全分會系統性弱項，屬分會問題而非個人問題。` : "本期無全分會結構性零分項。"}</b>來賓 0 分 ${engine.structural.visitorZeroScore}/${active} 人・培訓 0 分 ${engine.structural.educationZeroScore}/${active} 人・交易 0 分 ${engine.structural.tyfcbZeroScore}/${active} 人。
     <div class="d">建議：以分會層級活動（邀賓日、培訓班表）處理，個人關懷聚焦在偏離分會平均的個案。</div>
@@ -354,7 +359,7 @@ function dlCard(name){
   let H=252;
   mc.font="26px -apple-system,'PingFang TC',sans-serif";
   d.steps.forEach(t=>{H+=Math.max(1,Math.ceil(mc.measureText(t).width/(W-pad*2-56)))*38+18;});
-  H+=104;
+  H+=160;
   if(d.note){mc.font="20px sans-serif";H+=Math.ceil(mc.measureText(d.note).width/(W-pad*2))*30+14;}
   H+=96;
   const cv=document.createElement("canvas");cv.width=W*2;cv.height=H*2;
@@ -374,8 +379,8 @@ function dlCard(name){
   c.fillText("目前 "+d.score+" 分",pad+nw+44,168);
   c.strokeStyle="#e7e5e0";c.beginPath();c.moveTo(pad,196);c.lineTo(W-pad,196);c.stroke();
   c.fillStyle="#4b5563";c.font="22px -apple-system,'PingFang TC',sans-serif";
-  c.fillText(CARD_MONTH+" 月正常參與（每週一對一 2 次、引薦 1.5 筆）之外，",pad,236);
-  c.fillText("再完成：",pad,266);
+  c.fillText(CARD_MONTH+" 月需完成的總量（包含正常參與）：",pad,236);
+  c.fillText("依目前資料估算，滾動窗口變動後須重新確認。",pad,266);
   let y=316;
   d.steps.forEach((t,i)=>{
     c.beginPath();c.arc(pad+16,y-9,16,0,7);c.fillStyle="#f0f7f2";c.fill();
@@ -384,13 +389,12 @@ function dlCard(name){
     c.fillStyle="#1a1d21";c.font="26px -apple-system,'PingFang TC',sans-serif";
     y=wrap(c,t,pad+56,y,W-pad*2-56,38)+18;
   });
-  rr(c,pad,y-10,W-pad*2,64,12);c.fillStyle="#f0f7f2";c.fill();
+  rr(c,pad,y-10,W-pad*2,112,12);c.fillStyle="#f0f7f2";c.fill();
   c.fillStyle="#2e7d54";c.font="800 26px -apple-system,'PingFang TC',sans-serif";
   c.fillText("完成後下期預估：",pad+24,y+31);
-  const lw=c.measureText("完成後下期預估：").width;
-  c.beginPath();c.arc(pad+34+lw,y+23,9,0,7);c.fill();
-  c.fillText(d.result,pad+52+lw,y+31);
-  y+=88;
+  c.font="700 24px -apple-system,'PingFang TC',sans-serif";
+  c.fillText(d.result,pad+24,y+73);
+  y+=136;
   if(d.note){c.fillStyle="#6b7280";c.font="20px -apple-system,'PingFang TC',sans-serif";y=wrap(c,d.note,pad,y,W-pad*2,30)+8;}
   c.fillStyle="#9ca3af";c.font="17px -apple-system,'PingFang TC',sans-serif";
   c.fillText("富聯分會 會員委員會（估算）",pad,H-40);

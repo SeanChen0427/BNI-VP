@@ -66,7 +66,7 @@ export function behaviorDiagnostics(scored, tenureMonths, { officialTenurePendin
   } else if (o >= 2.0 && g < 1.0 && r < 1.0) {
     findings.push({ module: "triangle", pattern: "C", evidence: `一對一 ${o.toFixed(2)}/週、提供 ${g.toFixed(2)}/週、收到 ${r.toFixed(2)}/週`, meaning: "一對一未轉化為引薦" });
   } else if (g < 0.75 && r < 0.75 && o < 0.75) {
-    findings.push({ module: "triangle", pattern: "D", evidence: `提供 ${g.toFixed(2)}／收到 ${r.toFixed(2)}／一對一 ${o.toFixed(2)}（每週）`, meaning: tenureMonths !== null && tenureMonths >= 12 ? "老會員全面低參與，需深度對話" : "未融入系統，需 Mentor 帶動" });
+    findings.push({ module: "triangle", pattern: "D", evidence: `提供 ${g.toFixed(2)}／收到 ${r.toFixed(2)}／一對一 ${o.toFixed(2)}（每週）`, meaning: tenureMonths !== null && tenureMonths >= 12 ? "老會員全面低參與，需深度對話" : "未融入系統，需 導師 帶動" });
   }
 
   // 模組三：引薦含金量（提供引薦 = 0 不計算，歸入互動三角）
@@ -192,37 +192,43 @@ export function yellowBreakthrough(scored, { monthWeeks = 4 } = {}) {
     options.push({ item: "education", tierScore: pts, pointsGain: gain, extraActions: Math.max(0, th - m.ceu), unit: "培訓分（現值計，滾出月份會使分數自動變動）", estimated: true });
   }
 
-  // 最省路徑：以每分行動成本排序的貪婪組合（估算）。單月不現實者標記。
-  const feasible = options.filter((o) => o.pointsGain > 0).map((o) => ({ ...o, unrealistic: o.extraActions > 12 }));
-  feasible.sort((a, b) => (a.extraActions / a.pointsGain) - (b.extraActions / b.pointsGain));
-  const path = [];
-  let acc = 0;
-  const usedItems = new Set();
-  for (const o of feasible) {
-    if (acc >= gapToGreen) break;
-    if (usedItems.has(o.item) || o.unrealistic) continue;
-    usedItems.add(o.item);
-    path.push(o);
-    acc += o.pointsGain;
+  // Enumerate complete combinations. A cheap partial referral tier must not
+  // prevent selecting a higher tier in that same item (Sean 2026-10-01).
+  const groups = ["referral", "oneToOne", "education"].map(item => [null, ...options.filter(o => o.item === item)]);
+  const combinations = [];
+  for (const referral of groups[0]) for (const oneToOne of groups[1]) for (const education of groups[2]) {
+    const path = [referral, oneToOne, education].filter(Boolean);
+    combinations.push({ path, gain: path.reduce((sum, o) => sum + o.pointsGain, 0), cost: path.reduce((sum, o) => sum + o.extraActions, 0) });
   }
-
-  // 替代補分路徑（來賓 7 位 → +10；成交 40 萬 → +5）：
-  // 缺席有失分（只能等滾出）或最省路徑蓋不滿缺口（可控項需求不現實）時提供。
+  const covering = combinations.filter(p => p.gain >= gapToGreen).sort((a, b) => a.cost - b.cost || a.gain - b.gain || a.path.length - b.path.length);
+  const selected = covering[0] || combinations.sort((a, b) => b.gain - a.gain || a.cost - b.cost)[0];
+  const path = selected.path;
+  const additionalActions = Object.fromEntries(["referral", "oneToOne", "education"].map(item => [item, path.find(o => o.item === item)?.extraActions || 0]));
+  const monthlyActions = { referral: Math.ceil(1.5 * monthWeeks) + additionalActions.referral, oneToOne: 2 * monthWeeks + additionalActions.oneToOne, education: additionalActions.education };
+  const controllableCeiling = scored.scores.absence + scored.scores.visitor + scored.scores.tyfcb + 20 + 15 + 15;
+  const attendanceBlocksGreen = scored.scores.absence < 20 && controllableCeiling < 70;
   const alternatives = [];
-  if (scored.scores.absence < 20 || acc < gapToGreen) {
-    if (scored.scores.visitor < 10) alternatives.push({ item: "visitor", condition: `窗口累計來賓 7 位（目前 ${m.visitors}）`, pointsGain: 10 - scored.scores.visitor, note: "替代補分路徑" });
-    if (scored.scores.tyfcb < 5) alternatives.push({ item: "tyfcb", condition: `窗口累計成交 40 萬（目前 ${(m.tyfcb / 10000).toFixed(1)} 萬）`, pointsGain: 5 - scored.scores.tyfcb, note: "替代補分路徑" });
+  if (attendanceBlocksGreen) {
+    const visitors = [{ target: m.visitors, gain: 0 }, ...[[7, 10], [11, 15]].filter(([, points]) => points > scored.scores.visitor).map(([target, points]) => ({ target, gain: points - scored.scores.visitor }))];
+    const transactions = [{ target: m.tyfcb, gain: 0 }, ...[[400000, 5], [800000, 10], [2000000, 15]].filter(([, points]) => points > scored.scores.tyfcb).map(([target, points]) => ({ target, gain: points - scored.scores.tyfcb }))];
+    const plans = visitors.flatMap(v => transactions.map(t => ({ v, t, gain: v.gain + t.gain, count: Number(v.gain > 0) + Number(t.gain > 0) })))
+      .filter(p => controllableCeiling + p.gain >= 70)
+      .sort((a, b) => a.count - b.count || a.t.target - b.t.target || a.v.target - b.v.target);
+    const alternative = plans[0];
+    if (alternative?.v.gain) alternatives.push({ item: "visitor", condition: "窗口累計來賓 " + alternative.v.target + " 位（目前 " + m.visitors + "，還需 " + Math.max(0, alternative.v.target - m.visitors) + " 位）", pointsGain: alternative.v.gain, note: "僅因缺席失分，三項補滿仍未達70分；與列出的其他替代項合併" });
+    if (alternative?.t.gain) alternatives.push({ item: "tyfcb", condition: "窗口累計交易 " + alternative.t.target / 10000 + " 萬（目前 " + (m.tyfcb / 10000).toFixed(1) + " 萬，還需 " + Math.max(0, alternative.t.target - m.tyfcb).toLocaleString() + " 元）", pointsGain: alternative.t.gain, note: "僅因缺席失分，三項補滿仍未達70分；與列出的其他替代項合併" });
   }
   return {
-    name: scored.name,
-    total: scored.total,
-    gapToGreen,
+    name: scored.name, total: scored.total, gapToGreen,
     windowNote: `估算：6 個月滾動窗，滾出約 ${rolledOut} 週、本月以 ${monthWeeks} 週計`,
-    options: feasible,
-    cheapestPath: path,
-    pathCoversGap: acc >= gapToGreen,
-    alternatives,
-    estimated: true,
+    options, cheapestPath: path, pathCoversGap: selected.gain >= gapToGreen,
+    monthlyActions, additionalActions, controllableCeiling, attendanceBlocksGreen,
+    attendanceReason: attendanceBlocksGreen
+      ? `等效缺席 ${scored.equivalentAbsence} 次，出席項得 ${scored.scores.absence}／20 分；引薦 20＋一對一 15＋培訓 15 分全拿滿，再加目前來賓 ${scored.scores.visitor}＋交易 ${scored.scores.tyfcb} 分，最高 ${controllableCeiling} 分，距綠燈仍差 ${70 - controllableCeiling} 分。缺席紀錄滾出半年計分期間後須重新估算。`
+      : null,
+    highWorkload: additionalActions.referral > 12 || additionalActions.oneToOne > 12,
+    projectedScore: scored.total + selected.gain,
+    alternatives, estimated: true,
   };
 }
 

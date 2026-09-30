@@ -126,13 +126,15 @@
       const name = document.createElement("strong");
       const dates = document.createElement("small");
       const button = document.createElement("button");
-      name.textContent = `${item.name}・中心已完成`;
+      const caseClosed = item.source === "case-closed";
+      name.textContent = `${item.name}・${caseClosed ? "系統續約案件已結案" : "中心已完成"}`;
       dates.textContent = `完成日 ${item.completedOn}｜原到期日 ${item.priorExpiryOn}`;
       details.append(name, dates);
       button.type = "button";
       button.className = "secondary";
-      button.textContent = "撤銷誤確認";
-      button.addEventListener("click", () => revokeRenewal(item, button));
+      button.textContent = caseClosed ? "依案件結案狀態" : "撤銷誤確認";
+      button.disabled = caseClosed;
+      if (!caseClosed) button.addEventListener("click", () => revokeRenewal(item, button));
       card.append(details, button);
       return card;
     });
