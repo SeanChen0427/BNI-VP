@@ -9,6 +9,7 @@ import { scoreMember, reportTotalWeeks } from "./score.mjs";
 import { reconcile } from "./reconcile.mjs";
 import { behaviorDiagnostics, greenIdle, renewalRadar, yellowBreakthrough, lifecycleLists, memberTenure } from "./diagnostics.mjs";
 import { loadAuditMonth, runAuditFamilies } from "./audit.mjs";
+import { resolveRenewalDecisionExclusions } from "./renewal-meeting-decisions.mjs";
 import { taipeiDay } from "./time.mjs";
 
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -80,6 +81,7 @@ export function buildAnalysisFromParsed({
   auditMonthName = null,
   renewalCompletions = [],
   renewalCaseEvidence = null,
+  renewalDecisions = [],
   midtermCompletions = [],
   midtermTasks = [],
   officialSyncPending = [],
@@ -149,6 +151,8 @@ export function buildAnalysisFromParsed({
     const expiry = expiryByName.get(item.name);
     return activeNames.has(item.name) && expiry?.expiryDate === item.priorExpiryOn;
   });
+  const renewalDecisionEvidence = resolveRenewalDecisionExclusions({ decisions: renewalDecisions, expiryByName, asOf });
+  const renewalNonRenewals = renewalDecisionEvidence.exclusions.filter(item => activeNames.has(item.name));
   const radar = renewalRadar({
     activeScored,
     expiryByName,
@@ -156,6 +160,7 @@ export function buildAnalysisFromParsed({
     asOf,
     expiredUnrenewed: reconciliation.expiredUnrenewed,
     confirmedRenewals,
+    confirmedNonRenewals: renewalNonRenewals,
   });
 
   // 黃燈突圍
@@ -197,6 +202,8 @@ export function buildAnalysisFromParsed({
     renewalRadar: radar,
     renewalConfirmations: confirmedRenewals,
     renewalCaseEvidence,
+    renewalNonRenewals,
+    renewalDecisionEvidence,
     yellowBreakthroughs: breakthroughs,
     lifecycle,
     audit,

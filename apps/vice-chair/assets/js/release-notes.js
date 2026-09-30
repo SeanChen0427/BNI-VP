@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.9", publishedAt: "2026-10-01", title: "續約雷達接續月會決議", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["已結案月會確認不續約者，排除同一次續約雷達，不再重複提示排定續約訪談。", "追加更正為續約後可恢復追蹤，舊決議不影響下一次到期週期。"]),
+      howTo: "月會決議或更正後，重新產出並確認分析；會員關懷頁顯示最新已發布結果。",
+      impact: "保留月會原決議、會員主檔與案件，未把不續約當成已離會或完成續約。"
+    }),
+    Object.freeze({
       version: "1.8.8", publishedAt: "2026-10-01", title: "關懷報表閱讀排版修正", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["黃燈表格保留姓名、分數與下載欄寬，長建議在自己的欄位換行。", "結構性洞察分開摘要、逐人證據及關懷建議，方便閱讀。"]),

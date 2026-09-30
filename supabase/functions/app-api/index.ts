@@ -3099,13 +3099,14 @@ async function loadEngineSources(reportMonth = "") {
   for (const row of auditRows) audits.push(parseAuditWeekText(await downloadReport(row), row.storage_path));
   const departedRows = await db("members?status=eq.departed&select=departed_on,people!inner(display_name)");
   const departed = departedRows.map((row: any) => ({ name: String(row.people.display_name).replace(/\s+/g, ""), confirmedAt: row.departed_on }));
-  const [renewalRows, activeMemberRows, midtermRows, promotedRows, renewalCaseRows, renewalHistoryRows] = await Promise.all([
+  const [renewalRows, activeMemberRows, midtermRows, promotedRows, renewalCaseRows, renewalHistoryRows, meetingDecisionRows] = await Promise.all([
     db("membership_renewal_completions?revoked_at=is.null&select=id,member_id,prior_expiry_on,completed_on,source,confirmed_at&order=confirmed_at.desc"),
     db("members?status=eq.active&select=id,people!inner(display_name)"),
     db("tasks?source=eq.vice-chair-work-plan&category=eq.midterm&status=in.(pending,in_progress,completed)&select=id,member_id,title,status,created_at,due_at,completed_at,source_reference&order=created_at.desc"),
     db("provisional_members?status=eq.promoted&select=display_name,promoted_at"),
     db("cases?type=eq.renewal&select=id,type,member_id,stage,completed_at,created_at,analysis_snapshot_id&order=created_at.asc"),
     db("analysis_snapshots?is_published=eq.true&select=id,is_published,published_at,snapshot&order=published_at.desc"),
+    db("committee_meetings?status=eq.final&select=id,meeting_month,status,updated_at,care_summary&order=meeting_month.asc"),
   ]);
   const renewalNames = new Map((activeMemberRows || []).map((row: any) => [row.id, String(row.people.display_name).replace(/\s+/g, "")]));
   const renewalCompletions = (renewalRows || []).map((row: any) => ({
@@ -3120,6 +3121,17 @@ async function loadEngineSources(reportMonth = "") {
     cases: renewalCaseRows, snapshots: renewalHistoryRows, members: activeMemberRows, asOf: taipeiDay(),
   });
   renewalCompletions.push(...caseRenewals.completions);
+  const renewalDecisions = (meetingDecisionRows || []).flatMap((meeting: any) =>
+    (Array.isArray(meeting.care_summary?.items) ? meeting.care_summary.items : [])
+      .filter((item: any) => item.taskType === "renewal")
+      .map((item: any) => ({
+        meetingId: meeting.id, meetingMonth: meeting.meeting_month, status: meeting.status,
+        careItemId: item.id, name: String(item.member || "").replace(/\s+/g, ""),
+        deadline: String(item.detail || "").match(/續約截止\s*(\d{4}-\d{2}-\d{2})/)?.[1] || "",
+        disposition: isValidMonthlyCareDisposition(item) ? effectiveMonthlyCareDisposition(item) : "invalid",
+        recordedAt: meeting.updated_at,
+      })));
+
   const midtermCompletions = (midtermRows || []).filter((row: any) => row.status === "completed" && row.completed_at).map((row: any) => ({
     name: renewalNames.get(row.member_id) || String(row.title || "").replace(/\s+/g, ""),
     completedAt: row.completed_at,
@@ -3152,6 +3164,7 @@ async function loadEngineSources(reportMonth = "") {
   const sources = [half, monthlyRow, expiry, tenure, ...(annualRow ? [annualRow] : []), ...auditRows].map((row: any) => ({ path: `Private Storage/${row.storage_path}`, sha256: row.sha256?.slice(0, 12) || null, modifiedAt: row.imported_at }));
   // A closed/reopened case also invalidates a previously reviewed draft.
   sources.push({ path: "System/renewal-case-closures", sha256: (await sha256Text(JSON.stringify(caseRenewals))).slice(0, 12), modifiedAt: null });
+  sources.push({ path: "System/final-meeting-renewal-decisions", sha256: (await sha256Text(JSON.stringify(renewalDecisions))).slice(0, 12), modifiedAt: null });
   return {
     engine: buildAnalysisFromParsed({
       palms: halfReport,
@@ -3163,6 +3176,7 @@ async function loadEngineSources(reportMonth = "") {
       auditMonthName: expectedMonth.month,
       renewalCompletions,
       renewalCaseEvidence: caseRenewals,
+      renewalDecisions,
       midtermCompletions,
       midtermTasks,
       officialSyncPending,
@@ -3198,7 +3212,7 @@ async function analysisSnapshotApi(request: Request, context: Context) {
   return snapshot;
 }
 
-const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告；Mentor 一律寫「導師」，續約提醒依引擎採系統案件結案與當次週期排除，不等待中心區同步。黃燈升綠建議必須引用引擎 monthlyActions 的本月引薦、一對一、培訓明確數量（含正常參與），不得只寫維持正常參與；只有 attendanceBlocksGreen 為真才能建議來賓或成交金額，並引用 attendanceReason 說明缺席扣分、基本三項全滿的最高總分與距 70 分缺口。結構性洞察應挑選審計對帳與觀察中值得提出的證據，附可能原因與具體關懷方向，不得留空或指控。結尾標注本報告為草稿，需副主席確認後才正式發佈。";
+const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告；Mentor 一律寫「導師」，續約提醒依引擎採系統案件結案與當次週期排除，不等待中心區同步；已結案月會確認不續約者只排除當次續約提醒，不視為已續約或已離會，也不再建議追催續約。黃燈升綠建議必須引用引擎 monthlyActions 的本月引薦、一對一、培訓明確數量（含正常參與），不得只寫維持正常參與；只有 attendanceBlocksGreen 為真才能建議來賓或成交金額，並引用 attendanceReason 說明缺席扣分、基本三項全滿的最高總分與距 70 分缺口。結構性洞察應挑選審計對帳與觀察中值得提出的證據，附可能原因與具體關懷方向，不得留空或指控。結尾標注本報告為草稿，需副主席確認後才正式發佈。";
 
 async function currentDraft() {
   const published = await latestPublished();

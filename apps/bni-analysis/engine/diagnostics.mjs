@@ -112,10 +112,10 @@ export function greenIdle(scored, structuralItems = []) {
 }
 
 // 續約雷達。asOf = 分析基準日（YYYY-MM-DD）。annualByName 可為 null（改用半年 ×2 估算）。
-export function renewalRadar({ activeScored, expiryByName, annualByName, asOf, expiredUnrenewed, confirmedRenewals = [] }) {
+export function renewalRadar({ activeScored, expiryByName, annualByName, asOf, expiredUnrenewed, confirmedRenewals = [], confirmedNonRenewals = [] }) {
   const items = [];
   const asOfMonth = asOf.slice(0, 7);
-  const confirmedCycles = new Set(confirmedRenewals.map((item) => `${item.name}\u0000${item.priorExpiryOn}`));
+  const confirmedCycles = new Set([...confirmedRenewals, ...confirmedNonRenewals].map((item) => `${item.name}\u0000${item.priorExpiryOn}`));
   for (const s of activeScored) {
     const e = expiryByName.get(s.name);
     if (!e || !e.expiryDate) continue;
@@ -137,6 +137,7 @@ export function renewalRadar({ activeScored, expiryByName, annualByName, asOf, e
     }
   }
   for (const name of expiredUnrenewed) {
+    if (confirmedCycles.has(`${name}\u0000${expiryByName.get(name)?.expiryDate}`)) continue;
     items.push({ name, kind: "expired-unrenewed" });
   }
   const order = { "expired-unrenewed": 0, overdue: 1, "due-this-month": 2, upcoming: 3, "weak-early-warning": 4 };
