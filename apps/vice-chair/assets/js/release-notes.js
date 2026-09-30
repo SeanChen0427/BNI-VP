@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.8", publishedAt: "2026-10-01", title: "關懷報表閱讀排版修正", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["黃燈表格保留姓名、分數與下載欄寬，長建議在自己的欄位換行。", "結構性洞察分開摘要、逐人證據及關懷建議，方便閱讀。"]),
+      howTo: "重新整理會員關懷頁即可看到新排版；手機可在表格內左右滑動。",
+      impact: "調整閱讀版面，分析內容、數量與分數維持不變。"
+    }),
+    Object.freeze({
       version: "1.8.7", publishedAt: "2026-10-01", title: "續約雷達與升綠建議修正", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["新分析會排除同一到期週期中已結案的續約案件，不再等待中心區同步；投票中或重新開案者仍保留提醒。", "升綠建議列出一對一、引薦與培訓的明確數量；只有缺席扣分造成基本項全滿仍不足70分，才列替代補分方式及原因。", "結構性洞察呈現當月審計重點；報告用語統一為「導師」。"]),
