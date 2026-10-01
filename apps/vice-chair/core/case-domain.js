@@ -208,18 +208,19 @@
 
   function feedbackParticipation(task, state, userName, committee = []) {
     const normalizedName = String(userName || "").trim();
+    const roster = decisionRoster(state, committee, task?.member);
+    const participant = roster.find(item => item.name === normalizedName);
     const isCommitteeMember =
       Boolean(normalizedName) && committee.includes(normalizedName);
     const eligible =
-      isCommitteeMember &&
-      eligibleMembers(committee, task?.member).includes(normalizedName);
+      isCommitteeMember && Boolean(participant) && !participant.isRecused;
     const submitted = Boolean(
       String(state?.feedback?.[normalizedName] || "").trim()
     );
     return {
       eligible,
       submitted,
-      status: !isCommitteeMember
+      status: !isCommitteeMember || !participant
         ? "not-eligible"
         : !eligible
           ? "recused"
@@ -341,6 +342,27 @@
     return committee.filter((name) => name !== recused);
   }
 
+  // Once voting opens, its roster belongs to the case, not the current term.
+  // Never infer the historical denominator from the people who submitted feedback.
+  function decisionRoster(state, committee = [], applicant = "") {
+    if (Array.isArray(state?.voterRoster) && state.voterRoster.length) {
+      return state.voterRoster.map(item => ({ ...item, isRecused: Boolean(item.isRecused) }));
+    }
+    if (Array.isArray(state?.voterSnapshot) && state.voterSnapshot.length) {
+      return state.voterSnapshot.map(name => ({ name, isRecused: false }));
+    }
+    const recused = recusedApplicant(committee, applicant);
+    return committee.map(name => ({ name, isRecused: name === recused }));
+  }
+
+  function feedbackSummary(state, committee = [], applicant = "") {
+    const eligible = decisionRoster(state, committee, applicant)
+      .filter(item => !item.isRecused).map(item => item.name);
+    const count = eligible.filter(name => String(state?.feedback?.[name] || "").trim()).length;
+    const required = majorityThreshold(eligible.length);
+    return { eligible, count, required, ready: count >= required };
+  }
+
   function majorityThreshold(base) {
     return Math.floor(Math.max(Number(base) || 0, 0) / 2) + 1;
   }
@@ -408,6 +430,8 @@
     stageSnapshot,
     recusedApplicant,
     eligibleMembers,
+    decisionRoster,
+    feedbackSummary,
     majorityThreshold,
     voteDeadlineStatus,
     annualRenewalMetrics,

@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.10", publishedAt: "2026-10-01", title: "換屆保留原案件回饋與投票", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["已開票案件沿用原委員名單、回饋門檻及投票紀錄，不因換屆換成新委員。", "新任副主席可依原決議接續董顧確認、公告及結案；新任委員不會收到舊案回饋待辦。"]),
+      howTo: "重新整理案件決議頁，查看本案原有回饋與投票；依尚未完成的步驟繼續操作。",
+      impact: "保留歷史票數、資格快照及原有結案條件，不會要求重投或自動結案。"
+    }),
+    Object.freeze({
       version: "1.8.9", publishedAt: "2026-10-01", title: "續約雷達接續月會決議", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["已結案月會確認不續約者，排除同一次續約雷達，不再重複提示排定續約訪談。", "追加更正為續約後可恢復追蹤，舊決議不影響下一次到期週期。"]),
