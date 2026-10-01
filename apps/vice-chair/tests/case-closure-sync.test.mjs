@@ -46,3 +46,16 @@ test("結案交易必須先鎖定回饋，再把案件標為 closed", () => {
   assert.match(migration, /set status = 'closed'/);
   assert.match(migration, /set status = 'completed'/);
 });
+
+test("跨屆結案只放行領導角色原樣鎖定，不以現任名單否定歷史回饋", () => {
+  const fix = read("supabase/migrations/20261001090000_fix_historical_feedback_closure.sql");
+  assert.match(fix, /tg_op = 'UPDATE'/);
+  assert.match(fix, /old\.locked_at is not null/);
+  assert.match(fix, /new\.locked_at is distinct from old\.locked_at/);
+  assert.match(fix, /coalesce\(\(select private\.current_app_role\(\)\) in \('vp', 'admin'\), false\)/);
+  assert.match(fix, /\(to_jsonb\(new\) - 'locked_at' - 'updated_at'\)\s+is not distinct from \(to_jsonb\(old\) - 'locked_at' - 'updated_at'\)/);
+  assert.ok(fix.indexOf("return new;") < fix.indexOf("private.is_active_committee_person(new.author_person_id)"));
+  assert.match(fix, /回饋者不是當期有效投票成員/);
+  assert.match(fix, /申請者本人必須迴避/);
+  assert.doesNotMatch(fix, /\b(grant|disable trigger|update public\.|delete from|insert into)\b/i);
+});

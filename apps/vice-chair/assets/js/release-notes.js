@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.11", publishedAt: "2026-10-01", title: "修正跨屆案件結案驗證", level: "normal",
+      audience: "副主席與系統管理員",
+      changes: Object.freeze(["修正結案鎖定歷史回饋時，誤將卸任作者視為無效成員的錯誤。", "原回饋內容與歸屬完整保留；新任副主席可在既有前置步驟完成後結案。"]),
+      howTo: "重新整理案件頁，再按「結案存檔」。若尚未完成董顧確認或公告，請先補齊實際完成紀錄。",
+      impact: "只修正既有回饋的原樣鎖定；新增、修改、迴避及已結案資料保護維持。"
+    }),
+    Object.freeze({
       version: "1.8.10", publishedAt: "2026-10-01", title: "換屆保留原案件回饋與投票", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["已開票案件沿用原委員名單、回饋門檻及投票紀錄，不因換屆換成新委員。", "新任副主席可依原決議接續董顧確認、公告及結案；新任委員不會收到舊案回饋待辦。"]),
