@@ -24,3 +24,13 @@
 ## 回復
 
 將本次前端與 app-api 回復至發布前 `0dae21c` 的程式，通過完整檢查後部署；無資料遷移需要回復。來源保護 guard 保留。
+
+
+## 正式發布結果
+
+- 隔離發布副本完整 `npm run check` 同樣通過 357／357、稽核 0 錯誤／19 項既有提醒、BNI 46／46。公開來源掃描 494 檔通過，前端建置 200 檔。
+- 正式半年 PALMS 原始欄位另行獨立對帳：五項最高值與得獎姓名、26 週及 20 位全勤全部吻合。
+- Supabase `app-api` 版本 92，ACTIVE、`verify_jwt=true`。正式副主席／Admin 200、委員 403、匿名 401；其他方法 405、無月份來源 404；預設單月 API 回應與舊契約一致。所有測試工作階段結束登出，未寄信。
+- 部署前後會員、已發布快照、報表索引完全相同；正式與本機結果一致。
+- 程式提交 `bc1e02e`；[GitHub Pages 部署 37439332950](https://github.com/SeanChen0427/BNI-VP/actions/runs/37439332950) 成功。
+- 正式 index、monthly-awards JS／CSS／domain、release-notes 共五檔 HTTP 200，SHA-256 與本次建置逐檔一致。
