@@ -21,6 +21,18 @@ export function monthlyReportCatalog(imports=[]){
   return [...latest].sort(([a],[b])=>b.localeCompare(a)).map(([month,row])=>({month,period:{start:row.period_start,end:row.period_end},importedAt:row.imported_at||null,sourceId:row.id}));
 }
 
+// 名錄及月度公告共用期間、版本及姓名驗證，評比母體由各消費者決定。
+export async function readMonthlyReport({imports,catalog=monthlyReportCatalog(imports),month,downloadReport}){
+  const selected=catalog.find(item=>item.month===month);
+  if(!selected)throw fail("這個月份尚未匯入完整單月 PALMS",404);
+  const source=imports.find(item=>item.id===selected.sourceId);
+  const report=parsePalmsText(await downloadReport(source),"單月 PALMS");
+  if(report.period.start!==selected.period.start||report.period.end!==selected.period.end)throw fail("匯入索引與報表期間不一致，請先核對資料");
+  const names=report.members.map(member=>normalizeName(member.name));
+  if(names.some(name=>!name)||new Set(names).size!==names.length)throw fail("單月報表姓名缺漏或重複，請先核對資料");
+  return {report,selected};
+}
+
 // 僅讀取既有單月匯入檔；沿用分析核心解析，不產生新的計分或診斷。
 export function createPartnerReportsApi({getImports,downloadReport,getRoster}){
   return async function partnerReportsApi(request,url,context){
@@ -30,13 +42,7 @@ export function createPartnerReportsApi({getImports,downloadReport,getRoster}){
     if(month&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(month))throw fail("月份格式不正確",400);
     const imports=await getImports(),catalog=monthlyReportCatalog(imports);
     if(!month)return{schema:"fulian.partner-reports.v1",months:catalog};
-    const selected=catalog.find(item=>item.month===month);
-    if(!selected)throw fail("這個月份尚未匯入完整單月 PALMS",404);
-    const source=imports.find(item=>item.id===selected.sourceId);
-    const report=parsePalmsText(await downloadReport(source),"單月 PALMS");
-    if(report.period.start!==selected.period.start||report.period.end!==selected.period.end)throw fail("匯入索引與報表期間不一致，請先核對資料");
-    const names=report.members.map(member=>normalizeName(member.name));
-    if(names.some(name=>!name)||new Set(names).size!==names.length)throw fail("單月報表姓名缺漏或重複，請先核對資料");
+    const {report,selected}=await readMonthlyReport({imports,catalog,month,downloadReport});
     const roster=new Set((await getRoster()).map(normalizeName));
     const members=report.members.filter(member=>roster.has(normalizeName(member.name))).map(member=>({name:member.name,metrics:normalizedPalmsMetrics(member)}));
     return{schema:"fulian.partner-reports.v1",month,period:report.period,importedAt:selected.importedAt,members,reportMemberCount:report.members.length,matchedMemberCount:members.length,reportOnlyCount:report.members.length-members.length};

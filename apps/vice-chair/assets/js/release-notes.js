@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.13", publishedAt: "2026-10-06", title: "每月績優公告與 LINE 複製", level: "normal",
+      audience: "副主席",
+      changes: Object.freeze(["首頁每月資料更新下方新增四項績優公告，可切換月份查看姓名與成績；最高值相同者全部並列。", "僅評比目前仍在會且當月有資料的會員，可一鍵複製完整公告貼到 LINE 群。"]),
+      howTo: "副主席登入首頁，找到「每月績優公告」，選擇資料月份後按「複製 LINE 公告」。",
+      impact: "全零項目顯示本月無紀錄；缺資料不補零。只提供人工複製，不自動發送 LINE，也不修改會員資料或 BNI 計分。"
+    }),
+    Object.freeze({
       version: "1.8.12", publishedAt: "2026-10-06", title: "離會即同步現役名錄與人數", level: "normal",
       audience: "副主席、會員委員與系統管理員",
       changes: Object.freeze(["離會後立即排除現役名錄、會員人數與關懷選單，不必等待下次分析。", "建立案件前更新名單，後端阻擋離會會員的一般案件；離會訪談仍可安排。"]),

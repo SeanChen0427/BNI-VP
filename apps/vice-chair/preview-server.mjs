@@ -8,6 +8,7 @@ import {createCipheriv,createDecipheriv,randomBytes} from "node:crypto";
 import {buildBniAnalysisSnapshot,parsePalmsReport} from "./bni-bridge.mjs";
 import {analysisDraftApi,analysisSnapshotsApi} from "./services/analysis-draft.mjs";
 import {memberDepartureApi} from "./services/member-departure.mjs";
+import {localMonthlyAwards} from "./services/local-monthly-awards.mjs";
 import {createPartnerReportsApi} from "./services/partner-reports.mjs";
 import {createInterviewTemplateApi} from "./services/interview-template-api.mjs";
 import {localMemberInteractions} from "./services/local-member-interactions.mjs";
@@ -357,6 +358,11 @@ const server=http.createServer(async(req,res)=>{
   if(url.pathname==="/api/member-interactions"){
     const identity=url.searchParams.get("identity")||"";
     try{return json(res,200,await localMemberInteractions(req,url,{role:validIdentity(identity)?identityRole(identity):""},bniRoot()))}
+    catch(error){return json(res,error.status||500,{message:error.message})}
+  }
+  if(url.pathname==="/api/monthly-awards"){
+    const identity=url.searchParams.get("identity")||"";
+    try{return json(res,200,await localMonthlyAwards(req,url,{role:validIdentity(identity)?identityRole(identity):""},bniRoot()))}
     catch(error){return json(res,error.status||500,{message:error.message})}
   }
   if(url.pathname==="/api/partner-reports"){

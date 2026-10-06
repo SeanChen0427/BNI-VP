@@ -16,6 +16,7 @@ import { createTrainingCatalogApi } from "../_shared/training-catalog-sync.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
 import { createInterviewTemplateApi } from "../../../apps/vice-chair/services/interview-template-api.mjs";
+import { createMonthlyAwardsApi } from "../../../apps/vice-chair/services/monthly-awards.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
 import { createMemberInteractionsApi } from "../../../apps/vice-chair/services/member-interactions.mjs";
 import {
@@ -294,6 +295,18 @@ function expectedAuditWeeks(start: string, end: string) {
 async function reportImports() {
   return db("report_imports?select=*&order=imported_at.desc");
 }
+
+const monthlyAwardsApi = createMonthlyAwardsApi({
+  getImports: reportImports,
+  downloadReport: async (row: any) => {
+    const response = await serviceFetch(`/storage/v1/object/authenticated/${row.storage_bucket}/${row.storage_path}`);
+    return new Uint8Array(await response.arrayBuffer());
+  },
+  getRoster: async () => {
+    const rows = await db("members?status=eq.active&people.status=eq.active&select=people!inner(display_name,status)");
+    return rows.map((row: any) => row.people.display_name);
+  },
+});
 
 const partnerReportsApi = createPartnerReportsApi({
   getImports: reportImports,
@@ -6244,7 +6257,8 @@ Deno.serve(async (request) => {
     const identity = url.searchParams.get("identity") || bodyForIdentity?.identity || "";
     const context = await authenticate(request, identity);
     let result;
-    if (path === "/api/partner-reports") result = await partnerReportsApi(request, url, context);
+    if (path === "/api/monthly-awards") result = await monthlyAwardsApi(request, url, context);
+    else if (path === "/api/partner-reports") result = await partnerReportsApi(request, url, context);
     else if (path === "/api/member-interactions") result = await memberInteractionsApi(request, url, context);
     else if (path === "/api/monthly-data") result = await monthlyDataApi(request, url, context);
     else if (path === "/api/renewal-data") result = await renewalDataApi(request, url, context);
