@@ -69,7 +69,7 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
         : [];
       return {
         items,
-        sources: sources.filter(row => directory.memberById.has(row.member_id)).map(row => ({ id: row.id, caseId: row.source_reference, memberId: row.member_id, memberName: directory.memberById.get(row.member_id).name })),
+        sources: sources.filter(row => directory.memberById.get(row.member_id)?.status === "active").map(row => ({ id: row.id, caseId: row.source_reference, memberId: row.member_id, memberName: directory.memberById.get(row.member_id).name })),
         members: domain.manager(context) ? [...directory.memberById].filter(([, member]) => member.status === "active").map(([id, member]) => ({ id, name: member.name })) : [],
         people: [...directory.personByName].map(([name, id]) => ({ id, name })),
       };
@@ -94,7 +94,7 @@ export function createRenewalFoundationsApi({ db, taskDirectory, taskSource, mea
         sourceTaskId = validateId(body.sourceTaskId);
         const sources = await db(`tasks?id=eq.${sourceTaskId}&source=eq.${taskSource}&category=eq.renewal&select=id,member_id,source_reference&limit=1`);
         const source = sources[0];
-        if (!source || !directory.memberById.has(source.member_id)) fail("請選擇有效且已連結會員的續約案件");
+        if (!source || directory.memberById.get(source.member_id)?.status !== "active") fail("請選擇有效且已連結現任會員的續約案件");
         memberId = source.member_id;
         caseId = source.source_reference;
       }

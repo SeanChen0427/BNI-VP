@@ -3,7 +3,8 @@ import { parseAuditWeekText, combineAuditWeeks } from "../../../apps/bni-analysi
 import { buildAnalysisFromParsed } from "../../../apps/bni-analysis/engine/analyze.mjs";
 import { resolveRenewalCaseCompletions } from "../../../apps/bni-analysis/engine/renewal-case-completions.mjs";
 import { renderDashboard } from "../../../apps/bni-analysis/engine/render-dashboard.mjs";
-import { averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
+import { projectCurrentRoster } from "../../../apps/bni-analysis/engine/current-roster.mjs";
+import { averageMetrics, averagePalmsMetrics, enrichPublishedMemberData, hasCompletePublishedMemberData, normalizedPalmsMetrics, parseBniDashboard } from "../../../apps/vice-chair/bni-bridge.mjs";
 import "../../../apps/vice-chair/core/calendar-domain.js";
 import "../../../apps/vice-chair/core/attendance-domain.js";
 import "../../../apps/vice-chair/core/accountability-email-domain.js";
@@ -298,7 +299,7 @@ const partnerReportsApi = createPartnerReportsApi({
   getImports: reportImports,
   downloadReport,
   getRoster: async () => {
-    const published = await activePublished();
+    const published = await currentPublished();
     if (!Array.isArray(published?.snapshot?.members)) throw Object.assign(new Error("尚無已生效的名錄快照"), { status: 503 });
     return published.snapshot.members.map((member: any) => member.name);
   },
@@ -311,7 +312,7 @@ const memberInteractionsApi = createMemberInteractionsApi({
     return new Uint8Array(await response.arrayBuffer());
   },
   getRoster: async () => {
-    const published = await activePublished();
+    const published = await currentPublished();
     if (!Array.isArray(published?.snapshot?.members)) throw Object.assign(new Error("尚無已生效的名錄快照"), { status: 503 });
     return published.snapshot.members.map((member: any) => member.name);
   },
@@ -2760,10 +2761,10 @@ async function memberDepartureApi(request: Request, context: Context) {
     }
     if (!person) throw new Error(`${name} 不在會員主檔中`);
     if (!member) throw new Error(`${name} 沒有會員主檔`);
-    if (member.status === "departed") return { message: `${name} 已在離會名單中；下次產出分析會自動排除`, state: await memberDepartureState() };
+    if (member.status === "departed") return { message: `${name} 已在離會名單中；現役名錄已排除，仍可安排離會訪談`, state: await memberDepartureState() };
     await db(`members?id=eq.${member.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "departed", departed_on: confirmedAt }) });
     await db(`people?id=eq.${person.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=minimal" }, body: JSON.stringify({ status: "departed", notes: note }) });
-    return { message: `${name} 已登記離會；下次產出分析會自動排除`, state: await memberDepartureState() };
+    return { message: `${name} 已登記離會；現役名錄、人數與關懷選單已同步，離會訪談與歷史報表保留`, state: await memberDepartureState() };
   }
   if (body.action === "undo") {
     if (!person) throw new Error(`${name} 不在會員主檔中`);
@@ -3030,6 +3031,18 @@ async function activePublished() {
   return rows?.[0] || null;
 }
 
+async function withCurrentRoster(snapshot: any) {
+  const rows = await db("members?status=eq.active&people.status=eq.active&select=id,profession,people!inner(display_name,status)");
+  const projected = projectCurrentRoster(snapshot, rows.map((row: any) => ({ memberId: row.id, name: row.people.display_name, profession: row.profession || "" })));
+  projected.memberData = { ...projected.memberData, count: projected.members.length, averages: averageMetrics(projected.members) };
+  return projected;
+}
+
+async function currentPublished() {
+  const published = await activePublished();
+  return published?.snapshot ? { ...published, snapshot: await withCurrentRoster(published.snapshot) } : published;
+}
+
 async function loadPublishedFormSources(periodStart: string, periodEnd: string) {
   const imports = await reportImports();
   const halfPeriod = { start: periodStart, end: periodEnd };
@@ -3058,7 +3071,7 @@ async function aiChatApi(request: Request, context: Context) {
   if (!PROVIDERS.includes(provider)) throw new Error("AI 平台不正確");
   const question = String(body.question || "").trim().slice(0, 2000);
   if (!question) throw new Error("請輸入問題");
-  const published = await activePublished();
+  const published = await currentPublished();
   const source = published?.snapshot || {};
   const history = Array.isArray(body.history) ? body.history.slice(-6).map((item: any) => `${item.role === "assistant" ? "助手" : "使用者"}：${String(item.text || "").slice(0, 500)}`).join("\n") : "";
   const prompt = `${history ? `最近對話：\n${history}\n\n` : ""}本次問題：\n${question}\n\n[來源1] Supabase 已發佈會員分析快照\n${compactAiSource(source, `${history}\n${question}`)}`;
@@ -3190,7 +3203,7 @@ async function analysisSnapshotApi(request: Request, context: Context) {
   if (request.method !== "GET") throw Object.assign(new Error("不支援的操作"), { status: 405 });
   const published = await activePublished();
   if (!published?.snapshot) throw Object.assign(new Error("Supabase 尚無已發佈的 BNI 分析資料"), { status: 503 });
-  if (hasCompletePublishedMemberData(published.snapshot)) return published.snapshot;
+  if (hasCompletePublishedMemberData(published.snapshot)) return withCurrentRoster(published.snapshot);
   const formSources = await loadPublishedFormSources(published.period_start, published.period_end);
   const pendingOfficialData = published.snapshot.officialDataPending
     || published.reconciliation?.pendingOfficialData
@@ -3209,7 +3222,7 @@ async function analysisSnapshotApi(request: Request, context: Context) {
       body: JSON.stringify({ snapshot, member_count: snapshot.members.length }),
     });
   }
-  return snapshot;
+  return withCurrentRoster(snapshot);
 }
 
 const REVIEW_SYSTEM = "你是 BNI 富聯分會會員委員會的月度分析審視員。引擎數據是唯一數據來源：不得重算分數、修改燈號或發明數據。審計觀察必須用關懷語言，不得指控。不得作資格處置、續約核准或投票建議。輸出繁體中文 Markdown 六區關懷報告；Mentor 一律寫「導師」，續約提醒依引擎採系統案件結案與當次週期排除，不等待中心區同步；已結案月會確認不續約者只排除當次續約提醒，不視為已續約或已離會，也不再建議追催續約。黃燈升綠建議必須引用引擎 monthlyActions 的本月引薦、一對一、培訓明確數量（含正常參與），不得只寫維持正常參與；只有 attendanceBlocksGreen 為真才能建議來賓或成交金額，並引用 attendanceReason 說明缺席扣分、基本三項全滿的最高總分與距 70 分缺口。結構性洞察應挑選審計對帳與觀察中值得提出的證據，附可能原因與具體關懷方向，不得留空或指控。結尾標注本報告為草稿，需副主席確認後才正式發佈。";
@@ -3810,6 +3823,9 @@ async function taskResponse(context: Context) {
 
 async function saveLeadershipTask(input: any, context: Context, directory: any) {
   const task = cleanTaskInput(input);
+  if (task.type === "new" && directory.people.some((person: any) => person.display_name === task.member && person.status === "departed")) {
+    throw new Error("此人已離會，不能以新會員案件繞過會籍狀態；離會訪談請選擇離會訪談類型");
+  }
   const exactMember = task.memberRecordId ? directory.memberById.get(task.memberRecordId) : null;
   if (task.memberRecordId && (!exactMember || exactMember.name !== task.member)) {
     throw new Error("案件會員識別資料與姓名不一致，請重新選擇會員");

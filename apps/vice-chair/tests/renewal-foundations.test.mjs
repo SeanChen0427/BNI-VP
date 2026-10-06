@@ -87,6 +87,20 @@ function fixture({ hasRenewal = true } = {}) {
   return { call, create, rows, writes, events, directory, assignments };
 }
 
+test("已離會會員不能從舊續約案件或補登新增地基，既有地基紀錄保留", async () => {
+  const f = fixture();
+  await f.create();
+  f.directory.memberById.get(memberId).status = "departed";
+  const result = await f.call(vp);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.sources.length, 0);
+  assert.equal(result.members.length, 0);
+  const writes = f.writes.length;
+  await assert.rejects(f.create(), /現任會員/);
+  await assert.rejects(f.call(vp, { ...base(), action: "create", origin: "legacy", memberId, id }), /有效在籍會員/);
+  assert.equal(f.writes.length, writes);
+});
+
 test("API 可從已結案續約建立獨立地基，其他委員僅得摘要，完整紀錄受保護", async () => {
   const f = fixture();
   await assert.rejects(f.call(lead, { ...base(), action: "create", sourceTaskId: sourceId, id }), /只有副主席/);

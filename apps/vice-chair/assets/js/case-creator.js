@@ -92,7 +92,25 @@
     else syncProfession();
   }
 
-  function open(type = "renewal", preset = {}) {
+  async function open(type = "renewal", preset = {}) {
+    try {
+      const response = await fetch("/api/bni-analysis", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "會員名單無法更新");
+      members = (data.members || []).map(item => ({ memberId: item.memberId || item.id || "", name: item.name, profession: item.profession || "" }));
+      document.querySelector("#createMemberList").innerHTML = members.map(item => `<option value="${esc(item.name)}">${esc(item.profession)}</option>`).join("");
+      // Departure interviews deliberately retain their separate historical roster.
+      const responseDeparture = await fetch("/api/member-departure", { cache: "no-store" });
+      const departure = await responseDeparture.json();
+      if (!responseDeparture.ok) throw new Error(departure.message || "離會訪談名單無法更新");
+      departureMembers = [
+        ...(departure.currentMembers || []).map(item => ({ ...item, status: "active" })),
+        ...(departure.departed || []).map(item => ({ ...item, status: "departed" })),
+      ];
+    } catch (error) {
+      alert(error.message);
+      return;
+    }
     const selectedType = types[type] ? type : "renewal";
     document.querySelector("#createType").value = selectedType;
     document.querySelector("#createMember").value = "";

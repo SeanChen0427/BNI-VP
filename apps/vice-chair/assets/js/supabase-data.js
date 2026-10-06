@@ -20,7 +20,7 @@
     return analysisPromise;
   }
   async function getMemberNames(){
-    const rows=await rest("members?status=eq.active&select=people!inner(display_name)&order=created_at.asc");
+    const rows=await rest("members?status=eq.active&people.status=eq.active&select=people!inner(display_name,status)&order=created_at.asc");
     return rows.map(row=>row.people?.display_name).filter(Boolean);
   }
   function jsonResponse(data,status=200){
@@ -42,7 +42,9 @@
         requestOptions.body=JSON.stringify(body);
       }catch{ /* 非 JSON 請求維持原內容 */ }
     }
-    return FulianAuth.authorizedFetch(`${edgeUrl.pathname}${edgeUrl.search}`,requestOptions);
+    const response=await FulianAuth.authorizedFetch(`${edgeUrl.pathname}${edgeUrl.search}`,requestOptions);
+    if(url.pathname==="/api/member-departure"&&requestOptions.method==="POST"&&response.ok)analysisPromise=null;
+    return response;
   }
   async function onlineApi(input,options={}){
     const url=new URL(typeof input==="string"?input:input.url,location.origin);

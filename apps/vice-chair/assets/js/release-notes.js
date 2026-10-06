@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.12", publishedAt: "2026-10-06", title: "離會即同步現役名錄與人數", level: "normal",
+      audience: "副主席、會員委員與系統管理員",
+      changes: Object.freeze(["離會後立即排除現役名錄、會員人數與關懷選單，不必等待下次分析。", "建立案件前更新名單，後端阻擋離會會員的一般案件；離會訪談仍可安排。"]),
+      howTo: "重新整理頁面即可查看最新現役名單；離會補訪仍從離會訪談或設定頁進入。",
+      impact: "歷史報表與案件保留，個人分數不重算；統計依現任會員重新彙總。"
+    }),
+    Object.freeze({
       version: "1.8.11", publishedAt: "2026-10-01", title: "修正跨屆案件結案驗證", level: "normal",
       audience: "副主席與系統管理員",
       changes: Object.freeze(["修正結案鎖定歷史回饋時，誤將卸任作者視為無效成員的錯誤。", "原回饋內容與歸屬完整保留；新任副主席可在既有前置步驟完成後結案。"]),
