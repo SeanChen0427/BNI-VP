@@ -15,8 +15,11 @@
 - 回歸含現役投影、歷史不變、空名單／缺人對帳、舊分頁一般案件拒絕、離會補訪可用、舊續約來源不可新增離會者地基。
 - 部署前私密備份與投影核對：正式 active 42 人、原發布快照 43 人；42 人個人分數、燈號及報表數值不變。
 - 隔離發布副本最後完整檢查 345／345（含離會訪談不依賴分析可用性）、稽核 0 錯誤／19 項既有提醒、官方回歸 46／46；公開資料掃描 485 檔通過，前端建置 197 檔。
-- 正式 `app-api` 已透過指定專案 `--use-api` 部署；未執行 SQL 或 migration。
+- 正式 `app-api` 已透過指定專案 `--use-api` 部署為版本 90、ACTIVE，`verify_jwt=true` 保持；未執行 SQL 或 migration。
 - 使用既有 Admin 不寄信驗證工作階段實讀正式快照／離會／地基 API，完成後登出：現役 42 人、一般選單無離會者、離會補訪仍可用。所有已發布快照及會員列與部署前備份完全一致，42 人原分數與 PALMS 欄位完全一致。
-- GitHub Pages 第一批發布 [37429373910](https://github.com/SeanChen0427/BNI-VP/actions/runs/37429373910) 成功；離會訪談選單再補強為直接讀會籍，避免分析不可用時阻擋補訪。最後發布證據另追加。
+- GitHub Pages 第一批發布 [37429373910](https://github.com/SeanChen0427/BNI-VP/actions/runs/37429373910) 成功；離會訪談選單再補強為直接讀會籍，避免分析不可用時阻擋補訪。最後程式提交 `fb2c612`；[正式 Pages 發布 37429568846](https://github.com/SeanChen0427/BNI-VP/actions/runs/37429568846) 成功。
 
 私密資料及核對結果存於被 Git 排除的 `apps/bni-analysis/data/updates/2026-10-06-current-roster/`，不是整庫備份；不將真實名單提交公開程式庫。復原只需回退本次前後端程式，不重放 migration 或修改會員／歷史報表。
+
+- 部署後正式 `case-board.html`、`member-care.html`、`partners.html` 與 `case-creator.js`、`supabase-data.js`、`partners.js`、`release-notes.js` 7 個檔案皆 HTTP 200，SHA-256 與最後發布建置一致。
+- 正式鏡像索引保留原 v9 歷史，追加本次 `operationalReadbacks` 指向部署前後核對與現役投影，未以舊 baseline 覆蓋正式來源。
