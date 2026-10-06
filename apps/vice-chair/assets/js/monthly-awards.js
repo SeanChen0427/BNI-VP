@@ -21,6 +21,7 @@
     if(data.schema!=="fulian.monthly-awards.v1"||data.month!==month.value||!Array.isArray(data.awards)||data.awards.length!==4)throw new Error("公告資料不完整，請重新整理");
     const nodes=data.awards.map(award=>{
       const card=document.createElement("article"),title=document.createElement("h3"),value=document.createElement("strong"),names=document.createElement("p");
+      card.className="monthly-data-item";
       title.textContent=`${award.label}第一名`;
       value.textContent=award.status==="no-records"?"本月無紀錄":`${Number(award.value).toLocaleString("zh-TW")} ${award.unit}`;
       names.textContent=award.status==="no-records"?"本月未列第一名":`${award.winners.join("、")}${award.winners.length>1?"（並列）":""}`;
