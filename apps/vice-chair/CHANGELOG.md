@@ -2,7 +2,7 @@
 
 ## 2026-10-06｜v1.8.14 績優公告沿用首頁分欄表格
 
-Sean 截圖指出金色獨立卡片、字級及留白與既有首頁格格不入。分類 fix：只修正既有公告呈現，直接沿用 monthly-data-panel、monthly-data-head、monthly-data-bundle-grid 與 monthly-data-item；移除金框與額外卡片，統一頁首／頁尾、按鈕及桌機手機斷點。現役評比、資料來源、並列與複製行為維持，無後端或正式資料修改。
+Sean 截圖指出金色獨立卡片、字級及留白與既有首頁格格不入。分類 fix：只修正既有公告呈現，直接沿用 monthly-data-panel、monthly-data-head、monthly-data-bundle-grid 與 monthly-data-item；移除金框與額外卡片，統一頁首／頁尾、按鈕及桌機手機斷點。現役評比、資料來源、並列與複製行為維持，無後端或正式資料修改。完整檢查 352／352、BNI 46／46，前端已發布且正式檔案指紋吻合，見 [部署證據](docs/DEPLOYMENT_LOG_2026-10-06_MONTHLY_AWARDS_STYLE.md)。
 
 ## 2026-10-06｜v1.8.13 每月績優公告發布
 
