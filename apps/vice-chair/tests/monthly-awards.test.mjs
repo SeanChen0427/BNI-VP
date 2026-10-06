@@ -97,3 +97,60 @@ test("本機增量鏡像按 manifest 讀檔、使用較新現役核對，不用�
     await rm(path.join(root,"data/roster/after.json"));await assert.rejects(run(),/鏡像或現役核對資料不完整/);
   }finally{await rm(root,{recursive:true,force:true});}
 });
+
+const halfXml=(rows,start="2026-03-01",end="2026-08-31")=>`<Workbook><Table><Row>${cell("從:")}${cell(start+"T00:00:00")}</Row><Row>${cell("至:")}${cell(end+"T00:00:00")}</Row><Row>${cell("姓氏")}${cell("名字")}</Row>${rows.map(values=>`<Row>${Array.from({length:20},(_,i)=>cell(values[i]??(i===1?"":0))).join("")}</Row>`).join("")}</Table></Workbook>`;
+const halfRows=[{0:"測試甲",3:26,17:12,18:5000,19:18},{0:"測試乙",3:26,17:12,18:5000,19:18},{0:"新會員丁",3:8,19:2},{0:"離會丙",3:26,17:999,19:999}];
+const halfSource=halfXml(halfRows);
+const halfRow=(content=halfSource,overrides={})=>({id:"half",report_type:"half_year_palms",metadata:{category:"halfYear"},period_start:"2026-03-01",period_end:"2026-08-31",imported_at:"2026-09-02",sha256:hash(content),...overrides});
+const withHalf=({content=halfSource,imports=[row(),halfRow(content)],roster,downloadReport}={})=>build({imports,roster,downloadReport:downloadReport||(async item=>item.id==="new"?source:content)});
+const centerCall=(api,month="2026-08")=>api({method:"GET"},new URL(`https://example.invalid/api/monthly-awards?month=${month}&include=halfYear`),{role:"vp"});
+test("中心區回覆包含近半年、培訓並列與完整出席者；新人與離會者排除，原 API 相容",async()=>{
+  const api=withHalf(),data=await centerCall(api),half=data.halfYear;
+  assert.equal((await call(api)).halfYear,undefined);
+  assert.equal(half.status,"ready");assert.deepEqual(half.period,{start:"2026-03-01",end:"2026-08-31"});
+  assert.equal(half.attendance.totalWeeks,26);assert.deepEqual(new Set(half.attendance.winners),new Set(["測試甲","測試乙"]));
+  assert.deepEqual(new Set(half.awards.find(a=>a.key==="education").winners),new Set(["測試甲","測試乙"]));
+  const text=D.centerReply(data);
+  assert.match(text,/近半年 2026\/03\/01–2026\/08\/31/);assert.match(text,/2．引薦價值/);assert.match(text,/3．業務引薦/);assert.match(text,/5．培訓積分/);assert.match(text,/6．全勤獎/);
+  assert.match(text,/並列，各 18 分/);assert.match(text,/26 次/);assert.match(text,/PALMS 會面次數/);assert.doesNotMatch(text,/離會丙|Sean|本會期|undefined|NaN/);
+});
+test("全勤四項各自排除；整份報表決定完整週數，無全勤明列無",async()=>{
+  const rows=[...Array.from({length:4},(_,i)=>({0:`測試${i}`,3:25,[([4,5,6,8][i])]:1})),{0:"新人",3:8},{0:"離會者",3:26}];
+  const data=await centerCall(withHalf({content:halfXml(rows),roster:["測試甲",...rows.slice(0,-1).map(r=>r[0])]}));
+  assert.equal(data.halfYear.status,"ready");assert.equal(data.halfYear.attendance.totalWeeks,26);assert.deepEqual(data.halfYear.attendance.winners,[]);assert.match(D.centerReply(data),/6．全勤獎：本期無/);
+  const shorter=await centerCall(withHalf({content:halfXml([{0:"測試甲",3:8},{0:"離會者",3:26}]),roster:["測試甲"]}));
+  assert.equal(shorter.halfYear.attendance.totalWeeks,26);assert.deepEqual(shorter.halfYear.attendance.winners,[]);
+});
+test("半年來源只取精確期間最新合格報表，缺漏或損毀不誤報零、不回退舊版",async()=>{
+  const badCategory=halfRow(halfSource,{id:"renewal",metadata:{category:"renewal"},imported_at:"2026-09-05"});
+  let downloaded=[];
+  const api=withHalf({imports:[row(),halfRow(),badCategory,halfRow(halfSource,{id:"annual",metadata:{category:"annual"},imported_at:"2026-09-06"})],downloadReport:async item=>{downloaded.push(item.id);return item.id==="new"?source:halfSource;}});
+  assert.equal((await centerCall(api)).halfYear.status,"ready");assert.deepEqual(downloaded,["new","half"]);
+  const missing=await centerCall(withHalf({imports:[row(),badCategory]}));
+  assert.equal(missing.awards.length,4);assert.equal(missing.halfYear.status,"unavailable");assert.throws(()=>D.centerReply(missing),/尚未齊全/);
+  const broken=await centerCall(withHalf({imports:[row(),halfRow(),halfRow(halfSource,{id:"broken",imported_at:"2026-09-06",sha256:"0".repeat(64)})]}));
+  assert.equal(broken.halfYear.status,"unavailable");assert.match(broken.halfYear.message,/指紋不一致/);
+  for(const [index,value] of [[19,""],[3,""],[4,-1],[5,0.5]]){
+    const result=await centerCall(withHalf({content:halfXml([{...halfRows[0],[index]:value},...halfRows.slice(1)])}));
+    assert.equal(result.halfYear.status,"unavailable");assert.match(result.halfYear.message,/欄位缺漏或不正確/);
+  }
+  const wrongPeriod=await centerCall(withHalf({content:halfXml(halfRows,"2026-02-01")}));assert.equal(wrongPeriod.halfYear.status,"unavailable");
+});
+test("近六個月跨年與二月月底不採固定會期",async()=>{
+  const monthly=xml([["測試甲"]],"2026-02").replaceAll("2026-02-31","2026-02-28"),half=halfXml(halfRows,"2025-09-01","2026-02-28");
+  const api=build({imports:[{...row("new",monthly),period_start:"2026-02-01",period_end:"2026-02-28"},halfRow(half,{period_start:"2025-09-01",period_end:"2026-02-28",metadata:{}})],downloadReport:async item=>item.id==="new"?monthly:half});
+  const result=await centerCall(api,"2026-02");assert.equal(result.halfYear.status,"ready");assert.deepEqual(result.halfYear.period,{start:"2025-09-01",end:"2026-02-28"});
+});
+test("中心區複製成功與備援、缺半年禁用、切月清除兩份文字並忽略過期複製",async()=>{
+  let copied,finishCopy;
+  const p=page({clipboard:{writeText:text=>{copied=text;return new Promise(resolve=>finishCopy=resolve);}}});
+  p.requests[0].reply(catalog);await settle();assert.match(p.requests[1].url,/include=halfYear/);
+  p.requests[1].reply(await centerCall(withHalf()));await settle();
+  assert.equal(p.get("CenterCopy").disabled,false);const copying=p.get("CenterCopy").handlers.click();assert.match(copied,/6．全勤獎/);
+  p.get("Month").value="2026-07";const changing=p.get("Month").handlers.change();assert.equal(p.get("CenterText").value,"");assert.equal(p.get("CenterCopy").disabled,true);
+  finishCopy();await copying;assert.doesNotMatch(p.get("Status").textContent,/已複製/);
+  p.requests[2].reply({message:"尚無資料"},false);await changing;assert.equal(p.get("CenterText").value,"");
+  const fallback=page();fallback.requests[0].reply(catalog);await settle();fallback.requests[1].reply(await centerCall(withHalf()));await settle();
+  await fallback.get("CenterCopy").handlers.click();assert.equal(fallback.get("CenterPreview").open,true);assert.equal(fallback.get("CenterText").selected,true);
+  const missing=page();await ready(missing);assert.equal(missing.get("CenterCopy").disabled,true);assert.equal(missing.get("Copy").disabled,false);assert.equal(missing.get("CenterText").hidden,true);
+});

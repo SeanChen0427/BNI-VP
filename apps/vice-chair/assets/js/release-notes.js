@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.15", publishedAt: "2026-10-06", title: "中心區績優回覆補齊近半年與全勤", level: "normal",
+      audience: "副主席",
+      changes: Object.freeze(["績優公告新增「複製中心區回覆」，一併帶出單月四項、近半年五項及全勤獎。", "近半年隨所選月份往前六個月；全勤須出席完整半年，且缺席、請假、代理人、遲到皆為零。"]),
+      howTo: "首頁選擇公告月份，按「複製中心區回覆」即可貼上 LINE；下方可先展開查看全文。",
+      impact: "僅比較目前仍在會的會員，一對一採 PALMS 會面次數，同分全部並列；缺少完整半年資料時會提示補齊。"
+    }),
+    Object.freeze({
       version: "1.8.14", publishedAt: "2026-10-06", title: "績優公告統一首頁表格樣式", level: "normal",
       audience: "副主席",
       changes: Object.freeze(["績優公告沿用每月資料更新的分欄表格、標題與頁尾，統一字級、留白及按鈕。", "移除金色卡片樣式，手機沿用同一套單欄排版。"]),

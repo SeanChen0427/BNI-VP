@@ -22,14 +22,18 @@ export function monthlyReportCatalog(imports=[]){
 }
 
 // 名錄及月度公告共用期間、版本及姓名驗證，評比母體由各消費者決定。
+export async function readPalmsReport({source,downloadReport,label="單月報表"}){
+  const report=parsePalmsText(await downloadReport(source),label);
+  if(report.period.start!==source.period_start||report.period.end!==source.period_end)throw fail("匯入索引與報表期間不一致，請先核對資料");
+  const names=report.members.map(member=>normalizeName(member.name));
+  if(names.some(name=>!name)||new Set(names).size!==names.length)throw fail(`${label}姓名缺漏或重複，請先核對資料`);
+  return report;
+}
 export async function readMonthlyReport({imports,catalog=monthlyReportCatalog(imports),month,downloadReport}){
   const selected=catalog.find(item=>item.month===month);
   if(!selected)throw fail("這個月份尚未匯入完整單月 PALMS",404);
   const source=imports.find(item=>item.id===selected.sourceId);
-  const report=parsePalmsText(await downloadReport(source),"單月 PALMS");
-  if(report.period.start!==selected.period.start||report.period.end!==selected.period.end)throw fail("匯入索引與報表期間不一致，請先核對資料");
-  const names=report.members.map(member=>normalizeName(member.name));
-  if(names.some(name=>!name)||new Set(names).size!==names.length)throw fail("單月報表姓名缺漏或重複，請先核對資料");
+  const report=await readPalmsReport({source,downloadReport});
   return {report,selected};
 }
 

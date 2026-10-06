@@ -30,7 +30,7 @@
   <link rel="stylesheet" href="assets/css/notification-center.css?v=1">
   <link rel="stylesheet" href="assets/css/release-notes.css?v=2">
   <link rel="stylesheet" href="assets/css/monthly-data-update.css?v=2">
-  <link rel="stylesheet" href="assets/css/monthly-awards.css?v=2">
+  <link rel="stylesheet" href="assets/css/monthly-awards.css?v=3">
   <link rel="stylesheet" href="assets/css/ai-assistant.css?v=1">
   <link rel="stylesheet" href="assets/css/onboarding.css?v=9">
   <style>.committee-only,.strict-vp-only{display:none}.committee-mode .committee-only,.vp-mode .strict-vp-only{display:block}</style>
@@ -104,15 +104,17 @@
         </section>
         <section class="panel monthly-data-panel monthly-awards strict-vp-only" id="monthlyAwards" aria-labelledby="monthlyAwardsTitle">
           <div class="monthly-data-head monthly-awards-head">
-            <div><small>MONTHLY RECOGNITION</small><h2 id="monthlyAwardsTitle">每月績優公告</h2><p>每月更新後，查看績優夥伴並複製會議公告。</p></div>
+            <div><small>MONTHLY RECOGNITION</small><h2 id="monthlyAwardsTitle">每月績優公告</h2><p>查看單月績優，或一鍵複製單月與近半年的中心區回覆。</p></div>
             <div class="monthly-awards-actions">
               <label for="monthlyAwardsMonth">公告月份<select id="monthlyAwardsMonth" disabled aria-label="績優公告的資料月份"></select></label>
               <button type="button" id="monthlyAwardsCopy" disabled>複製 LINE 公告</button>
+              <button type="button" id="monthlyAwardsCenterCopy" disabled>複製中心區回覆</button>
             </div>
           </div>
           <div class="monthly-data-bundle-grid monthly-awards-results" id="monthlyAwardsResults"></div>
           <footer><span id="monthlyAwardsStatus" role="status">正在讀取每月績優資料…</span><button type="button" id="monthlyAwardsRefresh">重新整理</button></footer>
           <details id="monthlyAwardsPreview"><summary>查看公告文字／手動複製</summary><textarea id="monthlyAwardsText" readonly aria-label="LINE 公告文字"></textarea></details>
+          <details id="monthlyAwardsCenterPreview"><summary>查看中心區回覆（單月＋近半年）／手動複製</summary><p id="monthlyAwardsCenterStatus" role="status"></p><textarea id="monthlyAwardsCenterText" readonly hidden aria-label="中心區 LINE 回覆文字"></textarea></details>
         </section>
         <section class="panel learning-panel vp-only-card" data-guide-id="home.learning"><small>副主席專用工具</small><h2>交接與學習</h2><p>透過工作心智圖查找 22 個完整主題，或接續上次的閱讀位置。</p><div class="mini-progress"><span>上手指南</span><b id="courseProgress">0%</b><i><em id="courseProgressBar"></em></i></div><a href="course.html" data-guide-id="home.learning-link">開啟副主席交接教學 →</a></section>
       </div>
@@ -139,7 +141,7 @@
       <footer class="release-dialog-actions"><a href="system-updates.html">查看完整更新紀錄</a><button type="button" id="acknowledgeRelease">我知道了</button></footer>
     </div>
   </dialog>
-  <script src="assets/js/release-notes.js?v=1.8.14"></script>
+  <script src="assets/js/release-notes.js?v=1.8.15"></script>
   <script src="assets/js/handover-catalog.js?v=1"></script><script src="assets/js/dashboard.js?v=8"></script>
   <script src="assets/js/work-planner.js?v=13"></script>
   <script src="assets/js/announcement-board.js?v=3"></script>
@@ -147,8 +149,8 @@
   <script src="core/renewal-foundation-domain.js?v=5"></script>
   <script src="assets/js/renewal-foundation-summary.js?v=3"></script>
   <script src="assets/js/notification-center.js?v=9"></script>
-  <script src="core/monthly-awards-domain.js?v=1"></script>
-  <script src="assets/js/monthly-awards.js?v=2"></script>
+  <script src="core/monthly-awards-domain.js?v=2"></script>
+  <script src="assets/js/monthly-awards.js?v=3"></script>
   <script src="assets/js/monthly-data-update.js?v=6"></script>
   <script src="assets/js/ai-assistant.js?v=3"></script>
   <script src="assets/js/onboarding-guides.js?v=8"></script>
