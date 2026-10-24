@@ -3,14 +3,21 @@
   if(typeof module==="object"&&module.exports)module.exports=api;
   root.FulianInterviewTemplateDomain=api;
 })(typeof globalThis!=="undefined"?globalThis:this,function(){
-  const TEMPLATE=Object.freeze({id:"kp-membership-v8.3-20251022",schema:"fulian.interview-template.v1",sha256:"6ca49a710dd25b61966e70e5da8c8629a7d70271c37d1a50119a89037c649403",sourceSha256:"5c6c5ce84936cf1cedd56cb3c93651ef0d946be6af4cc7fb0e0723217277d126",types:Object.freeze(["new","industry"])});
+  const TEMPLATE=Object.freeze({id:"kp-membership-v1.1-20261012",schema:"fulian.interview-template.v1",sha256:"01bc970c4221622014fef0e4eff89b5d840d1dee13e872f427457a05b1db95cb",sourceSha256:"f85c689b2b61508d5d0ebf94a7f54b0fb5a005e7c20716b6b0f2a6386f1a68c9",types:Object.freeze(["new","industry"])});
   const registry=(id,sha256,sourceSha256)=>Object.freeze({id,sha256,sourceSha256,schema:TEMPLATE.schema});
   const TEMPLATES=Object.freeze({new:TEMPLATE,industry:TEMPLATE,
     midterm:registry("kp-midterm-v4-20241121","a34b8d5e1953c413f47e8778588e820a2651dc1736158300780c8042647362e4","12307bba2a51714f520b13800cd6ae290c1609af83b55783490ca27369cdb082"),
     renewal:registry("kp-renewal-v2-20251114","de03daa54f8a7f87248589cd4bc2707f2c6b93343ef5704a70e373501ac52a16","16e16ce60bf9a4b66fa9300557f9791d9102769b14bc29dd1d4ec6f046a7b3e1"),
     departure:registry("kp-departure-v2.1-20230428","511f910bf2c9db1a45604f2a6aad243b2d279e380038de158749928f4ea55a4c","774e7a95b2dc4cf8942aea0a6bdfedbc1aafc5ed7c5c82877bc105324eaedf88")});
   function templateFor(type){if(!Object.hasOwn(TEMPLATES,type))throw new Error("此訪談類型尚未建立已驗證的中心區模板");return TEMPLATES[type]}
-  const NARRATIVES=Object.freeze({businessContent:[11,34],advantages:[9,34],representativeClients:[4,34],successStories:[4,34],joinReason:[2,46],cooperationIndustries:[2,46],annualGoal:[2,46],otherQuestions:[6,46],chapterNotes:[4,46]});
+  const NARRATIVES=Object.freeze({businessContent:[6,42],advantages:[6,42],successStories:[7,42],annualBreakthrough:[3,42],growthVision:[3,42],threeYearVision:[5,42],targetMarkets:[5,42],cooperationIndustries:[5,42]});
+  const MEMBERSHIP=Object.freeze({version:TEMPLATE.id,
+    joinOptions:Object.freeze(["穩定轉介紹","增加品牌曝光","建立合作關係","認識更多關鍵人脈","擴大市場","建立團隊資源","提升商務能力","建立產業合作鏈"]),
+    goalOptions:Object.freeze(["業績成長","品牌建立","客戶來源","團隊建立","合作資源","市場拓展"]),
+    cooperationOptions:Object.freeze(["信任","專業","關係","服務","回應速度","價值觀"]),
+    yesNo:Object.freeze(["growthPlan","participation","learning","giving","visitorCulture","rightsOrganization","pledgeGuests"]),
+    confirmations:Object.freeze(["trustUnderstood","successUnderstood","engagementUnderstood","rightsCategory","rightsQualification","rightsPolicyFour","rightsMsp","rightsSession","rightsAttendance","rightsProxy","rightsGreen","rightsFees","rightsEthics"])
+  });
   function text(value){return String(value??"").trim()}
   function relation(draft,key){return draft[key]==="其他"?text(draft[key+"Other"]):text(draft[key])}
   function dateParts(value){const match=text(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2})?)?$/);return match?match.slice(1):null}
@@ -27,35 +34,29 @@
     return result;
   }
   function membershipFields(draft={},applicant=""){
-    const values={};
-    for(const key of ["meetingPlace","profession","licenses","taxId","capital","establishedDate","experienceYears","proxyName","guest1Name","guest2Name"])values[key]=text(draft[key]);
-    values.applicant=text(applicant||draft.applicant);values.chapter="富聯";
-    values.meetingDate=text(draft.meetingDate).replace("T"," ");
-    const companions=[draft.companionInterviewer,draft.secondCompanion].map(text).filter(Boolean);
-    values.interviewers=text(draft.leadInterviewer||draft.login)+(companions.length?`／陪訪：${companions.join("、")}`:"");
-    values.applicantSignature=text(draft.applicantSignature)||values.applicant||"_____________________";
-    ["witness1","witness2","witness3"].forEach((key,i)=>{values[key]=text(draft[key])||text([draft.leadInterviewer||draft.login,draft.companionInterviewer,draft.secondCompanion][i])||"________________"});
-    values.employmentFull=draft.employmentType==="全職"?"■":"□";values.employmentPart=draft.employmentType==="兼職"?"■":"□";
-    for(const key of ["sixHours","attendancePromise","mentorPlan","proxyAvailable","inviteVisitors","trainingSystem","mspCommitment","newMemberSession","greenStandard","policyEthics","otherOrganization","pledgeGuests","applicationCorrect"]){
-      const correct=key==="applicationCorrect";
-      values[key+"Yes"]=draft[`radio:${key}`]===(correct?"correct":"yes")?"■":"□";
-      values[key+"No"]=draft[`radio:${key}`]===(correct?"incorrect":"no")?"■":"□";
+    const values={applicant:text(applicant||draft.applicant),chapter:"富聯",meetingDate:text(draft.meetingDate).replace("T"," ")};
+    for(const key of ["profession","companyName","experienceYears","teamSize","joinReasonOther","annualGoalOther","cooperationOther","rightsExperienceYears","rightsOrganizationName"])values[key]=text(draft[key]);
+    values.interviewers=[draft.leadInterviewer||draft.login,draft.companionInterviewer,draft.secondCompanion].map(text).filter(Boolean).join("／");
+    values.applicantSignature=text(draft.applicantSignature);
+    values.interviewerSignatures=[draft.witness1,draft.witness2,draft.witness3].map(text).filter(Boolean).join("／");
+    values.rightsApplicantSignature=text(draft.rightsApplicantSignature);
+    values.rightsInterviewerSignatures=[draft.rightsWitness1,draft.rightsWitness2,draft.rightsWitness3].map(text).filter(Boolean).join("／");
+    values.interviewSignatureDate=chineseDate(draft.signatureDate);
+    values.rightsSignatureDate=chineseDate(draft.rightsSignatureDate);
+    for(const [prefix,key] of [["employment","employmentType"],["rightsEmployment","rightsEmploymentType"]]){
+      values[prefix+"Full"]=draft[key]==="全職"?"■":"□";values[prefix+"Part"]=draft[key]==="兼職"?"■":"□";
     }
-    for(const key of ["membershipTransfer","feeUse","attendancePolicy","policyFourUnderstood","openCategory"])values[key]=draft[key]===true?"■":"□";
-    for(const key of ["proxyRelation","guest1Relation","guest2Relation"])values[key]=relation(draft,key);
-    values.arrivalTime=/^\d{2}:\d{2}$/.test(text(draft.arrivalTime))?text(draft.arrivalTime).replace(":","點"):text(draft.arrivalTime);
-    for(const key of ["mspUpDate","mspDownDate","sessionDate1","sessionDate2"])values[key]=chineseDate(draft[key]);
-    values.organization=text(draft.organizationName)+(text(draft.organizationRole)?`（${text(draft.organizationRole)}）`:"");
-    const signature=dateParts(draft.signatureDate);
-    values.signatureYear=signature?String(Number(signature[0])-1911):"";values.signatureMonth=signature?String(Number(signature[1])):"";values.signatureDay=signature?String(Number(signature[2])):"";
-    for(const [key,[count,width]] of Object.entries(NARRATIVES)){
-      let content=text(draft[key]);
-      if(key==="businessContent"&&text(draft.companyName))content=`${text(draft.companyName)}\n${content}`;
-      if(content.length>20000)throw new Error("訪談單一欄位超過可輸出長度，請先檢查內容；系統未刪減任何答案");
-      const chunks=lines(content,width);
-      for(let i=0;i<count;i++)values[`${key}.${i}`]=i===count-1?chunks.slice(i).join("\n"):(chunks[i]||"");
+    for(const key of MEMBERSHIP.yesNo)for(const [suffix,answer] of [["Yes","yes"],["No","no"]])values[key+suffix]=draft[`radio:${key}`]===answer?"■":"□";
+    for(const key of MEMBERSHIP.confirmations)values[key]=draft[key]===true?"■":"□";
+    for(const [group,options] of [["join",MEMBERSHIP.joinOptions],["goal",MEMBERSHIP.goalOptions],["cooperation",MEMBERSHIP.cooperationOptions]]){
+      for(let i=1;i<=options.length;i++)values[group+"Option"+i]=draft[group+"Option"+i]===true?"■":"□";
+      values[group+"OtherSelected"]=draft[group+"OtherSelected"]===true?"■":"□";
     }
-    for(let i=1;i<=20;i++)for(const key of ["contactName","contactIndustry"])values[key+i]=text(draft[key+i]);
+    for(const key of ["mspUpDate","mspDownDate","mspUpDate2","mspDownDate2","sessionDate1"])values[key]=chineseDate(draft[key]);
+    for(const key of ["guest1Name","guest2Name"])values[key]=text(draft[key]);
+    for(const key of ["guest1Relation","guest2Relation"])values[key]=relation(draft,key);
+    for(const [key,[count,width]] of Object.entries(NARRATIVES))fillLines(values,key,draft[key],count,width);
+    for(let i=1;i<=20;i++)for(const key of ["contactName","contactIndustry","contactRelation"])values[key+i]=text(draft[key+i]);
     return values;
   }
   function fillLines(values,key,value,count,width=42){
@@ -121,8 +122,8 @@
     templateFor(type);
     const day=dateParts(meetingDate);if(!day)throw new Error("請先填寫訪談日期再產生 Word");
     const name=text(applicant).replace(/[\\/:*?"<>|\x00-\x1f]/g,"-");if(!name)throw new Error("請先填寫申請人姓名");
-    const prefix={new:"高屏區會員訪談表-新會員",industry:"高屏區會員訪談表-轉換行業別",midterm:"363留員計畫-期中輔導",renewal:"363留員計畫-終期輔導",departure:"離會訪談表"}[type];
+    const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"363留員計畫-期中輔導",renewal:"363留員計畫-終期輔導",departure:"離會訪談表"}[type];
     return `${prefix}-${name}-${day.join("")}.docx`;
   }
-  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,fields,fileName});
+  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,fields,fileName});
 });

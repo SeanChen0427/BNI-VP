@@ -33,11 +33,11 @@ test('保存填答、原訪談日與姓名需完整一致；拒絕用今天補�
 test('歷史簽名不以會員名或登入者補填，明確填答與承諾仍保留',()=>{
  const prepared=copy.prepare({...base,draft:{...base.draft,login:'現在登入人',leadInterviewer:'主責','radio:sixHours':'yes'}});
  const fields=domain.fields(prepared.draft,prepared.applicant,prepared.type,prepared.context);
- assert.equal(fields.sixHoursYes,'■');assert.equal(fields.policyEthicsYes,'□');
- assert.match(fields.applicantSignature,/^_+$/);assert.match(fields.witness1,/^_+$/);
+ assert.equal(fields.participationYes,'□');assert.equal(fields.rightsEthics,'□');assert.equal(fields.rightsMsp,'□');assert.equal(fields.rightsApplicantSignature,'');assert.equal(fields.rightsInterviewerSignatures,'');
+ assert.match(fields.applicantSignature,/^_+$/);assert.equal(fields.interviewerSignatures,'');
  assert.equal(prepared.draft.login,undefined);
  const explicit=domain.fields({...prepared.draft,witness1:'保存姓名',applicantSignature:'已填姓名'},prepared.applicant,'new',prepared.context);
- assert.equal(explicit.witness1,'保存姓名');assert.equal(explicit.applicantSignature,'已填姓名');
+ assert.equal(explicit.interviewerSignatures,'保存姓名');assert.equal(explicit.applicantSignature,'已填姓名');
 });
 test('只採同會員歷史 PALMS 快照；期中未保存分數留白，沒有即時資料請求',()=>{
  const options={...base,task:{...base.task,type:'renewal'},draft:{member:'範例',summary:'當時的總結',meetingDate:'2026-09-14',renewalRuleVersion:2,renewalMetricsSnapshot:{member:{name:'範例',metrics:{givenIn:3,givenOut:7}},averages:{amount:10},period:{start:'2025-09',end:'2026-08'}}}};

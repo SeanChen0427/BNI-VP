@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.8.16", publishedAt: "2026-10-25", title: "全面更新中心區會員訪談公版 V1.1", level: "important",
+      audience: "副主席、會員委員",
+      changes: Object.freeze(["新會員與轉換行業別改用最新中心區 V1.1 公版，完整填寫 A～F 區與獨立的會員制度與權益確認書。", "新增公司團隊人數、事業願景、多選題與商務名單關係；MSP 依新版填入兩組上／下課程日期。"]),
+      howTo: "重新整理後由案件開啟訪談，依新版填答並分別核對兩份簽名及日期，最後完成訪談並產生 Word。",
+      impact: "舊版停止新填寫與產檔；已保存的歷史 Word 保留。舊草稿的新制度確認須重新核對，內部紀錄不輸出至公版。"
+    }),
+    Object.freeze({
       version: "1.8.15", publishedAt: "2026-10-06", title: "中心區績優回覆補齊近半年與全勤", level: "normal",
       audience: "副主席",
       changes: Object.freeze(["績優公告新增「複製中心區回覆」，一併帶出單月四項、近半年五項及全勤獎。", "近半年隨所選月份往前六個月；全勤須出席完整半年，且缺席、請假、代理人、遲到皆為零。"]),

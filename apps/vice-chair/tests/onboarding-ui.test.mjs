@@ -242,13 +242,18 @@ test("全部頁面導覽都沿用月會的語意框選標準",()=>{
   ].forEach(selector=>assert.ok(!allPageSteps.some(step=>step.target===selector),`仍有零碎或錯位目標 ${selector}`));
 });
 
-test("每一份逐頁導覽的靜態目標都存在於對應頁面",()=>{
+test("每一份逐頁導覽的目標都存在於頁面或實際共用表單區段",()=>{
+  const membershipContext={window:{}};membershipContext.globalThis=membershipContext.window;
+  vm.runInNewContext(read("core/interview-template-domain.js"),membershipContext);
+  vm.runInNewContext(read("assets/js/membership-form.js"),membershipContext);
+  const membershipTarget={innerHTML:"",querySelectorAll:()=>[]};
+  membershipContext.window.FulianMembershipForm.render(membershipTarget);
   const sharedTargets=new Set(['[data-guide-id="workspace.menu"]','[data-guide-id="workspace.back"]']);
   const checked=new Set();
   ["vp","committee","public"].forEach(role=>catalog.listGuides(role).forEach(guide=>{
     if(!guide.id.startsWith("page:")||guide.id==="page:index")return;
     const page=guide.id.slice(5);
-    const source=read(page+".html");
+    const source=read(page+".html")+(["new-member-form","industry-change-form"].includes(page)?membershipTarget.innerHTML:"");
     guide.steps.forEach(step=>{
       const key=`${page}:${step.target}`;
       if(checked.has(key)||sharedTargets.has(step.target))return;

@@ -28,9 +28,12 @@ test("新會員與轉換行業別 Word 產生器都以元素 id 讀取勾選",as
   }
 });
 
-test("新會員表單先套用預設備註，再讓已保存草稿覆寫",async()=>{
-  const source=await readFile(new URL("../assets/js/new-member-form.js",import.meta.url),"utf8");
-  const defaultsAt=source.indexOf("DEFAULT_CHAPTER_NOTES");
-  const restoreAt=source.lastIndexOf("restore(JSON.parse");
-  assert.ok(defaultsAt>=0&&restoreAt>defaultsAt);
+test("兩種表單只呈現V1.1，分會備註留在內部且保留未映射的舊草稿",async()=>{
+ const view=await readFile(new URL("../assets/js/membership-form.js",import.meta.url),"utf8");
+ assert.match(view,/會員制度與權益確認書/);assert.match(view,/contactRelation/);assert.doesNotMatch(view,/26\./);
+ for(const stem of ["new-member","industry-change"]){
+  const source=await readFile(new URL(`../assets/js/${stem}-form.js`,import.meta.url),"utf8"),html=await readFile(new URL(`../${stem}-form.html`,import.meta.url),"utf8");
+  assert.match(source,/formVersion:window\.FulianMembershipForm\.version/);assert.match(source,/\.\.\.JSON\.parse\(localStorage\.getItem\(STORE_KEY\)/);
+  assert.doesNotMatch(source,/DEFAULT_CHAPTER_NOTES|const commitmentQuestions/);assert.match(html,/membership-form\.js/);
+ }
 });

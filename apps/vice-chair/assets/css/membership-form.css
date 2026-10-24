@@ -1,0 +1,16 @@
+.membership-contacts .contact-row {
+  grid-template-columns: 48px repeat(3, minmax(120px, 1fr));
+  min-width: 460px;
+}
+.membership-contacts {
+  overflow-x: auto;
+}
+#membershipSections .question p {
+  line-height: 1.8;
+}
+#membershipSections .signature-fields {
+  margin-top: 24px;
+}
+#membershipVersionNotice[hidden] {
+  display: none;
+}

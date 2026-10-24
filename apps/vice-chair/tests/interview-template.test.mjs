@@ -11,17 +11,23 @@ function unzip(bytes){const data=Buffer.from(bytes),parts={};let offset=0;while(
 function fixture(type,xml){const t=domain.templateFor(type);return{schema:t.schema,templateId:t.id,sourceSha256:t.sourceSha256,parts:{'[Content_Types].xml':Buffer.from('<Types/>').toString('base64'),'word/document.xml':Buffer.from(xml).toString('base64'),'word/styles.xml':Buffer.from('original styles byte for byte').toString('base64'),'word/media/logo.png':Buffer.from([0,255,20,100]).toString('base64')}}}
 test('五類使用四份白名單模板，檔名採訪談日，拒絕未知類型與缺漏日期',()=>{
  assert.equal(new Set(types.map(type=>domain.templateFor(type).id)).size,4);
- assert.equal(domain.fileName({type:'new',applicant:'範例',meetingDate:'2026-09-14T10:30'}),'高屏區會員訪談表-新會員-範例-20260914.docx');
+ assert.equal(domain.fileName({type:'new',applicant:'範例',meetingDate:'2026-09-14T10:30'}),'高屏區會員成功訪談表暨權利義務確認書-新會員-範例-20260914.docx');
  for(const type of types)assert.match(domain.fileName({type,applicant:'測試/姓名',meetingDate:'2026-09-14'}),/-測試-姓名-20260914\.docx$/);
  for(const type of ['../secret','constructor','toString','other'])assert.throws(()=>domain.templateFor(type));
  assert.throws(()=>domain.fileName({type:'renewal',applicant:'範例',meetingDate:''}),/日期/);
 });
-test('申請人與主陪訪簽名只帶入已知姓名，勾選忠實呈現，敘述不截斷',()=>{
+test('V1.1 新欄位與兩份簽名分開保存，舊承諾不推定為新版同意，長答案不截斷',()=>{
  const long='長答案&<符號>\n'.repeat(300);
- const values=domain.fields({businessContent:long,leadInterviewer:'主訪',companionInterviewer:'陪訪','radio:sixHours':'no',membershipTransfer:false},'範例');
- assert.equal(values.applicantSignature,'範例');assert.equal(values.witness1,'主訪');assert.equal(values.witness2,'陪訪');assert.match(values.witness3,/^_+$/);
- assert.equal(values.sixHoursYes,'□');assert.equal(values.sixHoursNo,'■');assert.equal(values.membershipTransfer,'□');
- const reconstructed=Array.from({length:11},(_,i)=>values[`businessContent.${i}`]).join('\n');assert.equal(reconstructed.replace(/\s/g,''),long.replace(/\s/g,''));
+ const values=domain.fields({businessContent:long,teamSize:6,leadInterviewer:'主訪',witness1:'已填主訪',applicantSignature:'已填申請人',rightsMsp:true,rightsQualification:true,rightsEmploymentType:'兼職',rightsExperienceYears:3,mspUpDate2:'2026-11-21',joinOption2:true,goalOption3:true,cooperationOtherSelected:true,contactRelation20:'客戶','radio:sixHours':'yes','radio:policyEthics':'yes',membershipTransfer:true},'範例');
+ assert.equal(domain.TEMPLATE.id,'kp-membership-v1.1-20261012');assert.equal(values.teamSize,'6');
+ assert.equal(values.applicantSignature,'已填申請人');assert.equal(values.interviewerSignatures,'已填主訪');
+ assert.equal(values.rightsApplicantSignature,'');assert.equal(values.rightsInterviewerSignatures,'');
+ assert.equal(values.rightsMsp,'■');assert.equal(values.rightsQualification,'■');assert.equal(values.rightsEmploymentPart,'■');assert.equal(values.rightsExperienceYears,'3');
+ assert.equal(values.rightsCategory,'□');assert.equal(values.rightsEthics,'□');assert.equal(values.participationYes,'□');
+ assert.equal(values.joinOption2,'■');assert.equal(values.joinOption1,'□');assert.equal(values.goalOption3,'■');assert.equal(values.cooperationOtherSelected,'■');
+ assert.equal(values.mspUpDate2,'2026年11月21日');assert.equal(values.contactRelation20,'客戶');
+ const reconstructed=Array.from({length:domain.NARRATIVES.businessContent[0]},(_,i)=>values[`businessContent.${i}`]).join('\n');assert.equal(reconstructed.replace(/\s/g,''),long.replace(/\s/g,''));
+ assert.ok(!Object.hasOwn(values,'sixHoursYes'));
 });
 test('期中 GROW 所有答案、簽名與分析數據映射，内部追蹤不另加章節',()=>{
  const draft={counselor:'主訪',companionCounselor:'陪訪',summary:'訪談總結',renewalFoundationSnapshot:'僅系統內部'};
