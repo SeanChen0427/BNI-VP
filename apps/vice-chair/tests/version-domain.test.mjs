@@ -90,3 +90,11 @@ test("版本預覽指令會從目前正式版本計算下一版", () => {
   assert.match(result.stdout, /分類：feature → minor/);
   assert.match(result.stdout, /下一版：v1\.9\.0/);
 });
+
+// A release must change the URL that returning browsers use for cached version metadata.
+test("所有版本顯示入口使用目前版本的程式快取網址", () => {
+  for(const name of ["index.html","settings.html","system-updates.html","course.html"]){
+    const html=fs.readFileSync(new URL(name,appRoot),"utf8");
+    assert.ok(html.includes(`assets/js/release-notes.js?v=${releaseState.currentVersion}`),`${name} 仍可能載入舊版快取`);
+  }
+});

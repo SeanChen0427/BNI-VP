@@ -172,7 +172,7 @@
     if(document.querySelector(`script[src^="${src}"]`))return Promise.resolve();
     return new Promise((resolve,reject)=>{
       const script=document.createElement("script");
-      script.src=`${src}?v=17`;
+      script.src=`${src}?v=${src==="assets/js/onboarding-page-guides.js"?18:17}`;
       script.onload=resolve;
       script.onerror=reject;
       document.body.append(script);
