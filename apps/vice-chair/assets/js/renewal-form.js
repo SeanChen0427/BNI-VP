@@ -4,7 +4,7 @@
   const part=document.body.dataset.renewalPart, internal=part==='assessment',kind=internal?'renewal-assessment':'renewal-interview';
   const taskId=new URLSearchParams(location.search).get('task');
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  let task,session,draft={},metrics=null,member=null,timer,trainingPicker,busy=false,locked=false;
+  let task,session,draft={},metrics=null,member=null,timer,trainingPicker,busy=false,locked=false,metricsRequest=0;
   const fields=()=>draft[internal?'renewalAssessment':'renewalInterview']||{};
   const state=()=>domain.readWorkflow(localStorage,taskId)||{};
   const draftKey=()=>domain.draftStorageKey(task);
@@ -54,27 +54,32 @@
   function matches(){const p=expectedPeriod();return Boolean(p&&metrics?.member?.name===task.member&&metrics.period?.start===p.start&&metrics.period?.end===p.end);}
   function renderMetrics(){
     const p=expectedPeriod(),m=matches()?metrics.member.metrics:null;
+    if(!locked){
+      const result=templates.prefillRenewalMetricStatuses({interview:fields(),tracking:draft.renewalMetricDefaults||{},metrics:m,period:p,member:task.member});
+      draft={...draft,renewalInterview:result.interview,renewalMetricDefaults:result.tracking};
+    }
     $('#palmsPeriod').textContent=p?`${p.start} 至 ${p.end}`:'請選擇本次續約';
     $('#periodNote').textContent=p?(p.first?`第一次續約：依實際會籍抓取 ${p.monthCount} 個完整月份。`:'第二次續約起：抓取訪談前 12 個完整月份。'):'';
     $('#chapterVisitors').textContent=m?.visitors??'—';
     const status=key=>choices(key,[['met','達標'],['unmet','未達']]);
+    const standards=templates.RENEWAL_METRIC_STANDARDS;
     const metric=(label,value,standard,key)=>`<div class="renewal-metric"><b>${label}</b><strong>${esc(value??'—')}</strong><small>${standard||''}</small>${key?status(key):''}</div>`;
-    $('#metricsDisplay').innerHTML='<div class="renewal-metrics">'+metric('缺席／代理人',m?`${m.absence} 次／${m.substitutes} 次`:null,'')+metric('一對一',m?.oneToOne,'區域標準 96 次／年','oneToOneStatus')+metric('培訓積分',m?.education,'區域標準 18 分／年','educationStatus')+metric('嘉賓邀約',m?.visitors,'區域標準 4 位／年','visitorsStatus')+metric('引薦數',m?m.givenIn+m.givenOut:null,'區域標準 144 單／年','referralsStatus')+metric('給出的 TYFCB 金額',m?.amount,'正式 PALMS 數據')+'</div>';
+    $('#metricsDisplay').innerHTML='<div class="renewal-metrics">'+metric('缺席／代理人',m?`${m.absence} 次／${m.substitutes} 次`:null,'')+metric('一對一',m?.oneToOne,`區域標準 ${standards.oneToOneStatus} 次／年`,'oneToOneStatus')+metric('培訓積分',m?.education,`區域標準 ${standards.educationStatus} 分／年`,'educationStatus')+metric('嘉賓邀約',m?.visitors,`區域標準 ${standards.visitorsStatus} 位／年`,'visitorsStatus')+metric('引薦數',m?m.givenIn+m.givenOut:null,`區域標準 ${standards.referralsStatus} 單／年`,'referralsStatus')+metric('給出的 TYFCB 金額',m?.amount,'正式 PALMS 數據')+'</div>';
     restore();
   }
   async function loadMetrics(file=null){
-    draft=serialize();const p=expectedPeriod();renderMetrics();if(!p)return;
-    if(!file&&matches()){ $('#renewalDataMessage').textContent='已載入本案保存的正式 PALMS 快照。';return; }
+    const requestId=++metricsRequest;draft=serialize();const p=expectedPeriod();renderMetrics();if(!p)return;
+    if(!file&&matches()){ $('#renewalDataMessage').textContent='已載入本案保存的正式 PALMS 快照。';if(!locked)await saveDraft().catch(e=>toast(e.message));return; }
     $('#renewalDataMessage').textContent='正在核對指定期間的正式 PALMS…';
     try{
       let response;
       if(file){const bytes=new Uint8Array(await file.arrayBuffer());let raw='';for(const byte of bytes)raw+=String.fromCharCode(byte);response=await fetch('/api/renewal-data',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({periodStart:p.start,periodEnd:p.end,member:task.member,files:[{name:file.name,dataBase64:btoa(raw)}]})});}
       else response=await fetch(`/api/renewal-data?${new URLSearchParams({periodStart:p.start,periodEnd:p.end,member:task.member})}`,{cache:'no-store'});
-      const data=await response.json();if(!response.ok)throw new Error(data.message||`HTTP ${response.status}`);
+      const data=await response.json();if(requestId!==metricsRequest)return;if(!response.ok)throw new Error(data.message||`HTTP ${response.status}`);
       if(data.member?.name!==task.member||data.period?.start!==p.start||data.period?.end!==p.end)throw new Error('續約 PALMS 與案件期間不一致');
       const keys=['absence','substitutes','oneToOne','education','visitors','givenIn','givenOut','amount'];if(!keys.every(k=>Number.isFinite(data.member.metrics?.[k])))throw new Error('正式 PALMS 缺少完整數據，請由副主席核對');
       metrics={period:data.period,member:data.member,averages:data.averages,memberCount:data.memberCount,source:data.source};renderMetrics();$('#renewalDataMessage').textContent=`已載入正式 PALMS，分會計算人數 ${data.memberCount} 人。`;if(!locked)await saveDraft();
-    }catch(error){metrics=null;renderMetrics();$('#renewalDataMessage').textContent=error.message;$('#renewalDataUpload').hidden=!['vp','admin'].includes(session.role);}
+    }catch(error){if(requestId!==metricsRequest)return;metrics=null;renderMetrics();$('#renewalDataMessage').textContent=error.message;$('#renewalDataUpload').hidden=!['vp','admin'].includes(session.role);}
   }
   function missing(){
     const v=fields(),out=[];
@@ -124,7 +129,7 @@
     }
     restore();$('#renewalForm').hidden=false;renderSaved();
     if(!internal){await loadMetrics();$('#renewalDataUpload').onclick=()=>$('#renewalDataFile').click();$('#renewalDataFile').onchange=()=>loadMetrics($('#renewalDataFile').files[0]);}
-    $('#renewalForm').addEventListener('input',event=>{if(locked)return;draft=serialize();if(event.target.dataset.field==='renewalCycle'){metrics=null;draft.renewalMetricsSnapshot=null;loadMetrics();}clearTimeout(timer);timer=setTimeout(()=>saveDraft().catch(()=>{}),400);});
+    $('#renewalForm').addEventListener('input',event=>{if(locked)return;draft=serialize();if(event.target.dataset.field==='renewalCycle'){metrics=null;draft.renewalMetricsSnapshot=null;loadMetrics();}else if(event.target.dataset.field==='chapterVisitorMinimum'){renderMetrics();}clearTimeout(timer);timer=setTimeout(()=>saveDraft().catch(()=>{}),400);});
     $('#saveDraft').onclick=()=>saveDraft().catch(e=>toast(e.message));$('#downloadWord').onclick=complete;
     if(locked){$$('#renewalForm input,#renewalForm textarea,#renewalForm button').forEach(n=>n.disabled=true);message('已進入回饋，表單與文件保留原件');}else message('新版續約表單已就緒');
   }catch(error){$('#loadError').hidden=false;$('#loadError').textContent=error.message;$('#renewalForm').hidden=true;message('無法開啟表單');}

@@ -32,6 +32,26 @@
     rejectReasons:["長期低投入","不願使用系統","不願合作","不認同核心價值","長期負能量","持續破壞團隊文化","無改善意願"],
     narratives:{personalGrowth:4,businessChallenge:4,usageReason:4,earlierActions:5,partnerStory:5,chapterGrowthReason:4,nextYearPlan:3,teamSupportPlan:3,chapterSuggestions:4}
   });
+  // Official form checkbox thresholds; these do not calculate BNI scores.
+  const RENEWAL_METRIC_STANDARDS=Object.freeze({oneToOneStatus:96,educationStatus:18,visitorsStatus:4,referralsStatus:144});
+  function prefillRenewalMetricStatuses({interview={},tracking={},metrics=null,period=null,member=''}){
+    const values={...interview},next={};
+    const valid=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0;
+    const minimum=String(interview.chapterVisitorMinimum??'').trim();
+    const referrals=valid(metrics?.givenIn)&&valid(metrics?.givenOut)?metrics.givenIn+metrics.givenOut:null;
+    const rows=[['oneToOneStatus',metrics?.oneToOne],['educationStatus',metrics?.education],['visitorsStatus',metrics?.visitors],['referralsStatus',referrals],['chapterVisitorsStatus',metrics?.visitors,minimum===''?null:Number(minimum)]];
+    for(const [key,value,fallback] of rows){
+      const threshold=RENEWAL_METRIC_STANDARDS[key]??fallback;
+      if(!member||!period?.start||!period?.end||!valid(value)||!valid(threshold)){delete values[key];continue;}
+      const source=JSON.stringify([member,period.start,period.end,value,threshold]);
+      const selected=['met','unmet'].includes(values[key]);
+      // Existing explicit choices survive reopens for the same data; changed data
+      // or standards receive a fresh default instead of carrying a stale answer.
+      if(!selected||(tracking[key]&&tracking[key].source!==source))values[key]=value>=threshold?'met':'unmet';
+      next[key]={source};
+    }
+    return {interview:values,tracking:next};
+  }
   const MIDTERM=Object.freeze({
     gains:['認識更多人','有引薦機會','增加曝光','學到新觀念','建立合作關係','增加信任感','增加產業鏈合作'],
     barriers:['不知道怎麼引薦','沒時間投入','還不熟悉會員','沒看到成果','不知道怎麼邀請來賓','缺少合作機會','工作太忙','缺少動力','不知道如何使用系統','不清楚自己的定位'],
@@ -180,5 +200,5 @@
     const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"BNI 363 留員計畫-期中關懷訪談表","midterm-assessment":"BNI 363 留員計畫-期中關懷會員委員會內部評估表",renewal:"高屏區會員續約訪談表","renewal-assessment":"高屏區續約會員委員會內部評估表",departure:"離會訪談表"}[type];
     return `${prefix}-${name}-${day.join("")}.docx`;
   }
-  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,RENEWAL,MIDTERM,fields,fileName});
+  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,RENEWAL,MIDTERM,RENEWAL_METRIC_STANDARDS,prefillRenewalMetricStatuses,fields,fileName});
 });
