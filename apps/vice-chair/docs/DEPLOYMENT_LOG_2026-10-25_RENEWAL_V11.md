@@ -29,3 +29,12 @@
 - 私密模板兩份由 CLI 回讀後，SHA-256 均與上表完全相同。
 - 單一欄位已套用，原案件筆數與文件索引不變；來源 handoff guard 與 restrictive RLS 條件雜湊前後完全相同。
 - Supabase `app-api` 已從 v93 部署為 v94，狀態 ACTIVE、verify_jwt=true；沒有修改 Auth 帳號或正式案件。
+
+## 正式前端發布與線上核對完成
+
+- 前端提交：`4baa0f8c665b7084d31f01038a7430548a2e68f4`；[GitHub Pages 工作 40155186869](https://github.com/SeanChen0427/BNI-VP/actions/runs/40155186869) 已成功。
+- 正式網站 39 個本次修改的公開 HTML／JS／CSS，直接由原網址讀取，全部 SHA-256 與發布打包結果一致，沒有使用查詢參數避開原網址快取。
+- Chrome 正式系統更新頁載入公開更新腳本（隔離合成身份）實際顯示 `v1.9.0`，腳本網址為 `assets/js/release-notes.js?v=1.9.0`。新版續約會員訪談與獨立內部評估頁已在正式 Pages 發布。
+- 兩類模板匿名 API 均為 HTTP 401；兩份私密模板的公開 Storage 網址均拒絕下載。正式資料未建立測試案例。
+- 本機明確同步本次 78 個發布路徑，保留既有 CHANGELOG、決策紀錄及 manifest 的未發布差異；原私密分析鏡像與主 checkout Git 狀態未重建或刪除。
+- 回復方式：前端回復本次前一提交 `2c748620074bfe3910a11a931e18054fdd3a6645`，後端以該提交原始碼重新部署 app-api；新增 `documents` 欄位可保留，禁止重播舊 migration。新版已建立案件不可改用單附件覆寫，必要時先停止其新填寫並保留兩份私密檔案。
