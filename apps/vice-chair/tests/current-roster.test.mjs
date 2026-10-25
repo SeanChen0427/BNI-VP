@@ -103,20 +103,24 @@ test("舊分頁不能替離會會員新增一般案件，但離會訪談仍可�
 test("離會訪談視窗直接讀會籍，不依賴分析可用；一般下拉不含離會者", async () => {
   const creator = readFileSync(new URL("../assets/js/case-creator.js", import.meta.url), "utf8");
   const nodes = new Map();
-  const context = { members: [], departureMembers: [], types: { renewal: {}, departure: {} }, esc: String,
+  const context = { members: [], departureMembers: [], openRequest:0, types: { renewal: {existing:true}, departure: {existing:true} }, esc: String,
     fetch: async path => {
       assert.equal(path, "/api/member-departure", "訪談不應依賴分析 API");
       return { ok: true, json: async () => ({ currentMembers: [{ memberId: "a", name: "測試甲" }], departed: [{ memberId: "b", name: "測試乙" }] }) };
     }, document: { querySelector: selector => {
-      if (!nodes.has(selector)) nodes.set(selector, { focus() {}, hidden: true });
+      if (!nodes.has(selector)) nodes.set(selector, { focus() {}, hidden: true, value:"" });
       return nodes.get(selector);
     } }, alert: message => assert.fail(message), local: () => "2026-10-06T09:00", committee: ["委員"], session: { name: "委員" }, config: {},
-    renderCompanions() {}, configureMemberField() {} };
+    renderCompanions() {}, configureMemberField() { context.renderExistingMembers(); } };
   vm.createContext(context);
+  vm.runInContext(creator.slice(creator.indexOf("  function memberOptionValue"), creator.indexOf("  async function open(")), context);
   vm.runInContext(creator.slice(creator.indexOf("  async function open("), creator.indexOf("  function close(")), context);
   await context.open("departure", { memberId: "b" });
   assert.equal(nodes.get("#caseCreateModal").hidden, false);
-  assert.ok(nodes.get("#createMemberList").innerHTML.includes("測試甲"));
-  assert.ok(!nodes.get("#createMemberList").innerHTML.includes("測試乙"));
+  assert.ok(nodes.get("#createDepartureMember").innerHTML.includes("測試乙"));
+  nodes.get("#createType").value="renewal";
+  context.configureMemberField();
+  assert.ok(nodes.get("#createExistingMember").innerHTML.includes("測試甲"));
+  assert.ok(!nodes.get("#createExistingMember").innerHTML.includes("測試乙"));
   assert.ok(context.departureMembers.some(m => m.name === "測試乙" && m.status === "departed"));
 });
