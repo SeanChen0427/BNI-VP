@@ -14,8 +14,10 @@
     const state = existing && typeof existing === "object" ? existing : {};
     const log = Array.isArray(state.log) ? state.log : [];
     if(documentKind){
-      const docs=documents||{},ready=globalThis.FulianCaseDomain.renewalDocumentsReady(docs);
-      return {...state,renewalPackVersion:1,renewalDocuments:docs,renewalInterviewSaved:Boolean(docs["renewal-interview"]),renewalAssessmentSaved:ready,wordSaved:ready,wordReal:Boolean(docs["renewal-interview"]),wordName:docs["renewal-interview"]?.name||state.wordName||"",interviewCompletedAt:documentKind==="renewal-interview"?(completedAt||state.interviewCompletedAt||""):state.interviewCompletedAt||"",renewalAssessmentCompletedAt:ready?(completedAt||""):"",log:[{text:`${documentKind==="renewal-interview"?"續約會員訪談":"委員會內部評估"} Word 已保存：${fileName}`,time:timeLabel,done:true},...log].slice(0,20)};
+      const pack=globalThis.FulianCaseDomain,spec=pack.documentPackSpec(documentKind.split('-')[0]);
+      if(!spec)throw new Error('不支援的文件類型');
+      const docs=documents||{},ready=pack.documentPackReady(docs,spec.type);
+      return {...state,[spec.versionKey]:1,[spec.documentsKey]:docs,[spec.interviewSavedKey]:Boolean(docs[spec.interviewKind]),[spec.assessmentSavedKey]:ready,wordSaved:ready,wordReal:Boolean(docs[spec.interviewKind]),wordName:docs[spec.interviewKind]?.name||state.wordName||'',closed:closeWithoutDecision?ready:Boolean(state.closed),interviewCompletedAt:documentKind===spec.interviewKind?(completedAt||state.interviewCompletedAt||''):state.interviewCompletedAt||'',[spec.type+'AssessmentCompletedAt']:ready?(completedAt||''):'',log:[{text:`${documentKind===spec.interviewKind?'會員訪談':'委員會內部評估'} Word 已保存：${fileName}`,time:timeLabel,done:true},...log].slice(0,20)};
     }
     return {
       ...state,
@@ -139,7 +141,7 @@
     if (typeof window !== "undefined") {
       await window.FulianCaseStateStore?.flush();
     }
-    if (closeWithoutDecision) {
+    if (closeWithoutDecision && state.wordSaved) {
       if (typeof window === "undefined" || typeof window.FulianTaskStore?.completeRecordOnly !== "function") {
         throw new Error("案件完成服務尚未更新，請重新整理頁面後再試");
       }
@@ -161,13 +163,15 @@
             { type: data.type }
           );
         }
-        if (response.status !== 404 || documentKind==="renewal-assessment") {const error=new Error(data.message || `Word 下載失敗：HTTP ${response.status}`);error.status=response.status;throw error;}
+        if (response.status !== 404 || documentKind.endsWith("-assessment")) {const error=new Error(data.message || `Word 下載失敗：HTTP ${response.status}`);error.status=response.status;throw error;}
       } catch (error) {
-        if (!indexedDb || documentKind==="renewal-assessment" || [401,403].includes(error.status)) throw error;
+        if (!indexedDb || documentKind.endsWith("-assessment") || [401,403].includes(error.status)) throw error;
         console.warn("Supabase Word 載入失敗，改讀本機備援", error);
       }
     }
-    const localKey=documentKind?`${caseId}:${documentKind}`:(typeof window!=="undefined"&&globalThis.FulianCaseDomain.readWorkflow(localStorage,caseId)?.renewalPackVersion===1?`${caseId}:renewal-interview`:caseId);
+    const workflow=typeof window!=='undefined'?globalThis.FulianCaseDomain.readWorkflow(localStorage,caseId):null;
+    const packType=['renewal','midterm'].find(type=>workflow?.[type+'PackVersion']===1);
+    const localKey=documentKind?`${caseId}:${documentKind}`:(packType?`${caseId}:${packType}-interview`:caseId);
     const database = await openDatabase(indexedDb);
     try {
       return await new Promise((resolve, reject) => {

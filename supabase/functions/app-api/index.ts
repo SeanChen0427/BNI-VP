@@ -15,7 +15,7 @@ import { loadAttendanceHistory } from "./attendance-history.mjs";
 import { createTrainingCatalogApi } from "../_shared/training-catalog-sync.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
-import { createRenewalDocumentSaver, renewalWorkflow, renewalStorageObjects, canReadRenewalAssessment, renewalFingerprintSource } from "../../../apps/vice-chair/services/renewal-documents.mjs";
+import { createRenewalDocumentSaver, renewalWorkflow, renewalStorageObjects, canReadRenewalAssessment, renewalFingerprintSource, DOCUMENT_KINDS } from "../../../apps/vice-chair/services/renewal-documents.mjs";
 import { createInterviewTemplateApi } from "../../../apps/vice-chair/services/interview-template-api.mjs";
 import { createMonthlyAwardsApi } from "../../../apps/vice-chair/services/monthly-awards.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
@@ -3923,8 +3923,10 @@ async function completeAssignedTask(input: any, context: Context) {
     throw Object.assign(new Error("這項工作已在其他裝置更新，請重新整理後再操作"), { status: 409 });
   }
   if (task.type !== "special") {
-    const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow&limit=1`);
-    if (!states?.[0]?.workflow?.wordSaved) {
+    const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow,draft&limit=1`);
+    const files=await db(`task_case_files?task_id=eq.${row.id}&select=*&limit=1`);
+    const verified=await renewalWorkflow({access:{task:row},workflow:states?.[0]?.workflow||{},draft:states?.[0]?.draft||{},files:files?.[0],sha256Text});
+    if (!verified.wordSaved) {
       throw Object.assign(new Error("訪談 Word 尚未成功保存，不能結案"), { status: 409 });
     }
   }
@@ -3958,9 +3960,11 @@ async function completeRecordOnlyTask(sourceReference: string, context: Context)
   }
   if (row.status === "completed") return;
   if (row.handover_pending) throw Object.assign(new Error("此工作正在換屆待指派，請先完成集中交接"), { status: 409 });
-  const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow&limit=1`);
+  const states = await db(`task_case_states?task_id=eq.${row.id}&select=workflow,draft&limit=1`);
   const workflow = states?.[0]?.workflow || {};
-  if (!workflow.wordSaved || !workflow.closed) {
+  const packFiles=await db(`task_case_files?task_id=eq.${row.id}&select=*&limit=1`);
+  const verified=await renewalWorkflow({access:{task:row},workflow,draft:states?.[0]?.draft||{},files:packFiles?.[0],sha256Text});
+  if (!verified.wordSaved || !verified.closed) {
     throw Object.assign(new Error("訪談 Word 或案件階段尚未成功保存，不能結案"), { status: 409 });
   }
   const updated = await db(`tasks?id=eq.${row.id}&revision=eq.${row.revision}`, {
@@ -4366,7 +4370,7 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
   return {
     taskId: task.source_reference,
     workflow,
-    draft: leadershipRole || assigned ? (recusedApplicant?{...(row?.draft||{}),renewalAssessment:undefined}:row?.draft||{}) : null,
+    draft: leadershipRole || assigned ? (recusedApplicant?{...(row?.draft||{}),renewalAssessment:undefined,midtermAssessment:undefined}:row?.draft||{}) : null,
     revision: Number(row?.revision || 0),
     canReadFile: leadershipRole || assigned || decisionCase,
   };
@@ -5363,7 +5367,8 @@ async function caseStatesApi(request: Request, context: Context) {
   const currentDraft = existing?.draft || {};
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
-  const renewalFiles=access.task.category==="renewal"?(await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`))?.[0]:null;
+  const packSpec=globalThis.FulianCaseDomain.documentPackSpec(access.task.category);
+  const renewalFiles=packSpec?(await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`))?.[0]:null;
   const renewalGate=await renewalWorkflow({access,workflow:currentWorkflow,draft:currentDraft,files:renewalFiles,sha256Text});
   if(access.task.category==="renewal"&&renewalGate.renewalPackVersion===1&&!["draft","workflow","reset"].includes(body.kind)&&!renewalGate.wordSaved)throw Object.assign(new Error("請先保存會員訪談與委員會內部評估兩份文件，再進入回饋"),{status:409});
 
@@ -5533,12 +5538,12 @@ async function caseStatesApi(request: Request, context: Context) {
       throw Object.assign(new Error("只有副主席或本案受指派人員可以保存訪談草稿"), { status: 403 });
     }
     draft = body.value && typeof body.value === "object" ? body.value : {};
-    if(access.task.category==="renewal"&&(renewalGate.renewalPackVersion===1||draft.renewalPackVersion===1)){
-      draft={...draft,renewalPackVersion:1,renewalAssessment:Object.hasOwn(draft,"renewalAssessment")?draft.renewalAssessment:currentDraft.renewalAssessment};
-      const assessmentChanged=renewalFingerprintSource("renewal-assessment",draft)!==renewalFingerprintSource("renewal-assessment",currentDraft);
+    if(packSpec&&(renewalGate[packSpec.versionKey]===1||draft[packSpec.versionKey]===1)){
+      draft={...draft,[packSpec.versionKey]:1,[packSpec.assessmentKey]:Object.hasOwn(draft,packSpec.assessmentKey)?draft[packSpec.assessmentKey]:currentDraft[packSpec.assessmentKey]};
+      const assessmentChanged=renewalFingerprintSource(packSpec.assessmentKind,draft)!==renewalFingerprintSource(packSpec.assessmentKind,currentDraft);
       if(assessmentChanged&&!canReadRenewalAssessment(access,context))throw Object.assign(new Error("申請人本人不得填寫內部評估"),{status:403});
-      if(assessmentChanged&&!renewalGate.renewalInterviewSaved)throw Object.assign(new Error("請先保存會員訪談再填寫內部評估"),{status:409});
-      const changed=assessmentChanged||renewalFingerprintSource("renewal-interview",draft)!==renewalFingerprintSource("renewal-interview",currentDraft);
+      if(assessmentChanged&&!renewalGate[packSpec.interviewSavedKey])throw Object.assign(new Error("請先保存會員訪談再填寫內部評估"),{status:409});
+      const changed=assessmentChanged||renewalFingerprintSource(packSpec.interviewKind,draft)!==renewalFingerprintSource(packSpec.interviewKind,currentDraft);
       if(changed&&(currentWorkflow.feedbackCallId||currentWorkflow.feedbackNotified||globalThis.FulianCaseDomain.hasFeedback(currentWorkflow)||currentWorkflow.votingOpen))throw Object.assign(new Error("已進入回饋或投票的續約填答不可覆寫"),{status:409});
     }
   } else if (body.kind === "workflow") {
@@ -5668,9 +5673,9 @@ async function caseStatesApi(request: Request, context: Context) {
     throw new Error("不支援的案件同步類型");
   }
 
-  if(access.task.category==="renewal"){
-    const authoritative=await renewalWorkflow({access,workflow:{...workflow,...(renewalGate.renewalPackVersion===1?{renewalPackVersion:1}:{})},draft,files:renewalFiles,sha256Text});
-    if(renewalGate.renewalPackVersion===1||draft.renewalPackVersion===1)workflow=authoritative;
+  if(packSpec){
+    const authoritative=await renewalWorkflow({access,workflow:{...workflow,...(renewalGate[packSpec.versionKey]===1?{[packSpec.versionKey]:1}:{})},draft,files:renewalFiles,sha256Text});
+    if(renewalGate[packSpec.versionKey]===1||draft[packSpec.versionKey]===1)workflow=authoritative;
   }
 
   if (body.kind === "workflow" && workflow.closed) {
@@ -5742,8 +5747,8 @@ async function taskFileApi(request: Request, url: URL, context: Context) {
     let file = rows?.[0];
     const documentKind=url.searchParams.get("document")||"";
     if(documentKind){
-      if(!["renewal-interview","renewal-assessment"].includes(documentKind)||access.task.category!=="renewal")throw Object.assign(new Error("文件類型不正確"),{status:400});
-      if(documentKind==="renewal-assessment"&&!canReadRenewalAssessment(access,context))throw Object.assign(new Error("只有副主席或本案訪談委員可以讀取內部評估"),{status:403});
+      if(!DOCUMENT_KINDS.includes(documentKind)||!documentKind.startsWith(access.task.category+"-"))throw Object.assign(new Error("文件類型不正確"),{status:400});
+      if(documentKind.endsWith("-assessment")&&!canReadRenewalAssessment(access,context))throw Object.assign(new Error("只有副主席或本案訪談委員可以讀取內部評估"),{status:403});
       const part=file?.documents?.[documentKind];
       file=part?{...part,original_filename:part.name}:null;
     }
@@ -5776,7 +5781,7 @@ async function taskFileApi(request: Request, url: URL, context: Context) {
   const fileRows=await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`);
   const stateRows=await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
   if(body.documentKind)return saveRenewalDocument({access,context,body,bytes,existing:fileRows?.[0],state:stateRows?.[0]});
-  if(access.task.category==="renewal"&&globalThis.FulianCaseDomain.renewalPackRequired(access.task,stateRows?.[0]?.workflow,stateRows?.[0]?.draft))throw Object.assign(new Error("新版續約須由訪談及內部評估兩頁分別保存文件"),{status:409});
+  if(globalThis.FulianCaseDomain.documentPackRequired(access.task,stateRows?.[0]?.workflow,stateRows?.[0]?.draft))throw Object.assign(new Error("新版訪談須由訪談及內部評估兩頁分別保存文件"),{status:409});
   const objectPath = `${access.task.id}/interview.docx`;
   await serviceFetch(`/storage/v1/object/case-files/${objectPath}`, {
     method: "POST",

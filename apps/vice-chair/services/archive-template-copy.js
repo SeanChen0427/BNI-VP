@@ -14,12 +14,12 @@
   const text=value=>typeof value==="string"?value.trim():"";
   async function eligible({task,role,file}){
     // The saved attachment is the boundary: feedback/voting need not be closed.
-    if(task?.type==="renewal")return false; // V1.1 與舊版題目不同，舊案僅保留原件，不以空白新題重製。
+    if(["renewal","midterm"].includes(task?.type))return false; // V1.1 與舊版題目不同，舊案僅保留原件，不以空白新題重製。
     if(!["vp","admin"].includes(role)||!supported.includes(task?.type)||!file)return false;
     return !(await root.FulianInterviewTemplate.readProvenance(file));
   }
   function prepare({task,draft}){
-    if(task?.type==="renewal")throw new Error("新版續約已拆成兩份文件，舊案請下載原保存檔，不重製不同題目的公版。");
+    if(["renewal","midterm"].includes(task?.type))throw new Error("新版訪談已拆成兩份文件，舊案請下載原保存檔，不重製不同題目的公版。");
     if(!supported.includes(task?.type))throw new Error("此案件沒有對應的中心區公版");
     if(!draft||!answers[task.type].some(key=>text(draft[key])))throw new Error("舊案未保存可重製的訪談填答，請下載原保存檔核對。");
     const applicant=text(task.member),savedName=text(draft.applicant||draft.member);

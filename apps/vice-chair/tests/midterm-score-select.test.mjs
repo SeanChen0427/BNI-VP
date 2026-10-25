@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
 const source = readFileSync(
-  new URL("../assets/js/midterm-form.js", import.meta.url),
+  new URL("../archive/pre-midterm-v11-midterm-form.js", import.meta.url),
   "utf8"
 );
 

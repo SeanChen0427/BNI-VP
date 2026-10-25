@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#a91419">
+  <title>委員會內部評估｜富聯分會</title>
+  <link rel="icon" type="image/png" sizes="512x512" href="assets/images/fulian-favicon.png">
+  <link rel="apple-touch-icon" href="assets/images/fulian-favicon.png">
+  <script src="assets/js/supabase-config.js?v=1"></script>
+  <script src="assets/js/auth.js?v=8"></script>
+  <script src="assets/js/supabase-data.js?v=4"></script>
+  <script src="core/calendar-domain.js?v=5"></script>
+  <script src="core/training-catalog-domain.js?v=1"></script>
+  <script src="core/training-selection-domain.js?v=1"></script>
+  <script src="assets/js/training-picker.js?v=1"></script>
+  <link rel="stylesheet" href="assets/css/training-picker.css?v=1">
+  <script src="core/case-domain.js?v=12"></script>
+  <script src="assets/js/task-store.js?v=8"></script>
+  <script src="assets/js/case-state-store.js?v=12"></script>
+  <script src="services/case-files.js?v=8"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/css/terminal-form.css">
+  <link rel="stylesheet" href="assets/css/terminal-form-extra.css">
+  <link rel="stylesheet" href="assets/css/interview-completion.css?v=1">
+  <link rel="stylesheet" href="assets/css/workspace-nav.css?v=7">
+
+
+  <link rel="stylesheet" href="assets/css/midterm-form.css?v=1">
+<link rel="stylesheet" href="assets/css/foundation-context.css?v=4"><script src="core/renewal-foundation-domain.js?v=5"></script><link rel="stylesheet" href="assets/css/mobile-polish.css?v=1"></head>
+<body data-midterm-part="assessment">
+<header class="topbar"><a class="back" href="case-board.html">← 回案件清單</a><div><strong>富聯分會</strong><span>期中關懷案件</span></div><span id="loginIdentity"></span></header>
+<main><section class="hero"><div><span class="eyebrow">中心區公版 V1.1 · 20261012</span><h1>委員會內部評估</h1><p>供本案受指派委員填寫。請在會員共同訪談結束後，再進行內部評估。</p></div><div class="save-state"><i></i><span id="saveState">正在載入案件…</span><small id="saveTime"></small></div></section>
+<nav class="midterm-steps" data-guide-id="form.progress-panel" aria-label="期中關懷流程"><a id="interviewLink">1 期中關懷訪談</a><span>→</span><a id="assessmentLink">2 委員會內部評估</a><span>→</span><a id="feedbackLink">3 結案存檔</a></nav>
+<section id="loadError" class="form-card" hidden role="alert"></section>
+<form id="midtermForm" autocomplete="off" hidden><div id="formSections"></div>
+<section class="actions"><div><b>委員會內部評估</b><p>兩份文件均保存完成後，案件即結案存檔。</p></div><button type="button" class="ghost" id="saveDraft">儲存草稿</button><button type="button" class="primary" id="downloadWord">保存內部評估並下載 Word</button></section></form>
+<section id="savedDocuments" class="form-card" hidden aria-live="polite"></section>
+</main><div id="toast" role="status"></div>
+<script src="core/interview-template-domain.js?v=5"></script><script src="services/interview-template.js?v=4"></script>
+<script src="assets/js/midterm-form.js?v=1"></script>
+<script src="assets/js/workspace-nav.js?v=26"></script>
+</body></html>

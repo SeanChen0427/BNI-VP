@@ -58,7 +58,7 @@ test("副主席與委員取得不同步驟，Admin 沒有任何版本",()=>{
 });
 
 test("完整導覽目錄具備固定版本、逐步文案與不重複識別",()=>{
-  const expected={vp:{guides:26,steps:328},committee:{guides:20,steps:220},public:{guides:2,steps:14}};
+  const expected={vp:{guides:27,steps:327},committee:{guides:21,steps:219},public:{guides:2,steps:14}};
   Object.entries(expected).forEach(([role,count])=>{
     const guides=catalog.listGuides(role);
     assert.equal(guides.length,count.guides,role+" 導覽數量不完整");
@@ -85,12 +85,12 @@ test("每個桌面導覽目標都有穩定 data-guide-id",()=>{
 test("所有登入後工作頁都有頁面導覽，並由共用選單載入同一套引擎",()=>{
   const workspacePages=[
     "accountability-emails","analysis-review","attendance","case-archive","case-board","case-workflow",
-    "departure-form","industry-change-form","member-care","message-templates","midterm-form","monthly-meeting",
+    "departure-form","industry-change-form","member-care","message-templates","midterm-form","midterm-assessment","monthly-meeting",
     "new-member-form","partners","renewal-foundations","renewal-assessment","routine-reminders","settings","system-updates","terminal-form","useful-links","training-catalog"
   ];
   workspacePages.forEach(name=>{
     const html=read(name+".html");
-    assert.match(html,/assets\/js\/workspace-nav\.js\?v=25/,name+" 未載入最新版共用選單");
+    assert.match(html,/assets\/js\/workspace-nav\.js\?v=26/,name+" 未載入最新版共用選單");
     assert.ok(catalog.getGuide("page:"+name,"vp")||catalog.getGuide("page:"+name,"committee"),name+" 缺少頁面導覽");
   });
   assert.match(workspaceNav,/onboarding-page-guides\.js/);
@@ -115,7 +115,7 @@ test("副主席與會員委員頁面內容依權限分流",()=>{
 
 test("課程介面導覽與制度課程內容保持分離",()=>{
   assert.match(course,/data-guide-page="page:course"/);
-  assert.match(course,/onboarding-page-guides\.js\?v=19/);
+  assert.match(course,/onboarding-page-guides\.js\?v=20/);
   const guide=catalog.getGuide("page:course","vp");
   assert.ok(guide.steps.some(step=>step.id==="nav"));
   assert.ok(guide.steps.some(step=>step.id==="map"));

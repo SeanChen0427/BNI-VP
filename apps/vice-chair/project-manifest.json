@@ -74,7 +74,9 @@
     "partnerMonthlyReports": "services/partner-reports.mjs",
     "partnerDirectoryExport": "core/partner-export-domain.js",
     "renewalDocumentIntegrity": "services/renewal-documents.mjs",
-    "renewalTwoPageForm": "assets/js/renewal-form.js"
+    "renewalTwoPageForm": "assets/js/renewal-form.js",
+    "midtermTwoPageForm": "assets/js/midterm-form.js",
+    "documentPackIntegrity": "services/renewal-documents.mjs"
   },
   "pages": {
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",
@@ -87,7 +89,7 @@
     "message-templates.html": "副主席／Admin 常用文稿、當屆副主席欄位套用與人工複製",
     "routine-reminders.html": "交流群 12 小時 Reply 提醒、好友備援，以及會員委員會群常態通知",
     "terminal-form.html": "終期輔導／續約訪談",
-    "midterm-form.html": "期中輔導",
+    "midterm-form.html": "期中關懷會員共同訪談，同案第一頁及獨立 Word",
     "new-member-form.html": "新會員訪談",
     "industry-change-form.html": "轉換行業別訪談",
     "departure-form.html": "離會訪談",
@@ -97,7 +99,8 @@
     "renewal-foundations.html": "續約地基逐期追蹤、既有地基補登、人工提醒與工作坊確認",
     "system-updates.html": "使用者版更新紀錄、全文搜尋與分批載入歷史",
     "handover-guide.html": "舊閱讀版網址相容入口，保留章節錨點導向 course.html",
-    "partners.html": "夥伴名錄：多選、月份、自選欄位、篩選排序、文字／圖片匯出與展開表格（v1.7.0）"
+    "partners.html": "夥伴名錄：多選、月份、自選欄位、篩選排序、文字／圖片匯出與展開表格（v1.7.0）",
+    "midterm-assessment.html": "期中關懷會員委員會內部評估，同案第二頁及獨立 Word"
   },
   "dataContinuity": {
     "formalOperationalSource": "Supabase",

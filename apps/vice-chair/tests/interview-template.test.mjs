@@ -6,11 +6,11 @@ import {createInterviewTemplateApi} from '../services/interview-template-api.mjs
 const require=createRequire(import.meta.url);
 const domain=require('../core/interview-template-domain.js');
 const service=require('../services/interview-template.js');
-const types=['new','industry','midterm','renewal','renewal-assessment','departure'];
+const types=['new','industry','midterm','renewal','renewal-assessment','midterm-assessment','departure'];
 function unzip(bytes){const data=Buffer.from(bytes),parts={};let offset=0;while(data.readUInt32LE(offset)===0x04034b50){const length=data.readUInt32LE(offset+18),nameLength=data.readUInt16LE(offset+26),extra=data.readUInt16LE(offset+28),start=offset+30+nameLength+extra;parts[data.subarray(offset+30,offset+30+nameLength).toString()]=data.subarray(start,start+length);offset=start+length}return parts}
 function fixture(type,xml){const t=domain.templateFor(type);return{schema:t.schema,templateId:t.id,sourceSha256:t.sourceSha256,parts:{'[Content_Types].xml':Buffer.from('<Types/>').toString('base64'),'word/document.xml':Buffer.from(xml).toString('base64'),'word/styles.xml':Buffer.from('original styles byte for byte').toString('base64'),'word/media/logo.png':Buffer.from([0,255,20,100]).toString('base64')}}}
-test('六種文件使用五份白名單模板，檔名採訪談日，拒絕未知類型與缺漏日期',()=>{
- assert.equal(new Set(types.map(type=>domain.templateFor(type).id)).size,5);
+test('七種文件使用六份白名單模板，檔名採訪談日，拒絕未知類型與缺漏日期',()=>{
+ assert.equal(new Set(types.map(type=>domain.templateFor(type).id)).size,6);
  assert.equal(domain.fileName({type:'new',applicant:'範例',meetingDate:'2026-09-14T10:30'}),'高屏區會員成功訪談表暨權利義務確認書-新會員-範例-20260914.docx');
  for(const type of types)assert.match(domain.fileName({type,applicant:'測試/姓名',meetingDate:'2026-09-14'}),/-測試-姓名-20260914\.docx$/);
  for(const type of ['../secret','constructor','toString','other'])assert.throws(()=>domain.templateFor(type));
@@ -29,13 +29,10 @@ test('V1.1 新欄位與兩份簽名分開保存，舊承諾不推定為新版同
  const reconstructed=Array.from({length:domain.NARRATIVES.businessContent[0]},(_,i)=>values[`businessContent.${i}`]).join('\n');assert.equal(reconstructed.replace(/\s/g,''),long.replace(/\s/g,''));
  assert.ok(!Object.hasOwn(values,'sixHoursYes'));
 });
-test('期中 GROW 所有答案、簽名與分析數據映射，内部追蹤不另加章節',()=>{
- const draft={counselor:'主訪',companionCounselor:'陪訪',summary:'訪談總結',renewalFoundationSnapshot:'僅系統內部'};
- for(const [group,count] of [['goal',5],['reality',5],['option',4],['forward',6]])for(let i=0;i<count;i++)draft[`${group}_${i}`]=`${group}答案${i}`;
- const values=domain.fields(draft,'範例','midterm',{metrics:{givenIn:2,givenOut:4},score:76,light:'綠燈'});
- for(const [key,value] of Object.entries(draft))if(/_\d$/.test(key))assert.equal(values[`${key}.0`],value);
- assert.equal(values['metric.given'],'6');assert.equal(values.scoreNote,'76分 綠燈');assert.equal(values.memberSignature,'範例');
- assert.equal(values['summary.0'],'訪談總結');assert.ok(!JSON.stringify(values).includes('僅系統內部'));
+test('期中新版兩份欄位分開，內部評估不得混入共同訪談，長答案不截斷',()=>{
+ const draft={counselor:'主訪',companionCounselor:'陪訪',midtermInterview:{gain1:true,engagement:'5',willingness:'2',achievement:'會員原話',chapterSupport:'長答案'.repeat(800)+'最後一句'},midtermAssessment:{light:'3',energy:'4',training16:true,summary:'內部專屬',assessmentDate:'2026-10-25'}};
+ const v=domain.fields(draft,'範例','midterm');assert.equal(v.gain1,'■');assert.equal(v.gain2,'□');assert.equal(v.engagement,'5');assert.equal(v.willingness2,'■');assert.equal(v['achievement.0'],'會員原話');assert.ok(!JSON.stringify(v).includes('內部專屬'));assert.ok(!Object.hasOwn(v,'memberSignature'));assert.ok(!Object.hasOwn(v,'metric.given'));assert.ok(v['chapterSupport.3'].endsWith('最後一句'));
+ const internal=domain.fields(draft,'範例','midterm-assessment');assert.equal(internal.light3,'■');assert.equal(internal.energy4,'■');assert.equal(internal.training16,'■');assert.equal(internal['summary.0'],'內部專屬');assert.ok(!JSON.stringify(internal).includes('會員原話'));assert.match(internal.assessmentSignatures,/^_+$/);
 });
 test('續約新版僅映射會員訪談，缺少數值留白，內部評估不得混入',()=>{
  const draft={renewalInterview:{renewalCycle:'3',gain1:true,usageScore:'4',mspUnderstood:true,nextYearPlan:'年度目標'},renewalAssessment:{notes:'內部不可出現在訪談',recommendation:'reject'}};
@@ -59,11 +56,11 @@ test('原始部件完整保留，XML 安全替換一次，缺少欄位即失敗'
 });
 test('五類生成驗證指定模板與登入後 API，損壞版本停止產檔',async()=>{
  for(const type of types){
-  const expected=domain.templateFor(type),template=fixture(type,'<w:p><w:r><w:t>{{'+(type==='renewal-assessment'?'assessmentDate':['new','industry'].includes(type)?'applicant':'member')+'}}</w:t></w:r></w:p>');
+  const expected=domain.templateFor(type),template=fixture(type,'<w:p><w:r><w:t>{{'+(type.endsWith('-assessment')?'assessmentDate':['new','industry'].includes(type)?'applicant':'member')+'}}</w:t></w:r></w:p>');
   const fetchImpl=async(url,options)=>{assert.equal(url,`/api/interview-template?type=${type}`);assert.equal(options.cache,'no-store');return{ok:true,json:async()=>({templateJson:JSON.stringify(template)})}};
   const cryptoImpl={subtle:{digest:async()=>Buffer.from(expected.sha256,'hex')}};
-  const output=await service.generate({type,applicant:'範例',draft:{meetingDate:'2026-09-14',renewalAssessment:{assessmentDate:'2026-09-14'}},fetchImpl,cryptoImpl});assert.equal(output.templateId,expected.id);assert.ok(output.blob.size>0);
-  await assert.rejects(service.generate({type,applicant:'範例',draft:{meetingDate:'2026-09-14',renewalAssessment:{assessmentDate:'2026-09-14'}},fetchImpl}),/版本驗證失敗/);
+  const output=await service.generate({type,applicant:'範例',draft:{meetingDate:'2026-09-14',renewalAssessment:{assessmentDate:'2026-09-14'},midtermAssessment:{assessmentDate:'2026-09-14'}},fetchImpl,cryptoImpl});assert.equal(output.templateId,expected.id);assert.ok(output.blob.size>0);
+  await assert.rejects(service.generate({type,applicant:'範例',draft:{meetingDate:'2026-09-14',renewalAssessment:{assessmentDate:'2026-09-14'},midtermAssessment:{assessmentDate:'2026-09-14'}},fetchImpl}),/版本驗證失敗/);
  }
 });
 test('後端拒絕未登入、寫入、路徑注入、缺檔與版本損壞，不回退自製版型',async()=>{
@@ -76,11 +73,11 @@ test('後端拒絕未登入、寫入、路徑注入、缺檔與版本損壞，�
  const absent=createInterviewTemplateApi({loadTemplate:async()=>{throw new Error('missing')}});await assert.rejects(absent(req,url,{role:'admin'}),{status:503});
 });
 test('五個入口使用模板，產檔失敗不得保存附件或推進案件',async()=>{
- for(const [file,type] of [['new-member-form','new'],['industry-change-form','industry'],['midterm-form','midterm'],['departure-form','departure']]){
+ for(const [file,type] of [['new-member-form','new'],['industry-change-form','industry'],['departure-form','departure']]){
   const source=await readFile(new URL(`../assets/js/${file}.js`,import.meta.url),'utf8'),html=await readFile(new URL(`../${file}.html`,import.meta.url),'utf8');
   assert.doesNotMatch(source,/new Document\(|Packer\.toBlob/);assert.match(source,new RegExp(`FulianInterviewTemplate.generate\\(\\{type:"${type}"`));
   assert.match(source,/\.failure\(\{error\}\);\s*toast\(error.message[^;]*\);\s*return;/);
-  if(["midterm","renewal"].includes(type))assert.match(source,/capture\(\);[\s\S]*?renewalFoundationSnapshot:foundationSnapshot[\s\S]*?await window.FulianCaseStateStore.flush\(\)[\s\S]*?FulianInterviewTemplate.generate/);
+  if(type==="renewal")assert.match(source,/capture\(\);[\s\S]*?renewalFoundationSnapshot:foundationSnapshot[\s\S]*?await window.FulianCaseStateStore.flush\(\)[\s\S]*?FulianInterviewTemplate.generate/);
   assert.match(html,/core\/interview-template-domain.js/);assert.match(html,/services\/interview-template.js/);assert.doesNotMatch(html,/vendor\/docx.iife/);
  }
 });

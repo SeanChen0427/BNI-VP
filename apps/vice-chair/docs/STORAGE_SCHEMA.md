@@ -132,3 +132,7 @@
 `services/renewal-documents.mjs` 檢查指派／本人迴避、指定模板、兩份文件關聯與並行寫入。`core/case-domain.js` 決定待內部評估／回饋階段；`services/case-files.js` 仍為前端保存與推進唯一入口。文件上傳成功但索引失敗會清理本次新物件，不標記完成。重新產檔的先前版本索引保留在私密 `documents._history`；刪除案件先將主檔、兩份索引及保留版本去重排入既有儲存清理工作。新檔索引失敗時若即時清理也失敗，則排入清理重試並回報，不靜默忽略。
 
 本次只新增 `documents` 欄位，不重放歷史 migration，不修改來源角色 guard、計分或會員業務資料。
+
+## 期中關懷雙文件（2026-10-25）
+
+沿用既有 `documents` JSONB，不新增 schema、不重放 migration。草稿欄位 `midtermPackVersion=1`、`midtermInterview`、`midtermAssessment`；附件鍵 `midterm-interview`／`midterm-assessment`。共用 `core/case-domain.js` 的 documentPackSpec／documentPackReady／documentPackRequired 與 `services/renewal-documents.mjs` 的完整性服務；兩份均有效後才設 wordSaved／closed。保存、主檔指標、填答指紋、評估綁定、並行更新及失敗清理與續約相同；完成任務 API 另從附件索引重算完整性，不能信任用戶端旗標。內部評估拒絕本人／未受指派者，離線備援不得繞過拒絕。

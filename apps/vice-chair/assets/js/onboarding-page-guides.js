@@ -277,22 +277,13 @@
       ]
     }),
 
-    "page:midterm-form":page({
-      key:"midterm-form",version:"1.0.2",
-      name:"期中輔導表",
-      title:"用 GROW 結構完成期中關懷",
-      vp:"從 PALMS 表現、現況、目標、選項到行動方案完成輔導；Word 保存後直接結案，不進入投票。",
-      steps:[
-        s("foundations","既有地基","#renewalFoundationPanel","先核對續約後約定的進度","查看該會員各項地基與當期結果，把待補資料、未完成及會員回覆帶入關懷討論；Word 會保留當次地基摘要。"),
-        s("progress","表單導覽",'[data-guide-id="form.progress-panel"]',"進度、GROW 區段與草稿","完整側欄會顯示百分比、GROW 區段與資料提醒；可中途離開續寫，只有最後完成 Word 才正式結案。"),
-        s("basic","基本資料","#basic","會員與輔導人員","核對會員、專業、日期、輔導專員及陪同人員。"),
-        s("performance","現況依據","#performance","PALMS 期間與表現","核對期間、分數及各項表現；數據是對話起點，不是對人的標籤。"),
-        s("grow","GROW 輔導","#growSections","目標、現況、選項與行動","依順序記錄，重點是會員自己能說出並執行的下一步。"),
-        s("summary","綜合建議","#summary","結論與後續行動","寫清楚承諾、責任人、時間點及追蹤方式。"),
-        s("reset","表單動作","#resetDraft","清除未完成草稿","會清除本案未完成內容且無法由畫面復原。"),
-        s("download","表單動作","#downloadWord","完成 Word 並直接結案","驗證內容、保存附件並完成期中案件；本類不進入回饋或投票。",{fact:note("正式完成","先核對會員、期間與結論。")})
-      ]
-    }),
+    "page:midterm-form":page({key:"midterm-form",version:"1.1.0",name:"期中關懷訪談",title:"與會員一起完成 13 題關懷對話",vp:"同一案件先保存會員訪談，再進入委員會內部評估；兩份 Word 分開下載。",steps:[
+      s("progress","流程",'[data-guide-id="form.progress-panel"]',"會員訪談、內部評估、結案","兩份文件都保存完成後才結案；本類不進入回饋與投票。"),
+      s("questions","會員對話","#formSections","共同訪談畫面","記錄會員的收穫、卡關、需要的支持與下一步行動；內部風險與評估留在下一頁。"),
+      s("download","保存","#downloadWord","保存第一份 Word","保存後先結束與會員共同觀看，再進入內部評估。")]}),
+    "page:midterm-assessment":page({key:"midterm-assessment",version:"1.0.0",name:"期中關懷內部評估",title:"由委員完成內部評估與追蹤安排",vp:"只供受指派委員及副主席使用，被訪談會員本人須迴避。",steps:[
+      s("assessment","評估","#formSections","評估狀態與後續安排","依本次關懷填寫燈號、能量、培訓及追蹤；此評估不改寫正式分析分數。"),
+      s("download","保存","#downloadWord","保存第二份 Word 並結案","兩份原公版文件保存成功後即結案，可分別下載回傳中心區。")]}),
 
     "page:terminal-form":page({key:"terminal-form",version:"1.1.0",name:"會員續約訪談",title:"與會員完成年度回顧及下一年度藍圖",vp:"同一案件先保存會員訪談，再到內部評估；兩份文件分開下載。",steps:[
       s("progress","流程",'[data-guide-id="form.progress-panel"]',"會員訪談、內部評估、委員回饋","兩份 Word 都保存後才進入回饋。"),

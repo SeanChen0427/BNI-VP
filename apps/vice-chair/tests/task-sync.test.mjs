@@ -129,7 +129,7 @@ test("刪除案件前先完成草稿同步，成功後才清除該案件本機�
   assert.match(caseStore, /function beforeTaskDelete\(task\)/);
   assert.match(caseStore, /function discardDeletedTask\(task\)/);
   assert.match(caseStore, /nativeRemoveItem\.call\(localStorage, key\)/);
-  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=17/);
+  assert.match(read("apps/vice-chair/case-board.html"), /assets\/js\/case-board\.js\?v=18/);
   const deleteHandler = caseBoard.match(/async function confirmDelete\(\)[\s\S]*?function bindDeleteDialog/)[0];
   assert.match(deleteHandler, /await window\.FulianTaskStore\.remove\(id\)/);
   assert.doesNotMatch(deleteHandler, /localStorage\.removeItem/);
@@ -179,7 +179,7 @@ test("案件流程、草稿與 Word 都走受保護的 Supabase API", () => {
   assert.match(edge, /async function completeRecordOnlyTask/);
   assert.match(edge, /body\.action === "complete-record-only"/);
   assert.match(edge, /\["midterm", "departure"\]/);
-  assert.match(edge, /!workflow\.wordSaved \|\| !workflow\.closed/);
+  assert.match(edge, /!verified\.wordSaved \|\| !verified\.closed/);
   assert.match(edge, /只有副主席或本案受指派人員可以保存訪談草稿/);
   assert.equal(
     edge.match(/function decodeBase64\(/g)?.length,

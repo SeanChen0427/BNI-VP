@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const forms = [
-  { html: "midterm-form.html", base: "assets/js/midterm-form.js", live: "assets/js/midterm-form-live.js", ready: "FulianMidtermFormReady", type: "midterm", form: "midtermForm" },
   { html: "new-member-form.html", base: "assets/js/new-member-form.js", live: "assets/js/new-member-form-live.js", ready: "FulianNewMemberFormReady", type: "new", form: "newMemberForm" },
   { html: "industry-change-form.html", base: "assets/js/industry-change-form.js", live: "assets/js/industry-change-form-live.js", ready: "FulianIndustryChangeFormReady", type: "industry", form: "industryChangeForm" },
   { html: "departure-form.html", base: "assets/js/departure-form.js", live: "assets/js/departure-form-live.js", ready: "FulianDepartureFormReady", type: "departure", form: "departureForm" },
@@ -24,3 +23,11 @@ for (const item of forms) {
 }
 
 console.log("form task binding tests passed");
+
+const midterm=read('assets/js/midterm-form.js');
+assert.match(midterm,/await Promise.all\(\[window.FulianTaskStore.ready,window.FulianCaseStateStore.ready\]\)/);
+assert.match(midterm,/t.id===taskId&&t.type==='midterm'/);
+assert.match(midterm,/data.members\?\.find\(m=>m.name===task.member\)/);
+for(const page of ['midterm-form.html','midterm-assessment.html'])assert.match(read(page),/<form[^>]+id="midtermForm"[^>]*hidden/);
+assert.match(midterm,/if\(!leader&&!assigned\)throw/);
+assert.match(midterm,/if\(internal&&task.member===session.name\)throw/);

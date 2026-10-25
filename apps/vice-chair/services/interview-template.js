@@ -54,7 +54,7 @@
   async function generate({type,applicant,draft,context={},fetchImpl=root.fetch,cryptoImpl=root.crypto}){
     const domain=root.FulianInterviewTemplateDomain;
     const expected=domain.templateFor(type);
-    const fileName=domain.fileName({type,applicant,meetingDate:type==="renewal-assessment"?draft.renewalAssessment?.assessmentDate:draft.meetingDate||draft.interviewDate});
+    const fileName=domain.fileName({type,applicant,meetingDate:type.endsWith("-assessment")?draft[type.split("-")[0]+"Assessment"]?.assessmentDate:draft.meetingDate||draft.interviewDate});
     const response=await fetchImpl(`/api/interview-template?type=${encodeURIComponent(type)}`,{cache:"no-store"});
     const data=await response.json();
     if(!response.ok)throw new Error(data.message||"無法取得中心區公版，已停止產生 Word");

@@ -45,11 +45,11 @@ test("混合發布採影響最高的變更類型", () => {
   assert.throws(() => nextProductVersion("1.0.25", "marketing"), /未知的版本變更類型/);
 });
 
-test("目前 v1.9.0 續約雙文件與分頁流程", () => {
+test("目前 v1.10.0 期中關懷雙文件與分頁流程", () => {
   const validation = validateReleaseTransition(releaseState);
   assert.equal(validation.valid, true);
-  assert.equal(releaseState.currentVersion, "1.9.0");
-  assert.equal(releaseState.previousVersion, "1.8.16");
+  assert.equal(releaseState.currentVersion, "1.10.0");
+  assert.equal(releaseState.previousVersion, "1.9.0");
   assert.equal(releaseState.changeType, "feature");
 });
 
@@ -86,9 +86,9 @@ test("版本預覽指令會從目前正式版本計算下一版", () => {
     { cwd: projectRoot, encoding: "utf8" }
   );
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stdout, /目前：v1\.9\.0/);
+  assert.match(result.stdout, /目前：v1\.10\.0/);
   assert.match(result.stdout, /分類：feature → minor/);
-  assert.match(result.stdout, /下一版：v1\.10\.0/);
+  assert.match(result.stdout, /下一版：v1\.11\.0/);
 });
 
 // A release must change the URL that returning browsers use for cached version metadata.

@@ -40,7 +40,7 @@ test('已建立回饋呼喚便鎖定文件；申請人迴避內部評估，錯�
 test('新案強制雙文件，歷史已保存舊案保留原流程；前後端不能用 wordSaved 繞過門檻',()=>{
  assert.equal(domain.renewalPackRequired({type:'renewal'},{},{}),true);assert.equal(domain.renewalPackRequired({type:'renewal'},{wordSaved:true},{}),false);assert.equal(domain.renewalPackRequired({type:'renewal'},{wordSaved:true,renewalPackVersion:1},{}),true);
  assert.deepEqual(domain.pendingActions({type:'renewal',member:'會員',lead:'委員'},{renewalPackVersion:1,wordSaved:true,renewalInterviewSaved:true},{userName:'委員',committee:['委員']}),['assigned']);
- const edge=readFileSync(new URL('../../../supabase/functions/app-api/index.ts',import.meta.url),'utf8');assert.match(edge,/renewalGate.renewalPackVersion===1\?\{renewalPackVersion:1\}/);assert.match(edge,/renewalGate.wordSaved\)throw/);assert.match(edge,/if\(assessmentChanged&&!canReadRenewalAssessment/);assert.match(edge,/if\(body.documentKind\)return saveRenewalDocument/);
+ const edge=readFileSync(new URL('../../../supabase/functions/app-api/index.ts',import.meta.url),'utf8');assert.match(edge,/renewalGate\[packSpec.versionKey\]===1\?\{\[packSpec.versionKey\]:1\}/);assert.match(edge,/renewalGate.wordSaved\)throw/);assert.match(edge,/if\(assessmentChanged&&!canReadRenewalAssessment/);assert.match(edge,/if\(body.documentKind\)return saveRenewalDocument/);
  const sql=readFileSync(new URL('../../../supabase/migrations/20261025090000_renewal_document_parts.sql',import.meta.url),'utf8');assert.match(sql,/add column if not exists documents jsonb/);assert.doesNotMatch(sql,/create or replace|update public\.|delete from|drop policy/i);
 });
 test('重產前版本保留私密索引，刪案會涵蓋所有版本；清理失敗回報並排入重試',async()=>{

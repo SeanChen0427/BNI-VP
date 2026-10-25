@@ -247,6 +247,8 @@
   }
 
   function isClosed(task, state) {
+    const spec=documentPackSpec(task?.type);
+    if(spec&&state?.[spec.versionKey]===1&&!documentPackReady(state?.[spec.documentsKey],spec.type))return false;
     return Boolean(
       state?.closed ||
       (requiresInterviewForm(task) &&
@@ -256,18 +258,26 @@
     );
   }
 
-  function renewalDocumentsReady(documents={}) {
-    const interview=documents["renewal-interview"],assessment=documents["renewal-assessment"];
+  function documentPackSpec(type) {
+    if(!['renewal','midterm'].includes(type))return null;
+    return {type,versionKey:type+'PackVersion',documentsKey:type+'Documents',interviewSavedKey:type+'InterviewSaved',assessmentSavedKey:type+'AssessmentSaved',interviewKey:type+'Interview',assessmentKey:type+'Assessment',interviewKind:type+'-interview',assessmentKind:type+'-assessment',assessmentPage:type+'-assessment.html',interviewPage:type==='renewal'?'terminal-form.html':'midterm-form.html'};
+  }
+  function documentPackReady(documents={},type='renewal') {
+    const spec=documentPackSpec(type);if(!spec)return false;
+    const interview=documents[spec.interviewKind],assessment=documents[spec.assessmentKind];
     return Boolean(interview?.sha256&&assessment?.sha256&&assessment.interviewSha256===interview.sha256&&assessment.interviewDraftSha256===interview.draftSha256);
   }
-  function renewalPackRequired(task,state={},draft={}) {
-    if((task?.type||task?.category)!=="renewal")return false;
-    if(state?.renewalPackVersion===1||draft?.renewalPackVersion===1)return true;
-    return !(state?.wordSaved||state?.feedbackNotified||hasFeedback(state)||state?.votingOpen||state?.closed);
+  function documentPackRequired(task,state={},draft={}) {
+    const spec=documentPackSpec(task?.type||task?.category);if(!spec)return false;
+    if(state?.[spec.versionKey]===1||draft?.[spec.versionKey]===1)return true;
+    return !(state?.wordSaved||state?.feedbackNotified||hasFeedback(state)||state?.votingOpen||state?.closed||task?.completed||task?.status==='completed');
   }
+  function renewalDocumentsReady(documents={}) {return documentPackReady(documents,'renewal');}
+  function renewalPackRequired(task,state={},draft={}) {return (task?.type||task?.category)==='renewal'&&documentPackRequired(task,state,draft);}
   function stageOf(task, state, draftExists = false) {
+    const spec=documentPackSpec(task?.type);
+    if(spec&&state?.[spec.versionKey]===1&&!documentPackReady(state?.[spec.documentsKey],spec.type))return state?.[spec.interviewSavedKey]?STAGES.ASSESSMENT:(draftExists?STAGES.INTERVIEW:STAGES.WAITING);
     if (isClosed(task, state)) return STAGES.CLOSED;
-    if(task?.type==="renewal"&&state?.renewalPackVersion===1&&!renewalDocumentsReady(state.renewalDocuments))return state?.renewalInterviewSaved?STAGES.ASSESSMENT:(draftExists?STAGES.INTERVIEW:STAGES.WAITING);
     if (
       state?.leadersSent ||
       state?.advisorStatus === "confirmed" ||
@@ -439,6 +449,9 @@
     isClosed,
     pendingActions,
     stageOf,
+    documentPackSpec,
+    documentPackReady,
+    documentPackRequired,
     renewalDocumentsReady,
     renewalPackRequired,
     stageSnapshot,

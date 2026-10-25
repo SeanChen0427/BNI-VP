@@ -21,7 +21,7 @@ test("首頁移除重複或未接正式資料的工作卡", async () => {
   assert.ok(priorityIndex >= 0 && monthlyDataIndex > priorityIndex);
   assert.ok(learningIndex > monthlyDataIndex);
   assert.match(html, /assets\/css\/dashboard\.css\?v=4/);
-  assert.match(html, /assets\/js\/work-planner\.js\?v=14/);
+  assert.match(html, /assets\/js\/work-planner\.js\?v=15/);
 });
 
 test("案件中心只把正式訪談案件放進五階段管線", async () => {

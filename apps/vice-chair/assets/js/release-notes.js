@@ -1,5 +1,6 @@
 (() => {
   const RELEASES = Object.freeze([
+    Object.freeze({version:"1.10.0",publishedAt:"2026-10-25",title:"期中關懷改用兩份新版公版",level:"important",audience:"副主席、會員委員",changes:Object.freeze(["同一案件先與會員完成 13 題訪談，保存後再進入委員會內部評估。","兩份 V1.1 Word 分別保存與下載；兩份都完成才結案，維持不經回饋與投票。"]),howTo:"重新整理後開啟期中關懷案件，先保存訪談 Word，再完成內部評估並保存第二份 Word。",impact:"舊版停止新填寫及新產檔；已保存舊案保留原件。內部評估不會覆寫正式 PALMS 分數或燈號。"}),
     Object.freeze({
       version: "1.9.0", publishedAt: "2026-10-25", title: "續約改用兩份中心區新版公版", level: "important",
       audience: "副主席、會員委員",

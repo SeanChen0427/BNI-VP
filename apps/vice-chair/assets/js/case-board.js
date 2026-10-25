@@ -159,7 +159,7 @@
     const type = typeMap[task.type] || typeMap.special;
     const deadline = due(task);
     const people = [task.lead, ...(task.companions || [])].filter(Boolean);
-    const form = `${stage === "assessment" ? "renewal-assessment.html" : type.form}?task=${encodeURIComponent(task.id)}`;
+    const form = `${stage === "assessment" ? domain.documentPackSpec(task.type).assessmentPage : type.form}?task=${encodeURIComponent(task.id)}`;
     const flow = `case-workflow.html?case=${encodeURIComponent(task.id)}`;
     const feedbackStarted = type.flow && Boolean(
       state?.wordSaved || state?.feedbackNotified || domain.hasFeedback(state)

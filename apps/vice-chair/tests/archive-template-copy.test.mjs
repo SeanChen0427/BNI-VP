@@ -13,7 +13,7 @@ const base={task:{type:'new',member:'範例',completed:true},state:{closed:true,
 test('五類已保存舊檔即可提供按鈕；新公版不依日期或檔名判斷',async()=>{
  for(const type of ['new','industry','midterm','renewal','departure']){
   const options={...base,task:{...base.task,type}};
-  assert.equal(await copy.eligible(options),type!=='renewal');
+  assert.equal(await copy.eligible(options),!['renewal','midterm'].includes(type));
   const file=templates.zipParts({'word/document.xml':new Uint8Array()}, {format:'fulian.regional-template.v1',templateId:domain.templateFor(type).id});
   assert.equal(await copy.eligible({...options,file}),false);
  }
@@ -39,12 +39,11 @@ test('歷史簽名不以會員名或登入者補填，明確填答與承諾仍�
  const explicit=domain.fields({...prepared.draft,witness1:'保存姓名',applicantSignature:'已填姓名'},prepared.applicant,'new',prepared.context);
  assert.equal(explicit.interviewerSignatures,'保存姓名');assert.equal(explicit.applicantSignature,'已填姓名');
 });
-test('只採同會員歷史 PALMS 快照；期中未保存分數留白，沒有即時資料請求',()=>{
+test('已改版的續約與期中舊案僅下載原件，不重製不同題目的副本',()=>{
  const options={...base,task:{...base.task,type:'renewal'},draft:{...base.draft,member:'範例',summary:'當時的總結'}};
  assert.throws(()=>copy.prepare(options),/拆成兩份文件/);
  let p,v;
- p=copy.prepare({...options,task:{...options.task,type:'midterm'}});v=domain.fields(p.draft,p.applicant,p.type,p.context);
- assert.equal(v.scoreNote,'');assert.equal(v['metric.given'],'');assert.match(v.memberSignature,/^_+$/);assert.equal(v.signatureDate,'');
+ assert.throws(()=>copy.prepare({...options,task:{...options.task,type:'midterm'}}),/拆成兩份文件/);
 });
 test('副本生成成功與失敗皆無儲存路徑，輸入及原附件逐位元保留',async()=>{
  const original=JSON.stringify({task:base.task,state:base.state,draft:base.draft});
@@ -89,6 +88,6 @@ test('投票中的副本保持回饋票數與原檔；共用面板在點擊時�
   const html=await readFile(new URL(`../${page}.html`,import.meta.url),'utf8');
   assert.match(html,/id="templateCopyPanel"[^>]*hidden/);
   assert.match(html,/template-copy-panel.js/);
-  assert.match(html,/archive-template-copy.js\?v=3/);
+  assert.match(html,/archive-template-copy.js\?v=4/);
  }
 });

@@ -6,7 +6,8 @@
   const TEMPLATE=Object.freeze({id:"kp-membership-v1.1-20261012",schema:"fulian.interview-template.v1",sha256:"01bc970c4221622014fef0e4eff89b5d840d1dee13e872f427457a05b1db95cb",sourceSha256:"f85c689b2b61508d5d0ebf94a7f54b0fb5a005e7c20716b6b0f2a6386f1a68c9",types:Object.freeze(["new","industry"])});
   const registry=(id,sha256,sourceSha256)=>Object.freeze({id,sha256,sourceSha256,schema:TEMPLATE.schema});
   const TEMPLATES=Object.freeze({new:TEMPLATE,industry:TEMPLATE,
-    midterm:registry("kp-midterm-v4-20241121","a34b8d5e1953c413f47e8778588e820a2651dc1736158300780c8042647362e4","12307bba2a51714f520b13800cd6ae290c1609af83b55783490ca27369cdb082"),
+    midterm:registry("kp-midterm-interview-v1.1-20261012","7037549309bb5d16b56430852dc2bc4b48a5ee503468a5d55aacecb4a77c7e1c","c9500a294c1ac03236db51fae7c5a343672f79c6b667a055cdb516db57fe37cb"),
+    "midterm-assessment":registry("kp-midterm-assessment-v1.1-20261012","574f3aed521a0b14bd8832cc4fa069714e3b09cf3f63fb2ace115b82aefb42a0","55afef011e70ec587cbaf966560bcb836bff7394e999861e3c45fbe17dfcfe54"),
     renewal:registry("kp-renewal-interview-v1.1-20261012","51e4e2bd022284b172f029cdf1871ea8010cb4c6a6158c5fb72f6a1680f813dc","7113a0e133dea14c044a1b6ccd653175d2c469a0cdbcdf5be54f8700560e6214"),
     "renewal-assessment":registry("kp-renewal-assessment-v1.1-20261012","008ce9e8362bf3e86d0c5cb14cfac36a07724a55d567595ab77daf06f5717961","e7f7116b594f5959ddb8d4a6c814f55a446df933a6a9a9193e8d85e428fc30dd"),
     departure:registry("kp-departure-v2.1-20230428","511f910bf2c9db1a45604f2a6aad243b2d279e380038de158749928f4ea55a4c","774e7a95b2dc4cf8942aea0a6bdfedbc1aafc5ed7c5c82877bc105324eaedf88")});
@@ -31,6 +32,38 @@
     rejectReasons:["長期低投入","不願使用系統","不願合作","不認同核心價值","長期負能量","持續破壞團隊文化","無改善意願"],
     narratives:{personalGrowth:4,businessChallenge:4,usageReason:4,earlierActions:5,partnerStory:5,chapterGrowthReason:4,nextYearPlan:3,teamSupportPlan:3,chapterSuggestions:4}
   });
+  const MIDTERM=Object.freeze({
+    gains:['認識更多人','有引薦機會','增加曝光','學到新觀念','建立合作關係','增加信任感','增加產業鏈合作'],
+    barriers:['不知道怎麼引薦','沒時間投入','還不熟悉會員','沒看到成果','不知道怎麼邀請來賓','缺少合作機會','工作太忙','缺少動力','不知道如何使用系統','不清楚自己的定位'],
+    feelings:['很有動力','穩定前進中','有點疲憊','缺少方向','有點觀望','需要更多支持','與會員互動較少'],
+    priorities:['出席','培訓','一對一','邀約來賓','引薦'],
+    supports:['一對一交流安排','引薦練習','來賓邀請協助','產業鏈連結','培訓課程建議','增加曝光機會','有人陪伴與提醒','增加與會員互動'],
+    actions:['約1場一對一','邀請1位來賓','報名培訓課程','提供1次引薦','參加分會活動','完成1場咖啡會議'],
+    willingness:['90-100%','70-89%','50-69%','50%以下'],
+    lights:['綠燈（穩定）','黃燈（需持續關心）','紅燈（高風險）'],
+    energy:['正向積極','普通穩定','疲憊低能量','有壓力','失去方向感'],
+    arrangements:['安排咖啡會議','安排陪跑會員','安排產業鏈連結','建議報名培訓課程','ED/DC關懷','持續追蹤即可'],
+    trainings:['MSP會員成功專案(上)、(下)','一對一表格攻略','一對一工作坊','咖啡會議工作坊','引薦工作坊','簡報工作坊','協力團隊工作坊','MYS成功藍圖工作坊','Connect工作坊','領導團隊培訓','期中領導團隊培訓','商業領袖論壇','LTnA會議','圓桌會議','會員委員會工作坊','導協工作坊'],
+    focuses:['來賓邀請','一對一交流','培訓參與','引薦狀況','情緒支持','關係建立','產業鏈合作'],
+    narratives:{gainNotes:3,achievement:4,barrierNotes:3,feelingNotes:2,partners:3,improvement:4,renewalReason:4,chapterSupport:4}
+  });
+  function midtermFields(type,draft,applicant,context){
+    const internal=type==='midterm-assessment',v=draft[internal?'midtermAssessment':'midtermInterview']||{},values={};
+    const checked=value=>value===true?'■':'□';
+    const groups=internal?{arrangement:MIDTERM.arrangements,training:MIDTERM.trainings,focus:MIDTERM.focuses}:{gain:MIDTERM.gains,barrier:MIDTERM.barriers,feeling:MIDTERM.feelings,support:MIDTERM.supports,action:MIDTERM.actions};
+    for(const [key,items] of Object.entries(groups))items.forEach((_,i)=>values[key+(i+1)]=checked(v[key+(i+1)]));
+    for(const key of (internal?['arrangement','focus']:['gain','barrier','feeling','support','action'])){values[key+'OtherSelected']=checked(v[key+'OtherSelected']);values[key+'Other']=text(v[key+'Other']);}
+    if(internal){
+      for(const [key,list] of [['light',MIDTERM.lights],['energy',MIDTERM.energy]])list.forEach((_,i)=>values[key+(i+1)]=String(v[key])===String(i+1)?'■':'□');
+      values.nextCareDate=chineseDate(v.nextCareDate);values.owner=text(v.owner);fillLines(values,'summary',v.summary,14,42);
+      values.assessmentSignatures=[v.interviewer,v.companion].map(text).filter(Boolean).join('／')||'____________________';values.assessmentDate=chineseDate(v.assessmentDate);
+    }else{
+      Object.assign(values,{member:text(applicant||draft.member),chapter:'富聯',profession:text(context.profession||draft.profession),meetingDate:text(draft.meetingDate).replace('T',' '),counselors:[draft.counselor,draft.companionCounselor].map(text).filter(Boolean).join('／'),engagement:text(v.engagement)});
+      for(const [key,list] of [['priority',MIDTERM.priorities],['willingness',MIDTERM.willingness]])list.forEach((_,i)=>values[key+(i+1)]=String(v[key])===String(i+1)?'■':'□');
+      for(const [key,count] of Object.entries(MIDTERM.narratives))fillLines(values,key,v[key],count,42);
+    }
+    return values;
+  }
   function renewalFields(type,draft,applicant,context){
     const interview=draft.renewalInterview||{},assessment=draft.renewalAssessment||{},values={};
     const checked=key=>key===true?"■":"□";
@@ -117,22 +150,17 @@
       values[`metric.${key}`]=text(m[key]);values[`average.${key}`]=text(averages[key]);
     }
     for(const [key,a,b] of [["given","givenIn","givenOut"],["received","receivedIn","receivedOut"]])values[`metric.${key}`]=Number.isFinite(m[a])&&Number.isFinite(m[b])?String(m[a]+m[b]):"";
-    if(type==="midterm"){
-      values.scoreNote=context.score==null?"":`${context.score}分 ${text(context.light)}`;values.periodNote=text(context.palmsPeriod);
-      for(const [key,counts] of Object.entries({goal:[2,2,2,2,2],reality:[3,3,3,3,3],option:[3,3,3,3],forward:[3,3,2,3,2,3]}))counts.forEach((count,i)=>fillLines(values,`${key}_${i}`,draft[`${key}_${i}`],count));
-      fillLines(values,"summary",draft.summary,3);
-    }else{
       values.departureDate=text(draft.departureDate);values.interviewers=[values.counselor,text(draft.companion)].filter(Boolean).join("／");
       for(const key of ["gains","likes","departureReason","dislikes","improvementAttempts"])values[key]=text(draft[key])||"_".repeat(66);
       for(const [key,radio,note] of [["training","trainingUnderstood","trainingUnderstandingNotes"],["msp","mspAttended","mspNotes"],["procedure","procedureDone","emailNoticeDate"]])values[key]=[text(draft[`radio:${radio}`]),text(draft[note])].filter(Boolean).join("；")||"____________________";
       const ruled=(value,width)=>{const content=text(value);const used=Array.from(content).reduce((n,c)=>n+(c.codePointAt(0)>255?2:1),0);return content+"_".repeat(Math.max(0,width-used))};
       for(const [key,width] of [["chapter",24],["member",24],["departureDate",23],["interviewers",24],["meetingDate",23]])values[key]=ruled(values[key],width);
       for(const [key,width] of [["presidentSignature",21],["vicePresidentSignature",20],["directorSignature",19]])values[key]=ruled(draft[key],width);
-    }
     return values;
   }
   function fields(draft={},applicant="",type="new",context={}){
     templateFor(type);
+    if(["midterm","midterm-assessment"].includes(type))return midtermFields(type,draft,applicant,context);
     if(["renewal","renewal-assessment"].includes(type))return renewalFields(type,draft,applicant,context);
     const values=["new","industry"].includes(type)?membershipFields(draft,applicant):careFields(type,draft,applicant,context);
     if(context.historicalCopy){
@@ -149,8 +177,8 @@
     templateFor(type);
     const day=dateParts(meetingDate);if(!day)throw new Error("請先填寫訪談日期再產生 Word");
     const name=text(applicant).replace(/[\\/:*?"<>|\x00-\x1f]/g,"-");if(!name)throw new Error("請先填寫申請人姓名");
-    const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"363留員計畫-期中輔導",renewal:"高屏區會員續約訪談表","renewal-assessment":"高屏區續約會員委員會內部評估表",departure:"離會訪談表"}[type];
+    const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"BNI 363 留員計畫-期中關懷訪談表","midterm-assessment":"BNI 363 留員計畫-期中關懷會員委員會內部評估表",renewal:"高屏區會員續約訪談表","renewal-assessment":"高屏區續約會員委員會內部評估表",departure:"離會訪談表"}[type];
     return `${prefix}-${name}-${day.join("")}.docx`;
   }
-  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,RENEWAL,fields,fileName});
+  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,RENEWAL,MIDTERM,fields,fileName});
 });
