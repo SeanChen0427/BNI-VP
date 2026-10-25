@@ -375,3 +375,9 @@ test("地基教學涵蓋首頁入口、逐期追蹤及副主席修正，委員�
   assert.ok(catalog.getGuide("page:index","committee").steps.some(step=>step.id==="foundations"));
   assert.ok(catalog.getGuide("global-shell","vp").steps.some(step=>step.id==="foundations"));
 });
+
+// Returning browsers must also refresh dynamically injected page guides.
+test("動態導覽使用與課程相同的目前快取版本",()=>{
+ assert.match(workspaceNav,/src==="assets\/js\/onboarding-page-guides.js"\?20:17/);
+ for(const name of ['midterm-form','midterm-assessment'])assert.match(read(name+'.html'),/midterm-form.js\?v=11/);
+});

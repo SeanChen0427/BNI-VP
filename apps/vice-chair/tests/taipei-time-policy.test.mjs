@@ -43,7 +43,7 @@ test("使用台北日期工具的頁面都先載入共用日曆核心",async()=>
     "../industry-change-form.html":"assets/js/industry-change-form.js?v=10",
     "../departure-form.html":"assets/js/departure-form.js?v=7",
     "../settings.html":"assets/js/settings.js?v=19",
-    "../midterm-form.html":"assets/js/midterm-form.js?v=1"
+    "../midterm-form.html":"assets/js/midterm-form.js?v=11"
   };
   for(const [page,script] of Object.entries(pages)){
     const html=await read(page);
