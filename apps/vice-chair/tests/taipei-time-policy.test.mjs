@@ -35,7 +35,7 @@ test("使用台北日期工具的頁面都先載入共用日曆核心",async()=>
     "../member-care.html":"assets/js/member-care.js?v=9",
     "../case-workflow.html":"assets/js/case-workflow.js?v=34",
     "../analysis-review.html":"assets/js/analysis-review.js?v=12",
-    "../terminal-form.html":"assets/js/renewal-form.js?v=2",
+    "../terminal-form.html":"assets/js/renewal-form.js?v=3",
     "../monthly-meeting.html":"assets/js/monthly-meeting.js?v=20",
     "../attendance.html":"assets/js/attendance.js?v=13",
     "../case-board.html":"assets/js/case-board.js?v=18",
@@ -43,7 +43,7 @@ test("使用台北日期工具的頁面都先載入共用日曆核心",async()=>
     "../industry-change-form.html":"assets/js/industry-change-form.js?v=10",
     "../departure-form.html":"assets/js/departure-form.js?v=7",
     "../settings.html":"assets/js/settings.js?v=19",
-    "../midterm-form.html":"assets/js/midterm-form.js?v=11"
+    "../midterm-form.html":"assets/js/midterm-form.js?v=12"
   };
   for(const [page,script] of Object.entries(pages)){
     const html=await read(page);

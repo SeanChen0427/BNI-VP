@@ -1,5 +1,6 @@
 (() => {
   const RELEASES = Object.freeze([
+    Object.freeze({version:"1.10.3",publishedAt:"2026-10-25",title:"訪談儲存與下一步按鈕更清楚",level:"normal",audience:"副主席、會員委員",changes:Object.freeze(["續約及期中訪談明確標示「① 儲存訪談表單並下載 Word」，成功後再按「② 下一步：委員會內部評估」。","暫存草稿與完成本頁分開說明；續約內部評估完成後進入回饋，期中內部評估完成後結案。"]),howTo:"共同訪談完成後先儲存第一份 Word，再由委員按下一步填寫內部評估；兩份文件仍分開下載。",impact:"操作順序、保存檢查與案件流程維持，未改動既有案件或正式資料。"}),
     Object.freeze({version:"1.10.2",publishedAt:"2026-10-25",title:"修正手機建立期中案件的會員選擇",level:"important",audience:"副主席、會員委員",changes:Object.freeze(["期中、續約等現任會員案件改用可搜尋的會員下拉選單，選取後自動帶入專業類別。","期中關懷僅能選現任會員；新會員申請使用獨立欄位，離會補訪保留獨立名單。"]),howTo:"重新整理案件清單後建立案件，選擇期中關懷，再從會員下拉選單點選；可先輸入姓名或專業篩選。",impact:"只修正建立畫面，不修改既有案件或會員資料。"}),
     Object.freeze({version:"1.10.1",publishedAt:"2026-10-25",title:"續約數據自動預選達標狀態",level:"normal",audience:"副主席、會員委員",changes:Object.freeze(["載入正式 PALMS 後，依表上標準預選一對一、培訓、嘉賓及引薦的達標或未達。","分會嘉賓門檻填妥後同步判斷；可手動調整，同資料重新開啟時保留選擇。"]),howTo:"重新整理續約訪談頁並載入對應期間 PALMS，即可查看預選結果。",impact:"缺資料不判未達；切換期間、數值或門檻會重新判斷，已進入回饋的保存原件不變。"}),
     Object.freeze({version:"1.10.0",publishedAt:"2026-10-25",title:"期中關懷改用兩份新版公版",level:"important",audience:"副主席、會員委員",changes:Object.freeze(["同一案件先與會員完成 13 題訪談，保存後再進入委員會內部評估。","兩份 V1.1 Word 分別保存與下載；兩份都完成才結案，維持不經回饋與投票。"]),howTo:"重新整理後開啟期中關懷案件，先保存訪談 Word，再完成內部評估並保存第二份 Word。",impact:"舊版停止新填寫及新產檔；已保存舊案保留原件。內部評估不會覆寫正式 PALMS 分數或燈號。"}),

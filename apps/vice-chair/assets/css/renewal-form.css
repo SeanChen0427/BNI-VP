@@ -102,3 +102,7 @@ fieldset[disabled]{
   flex-wrap:wrap;
   gap:12px}
 }
+
+#renewalForm[hidden]{
+  display:none;
+}

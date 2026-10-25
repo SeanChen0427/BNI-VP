@@ -34,7 +34,7 @@
   async function saveDraft(){
     if(locked)return;
     clearTimeout(timer);draft=serialize();localStorage.setItem(draftKey(),JSON.stringify(draft));message('正在同步草稿…');
-    try{await window.FulianCaseStateStore.flush();message('草稿已保存至 Supabase');$('#saveTime').textContent=calendar.formatTaipeiTime(new Date());renderSaved();}
+    try{await window.FulianCaseStateStore.flush();message('草稿已暫存（不會產生 Word）');$('#saveTime').textContent=calendar.formatTaipeiTime(new Date());renderSaved();}
     catch(error){message(`同步失敗：${error.message}`);throw error;}
   }
   function renderInterview(){
@@ -86,7 +86,7 @@
     $('#assessmentLink').href=`midterm-assessment.html?task=${encodeURIComponent(taskId)}`;$('#assessmentLink').setAttribute('aria-disabled',String(!interview));
     $('#feedbackLink').href=closeHref();$('#feedbackLink').setAttribute('aria-disabled',String(!ready));
     if(!interview&&!assessment){panel.hidden=true;return;}
-    panel.hidden=false;panel.innerHTML=`<h2>${ready?'兩份期中關懷文件已保存，案件已結案':'會員訪談已保存，待內部評估'}</h2><p>同一案件，兩份 Word 分開下載及回傳中心區。</p><div class="midterm-downloads">${interview?'<button type="button" data-document="midterm-interview">下載會員期中關懷訪談表</button>':''}${internal&&assessment?'<button type="button" data-document="midterm-assessment">下載委員會內部評估表</button>':''}</div>${internal?(ready?`<a class="midterm-next" href="${closeHref()}">${closeLabel()} →</a>`:''):`<a class="midterm-next" href="midterm-assessment.html?task=${encodeURIComponent(taskId)}">結束共同訪談，前往內部評估 →</a>`}`;
+    panel.hidden=false;panel.innerHTML=`<h2>${ready?'兩份期中關懷文件已保存，案件已結案':'會員訪談已保存，待內部評估'}</h2><p>${internal?'同一案件，兩份 Word 分開下載及回傳中心區。':'訪談表單已儲存。請結束與會員的共同訪談後，再按下一步進入委員會內部評估；兩份 Word 分開下載。'}</p><div class="midterm-downloads">${interview?'<button type="button" data-document="midterm-interview">下載會員期中關懷訪談表</button>':''}${internal&&assessment?'<button type="button" data-document="midterm-assessment">下載委員會內部評估表</button>':''}</div>${internal?(ready?`<a class="midterm-next" href="${closeHref()}">${closeLabel()} →</a>`:''):`<a class="midterm-next" href="midterm-assessment.html?task=${encodeURIComponent(taskId)}">② 下一步：委員會內部評估 →</a>`}`;
     panel.querySelectorAll('[data-document]').forEach(n=>n.onclick=()=>downloadSaved(n.dataset.document));
   }
   async function complete(){
@@ -96,7 +96,7 @@
       await saveDraft();
       const {blob,fileName}=await window.FulianInterviewTemplate.generate({type:internal?'midterm-assessment':'midterm',applicant:task.member,draft,context:internal?{}:{profession:member.profession}});
       await window.FulianCaseFiles.saveGeneratedWord({caseId:taskId,blob,fileName,sourceLabel:internal?'委員會內部評估':'期中關懷會員訪談',caseType:'midterm',documentKind:kind,domain,storage:localStorage,indexedDb:indexedDB,FileClass:File});
-      download(blob,fileName);renderSaved();message(internal?'兩份文件已保存，案件已結案':'會員訪談已保存，待委員填寫內部評估');$('#savedDocuments').scrollIntoView({behavior:'smooth',block:'center'});
+      download(blob,fileName);renderSaved();message(internal?'兩份文件已保存，案件已結案':'訪談表單已儲存，請按②前往委員會內部評估');$('#savedDocuments').scrollIntoView({behavior:'smooth',block:'center'});
     }catch(error){message('尚未完成保存：'+error.message);toast(error.message);}finally{busy=false;$('#downloadWord').disabled=false;}
   }
   try{
