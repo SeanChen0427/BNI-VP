@@ -20,6 +20,7 @@
   const STAGES = Object.freeze({
     WAITING: "waiting",
     INTERVIEW: "interview",
+    ASSESSMENT: "assessment",
     FEEDBACK: "feedback",
     VOTE: "vote",
     ADVISOR: "advisor",
@@ -255,8 +256,18 @@
     );
   }
 
+  function renewalDocumentsReady(documents={}) {
+    const interview=documents["renewal-interview"],assessment=documents["renewal-assessment"];
+    return Boolean(interview?.sha256&&assessment?.sha256&&assessment.interviewSha256===interview.sha256&&assessment.interviewDraftSha256===interview.draftSha256);
+  }
+  function renewalPackRequired(task,state={},draft={}) {
+    if((task?.type||task?.category)!=="renewal")return false;
+    if(state?.renewalPackVersion===1||draft?.renewalPackVersion===1)return true;
+    return !(state?.wordSaved||state?.feedbackNotified||hasFeedback(state)||state?.votingOpen||state?.closed);
+  }
   function stageOf(task, state, draftExists = false) {
     if (isClosed(task, state)) return STAGES.CLOSED;
+    if(task?.type==="renewal"&&state?.renewalPackVersion===1&&!renewalDocumentsReady(state.renewalDocuments))return state?.renewalInterviewSaved?STAGES.ASSESSMENT:(draftExists?STAGES.INTERVIEW:STAGES.WAITING);
     if (
       state?.leadersSent ||
       state?.advisorStatus === "confirmed" ||
@@ -290,13 +301,14 @@
 
     if (
       isAssignedTo(task, normalizedName) &&
-      (stage === STAGES.WAITING || stage === STAGES.INTERVIEW)
+      (stage === STAGES.WAITING || stage === STAGES.INTERVIEW || stage === STAGES.ASSESSMENT)
     ) {
       actions.push("assigned");
     }
 
     if (
       requiresDecisionWorkflow(task) &&
+      (stage !== STAGES.ASSESSMENT && (state?.renewalPackVersion !== 1 || renewalDocumentsReady(state.renewalDocuments))) &&
       (state?.wordSaved || state?.feedbackNotified || hasFeedback(state)) &&
       feedback.eligible &&
       !feedback.submitted
@@ -427,6 +439,8 @@
     isClosed,
     pendingActions,
     stageOf,
+    renewalDocumentsReady,
+    renewalPackRequired,
     stageSnapshot,
     recusedApplicant,
     eligibleMembers,

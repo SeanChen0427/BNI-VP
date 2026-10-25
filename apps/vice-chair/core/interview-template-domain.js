@@ -7,7 +7,8 @@
   const registry=(id,sha256,sourceSha256)=>Object.freeze({id,sha256,sourceSha256,schema:TEMPLATE.schema});
   const TEMPLATES=Object.freeze({new:TEMPLATE,industry:TEMPLATE,
     midterm:registry("kp-midterm-v4-20241121","a34b8d5e1953c413f47e8778588e820a2651dc1736158300780c8042647362e4","12307bba2a51714f520b13800cd6ae290c1609af83b55783490ca27369cdb082"),
-    renewal:registry("kp-renewal-v2-20251114","de03daa54f8a7f87248589cd4bc2707f2c6b93343ef5704a70e373501ac52a16","16e16ce60bf9a4b66fa9300557f9791d9102769b14bc29dd1d4ec6f046a7b3e1"),
+    renewal:registry("kp-renewal-interview-v1.1-20261012","51e4e2bd022284b172f029cdf1871ea8010cb4c6a6158c5fb72f6a1680f813dc","7113a0e133dea14c044a1b6ccd653175d2c469a0cdbcdf5be54f8700560e6214"),
+    "renewal-assessment":registry("kp-renewal-assessment-v1.1-20261012","008ce9e8362bf3e86d0c5cb14cfac36a07724a55d567595ab77daf06f5717961","e7f7116b594f5959ddb8d4a6c814f55a446df933a6a9a9193e8d85e428fc30dd"),
     departure:registry("kp-departure-v2.1-20230428","511f910bf2c9db1a45604f2a6aad243b2d279e380038de158749928f4ea55a4c","774e7a95b2dc4cf8942aea0a6bdfedbc1aafc5ed7c5c82877bc105324eaedf88")});
   function templateFor(type){if(!Object.hasOwn(TEMPLATES,type))throw new Error("此訪談類型尚未建立已驗證的中心區模板");return TEMPLATES[type]}
   const NARRATIVES=Object.freeze({businessContent:[6,42],advantages:[6,42],successStories:[7,42],annualBreakthrough:[3,42],growthVision:[3,42],threeYearVision:[5,42],targetMarkets:[5,42],cooperationIndustries:[5,42]});
@@ -18,6 +19,49 @@
     yesNo:Object.freeze(["growthPlan","participation","learning","giving","visitorCulture","rightsOrganization","pledgeGuests"]),
     confirmations:Object.freeze(["trustUnderstood","successUnderstood","engagementUnderstood","rightsCategory","rightsQualification","rightsPolicyFour","rightsMsp","rightsSession","rightsAttendance","rightsProxy","rightsGreen","rightsFees","rightsEthics"])
   });
+  const RENEWAL=Object.freeze({
+    gains:["建立人脈","增加合作","增加引薦","提升品牌曝光","建立信任圈","提升表達能力","商業思維成長","個人成長","領導力提升"],
+    underused:["一對一","咖啡會議","每週簡報","來賓邀約","引薦能力","建立信任","培訓參與","產業服務鏈","團隊合作","活動參與"],
+    partnerStatus:["已有穩定合作夥伴","有部分合作","尚未形成","不知道如何建立"],advocates:["0–2位","3–5位","6–10位","10位以上"],
+    barriers:["不知道邀請誰","不知道如何邀約","擔心被拒絕","時間安排問題","沒有邀約習慣","不知道如何篩選適合來賓","對邀約沒有明確目標"],
+    values:["長期人脈資產","穩定轉介紹","商業合作平台","個人品牌曝光","團隊支持","領導力成長","學習平台"],
+    commitments:[["invite","邀請優質來賓"],["oneToOne","積極一對一交流"],["cooperate","協助會員合作"],["learn","參與培訓學習"],["trust","建立長期信任關係"],["events","參與分會活動"]],
+    ratings:[["systemUse","系統使用度"],["cultureFit","文化適配度"],["longTerm","長期主義"],["cooperation","合作意願"],["chapterGrowth","幫助分會成長意願"]],
+    improvements:["出席率","一對一","培訓參與","嘉賓邀約","團隊參與","建立合作圈","平台使用度","每週簡報優化"],
+    rejectReasons:["長期低投入","不願使用系統","不願合作","不認同核心價值","長期負能量","持續破壞團隊文化","無改善意願"],
+    narratives:{personalGrowth:4,businessChallenge:4,usageReason:4,earlierActions:5,partnerStory:5,chapterGrowthReason:4,nextYearPlan:3,teamSupportPlan:3,chapterSuggestions:4}
+  });
+  function renewalFields(type,draft,applicant,context){
+    const interview=draft.renewalInterview||{},assessment=draft.renewalAssessment||{},values={};
+    const checked=key=>key===true?"■":"□";
+    const choices=(key,selected,list)=>list.forEach(value=>{values[key+value]=checked(String(selected)===String(value))});
+    if(type==="renewal-assessment"){
+      for(const [key] of RENEWAL.ratings)for(const choice of ["high","medium","low"])values[`rating.${key}.${choice}`]=checked(assessment[key]===choice);
+      for(const [key,value] of [["Normal","normal"],["Conditional","conditional"],["Reject","reject"]])values["recommend"+key]=checked(assessment.recommendation===value);
+      RENEWAL.improvements.forEach((_,i)=>values["improvement"+(i+1)]=checked(assessment["improvement"+(i+1)]));
+      RENEWAL.rejectReasons.forEach((_,i)=>values["rejectReason"+(i+1)]=checked(assessment["rejectReason"+(i+1)]));
+      values.coach=text(assessment.coach);fillLines(values,"improvementGoal",assessment.improvementGoal,14,11);fillLines(values,"notes",assessment.notes,1,11);
+      values.assessmentSignatures=[assessment.interviewer,assessment.companion].map(text).filter(Boolean).join("／")||"____________________";values.assessmentDate=chineseDate(assessment.assessmentDate);
+      return values;
+    }
+    const m=context.metrics||draft.renewalMetricsSnapshot?.member?.metrics||{};
+    Object.assign(values,{member:text(applicant||draft.member),chapter:"富聯",profession:text(context.profession||draft.profession),meetingDate:text(draft.meetingDate).replace("T"," "),counselors:[draft.counselor,draft.companionCounselor].map(text).filter(Boolean).join("／"),activation:text(draft.activation),expiryDate:text(draft.expiryDate)});
+    choices("cycle",interview.renewalCycle,[1,2,3]);
+    for(const key of ["absence","substitutes","oneToOne","education","visitors"])values["metric."+key]=text(m[key]);
+    values["metric.referrals"]=Number.isFinite(m.givenIn)&&Number.isFinite(m.givenOut)?String(m.givenIn+m.givenOut):"";
+    values["metric.amountGiven"]=text(m.amount);values["metric.amountReceived"]=text(interview.amountReceived);
+    for(const key of ["oneToOneStatus","educationStatus","visitorsStatus","referralsStatus","chapterVisitorsStatus"]){values[key+"Met"]=checked(interview[key]==="met");values[key+"Unmet"]=checked(interview[key]==="unmet")}
+    for(const key of ["eventInw","eventTaiwan","eventInternational","gainOtherSelected","underusedOtherSelected","visitorBarrierOtherSelected","valueOtherSelected","mspUnderstood"])values[key]=checked(interview[key]);
+    for(const key of ["eventCountry","gainOther","underusedOther","visitorBarrierOther","valueOther","chapterVisitorMinimum"])values[key]=text(interview[key]);
+    for(const [group,items] of [["gain",RENEWAL.gains],["underused",RENEWAL.underused],["visitorBarrier",RENEWAL.barriers],["value",RENEWAL.values]])items.forEach((_,i)=>values[group+(i+1)]=checked(interview[group+(i+1)]));
+    for(const [key,selected,list] of [["usageScore",interview.usageScore,[5,4,3,2,1]],["partnerStatus",interview.partnerStatus,[1,2,3,4]],["advocates",interview.advocates,[1,2,3,4]],["culture",interview.culture,[1,2,3,4]],["teamSupport",interview.teamSupport,[1,2,3]],["trust",interview.trust,[1,2,3]]])choices(key,selected,list);
+    for(const choice of ["High","Medium","Low"])values["growth"+choice]=checked(interview.chapterGrowth===choice.toLowerCase());
+    for(const [key] of RENEWAL.commitments)for(const choice of ["willing","uncertain","unwilling"])values[`commit.${key}.${choice}`]=checked(interview["commit_"+key]===choice);
+    for(const [key,count] of Object.entries(RENEWAL.narratives))fillLines(values,key,interview[key],count,38);
+    values.mspUp=chineseDate(interview.mspUp);values.mspDown=chineseDate(interview.mspDown);
+    values.memberSignature=text(interview.memberSignature)||"_______________________";values.interviewerSignatures=[interview.interviewer,interview.companion].map(text).filter(Boolean).join("／")||"____________________";values.signatureDate=chineseDate(interview.signatureDate);
+    return values;
+  }
   function text(value){return String(value??"").trim()}
   function relation(draft,key){return draft[key]==="其他"?text(draft[key+"Other"]):text(draft[key])}
   function dateParts(value){const match=text(value).match(/^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2})?)?$/);return match?match.slice(1):null}
@@ -77,24 +121,6 @@
       values.scoreNote=context.score==null?"":`${context.score}分 ${text(context.light)}`;values.periodNote=text(context.palmsPeriod);
       for(const [key,counts] of Object.entries({goal:[2,2,2,2,2],reality:[3,3,3,3,3],option:[3,3,3,3],forward:[3,3,2,3,2,3]}))counts.forEach((count,i)=>fillLines(values,`${key}_${i}`,draft[`${key}_${i}`],count));
       fillLines(values,"summary",draft.summary,3);
-    }else if(type==="renewal"){
-      values.score=text(context.score);values.light=text(context.light).replace(/燈$/,"");values.trafficPeriod=text(context.trafficPeriod);values.palmsPeriod=text(context.palmsPeriod);
-      for(const [key,radio,answer] of [["given","givenCompare","referralsGivenAnswer"],["received","receivedCompare","referralsReceivedAnswer"],["oneToOne","oneToOneCompare","oneToOneAnswer"]]){
-        const high=draft[`radio:${radio}`]==="high";
-        values[key+"Low"]=draft[`radio:${radio}`]==="low"?"■":"□";values[key+"High"]=high?"■":"□";
-        values[key+"LowAnswer"]=high?"":text(draft[answer]);values[key+"HighAnswer"]=high?text(draft[answer]):"";
-      }
-      values.visitorLow=draft["radio:visitorCompare"]==="low"?"■":"□";values.visitorHigh=draft["radio:visitorCompare"]==="high"?"■":"□";
-      values.visitorsLowAnswer=draft["radio:visitorCompare"]==="high"?"":text(draft.visitorsAnswer);values.visitorsHighAnswer=draft["radio:visitorCompare"]==="high"?"\n"+text(draft.visitorsAnswer):"";
-      for(const [key,source] of [["amountLow","amountCompareLow"],["amountHigh","amountCompareHigh"],["educationLow","educationCompare"],["mspUnderstood","mspUnderstood"],["policyUnderstood","policyUnderstood"]])values[key]=draft[source]===true?"■":"□";
-      values.amountLowAnswer=draft.amountCompareHigh===true&&!draft.amountCompareLow?"":text(draft.referralAmountAnswer);values.amountHighAnswer=draft.amountCompareHigh===true&&!draft.amountCompareLow?text(draft.referralAmountAnswer):"";
-      for(const [key,source] of [["receivedBenefit","receivedBenefit"],["oneToOneBenefit","oneToOneBenefit"],["workshop","workshopWilling"]])for(const [suffix,answer] of [["Yes","yes"],["No","no"]])values[key+suffix]=draft[`radio:${source}`]===answer?"■":"□";
-      for(const key of ["visitorsAnswer","attendanceAnswer","educationAnswer","leadershipAnswer","interviewerOpinion"])values[key]=text(draft[key]);
-      for(const [key,count] of Object.entries({chapterFeelingAnswer:2,bniBenefitAnswer:2,midtermGoalAnswer:2,midtermSummaryAnswer:2,businessSatisfactionAnswer:3,nextActionsAnswer:3,chapterNotes:2,chapterSuggestionAnswer:2,summary:3})){
-        const answer=key==="businessSatisfactionAnswer"?[text(draft.satisfactionScore)?`${text(draft.satisfactionScore)}分`:"",text(draft[key])].filter(Boolean).join("；"):draft[key];
-        fillLines(values,key,answer,count);
-      }
-      values.mspUp=chineseDate(draft.mspUp);values.mspDown=chineseDate(draft.mspDown);
     }else{
       values.departureDate=text(draft.departureDate);values.interviewers=[values.counselor,text(draft.companion)].filter(Boolean).join("／");
       for(const key of ["gains","likes","departureReason","dislikes","improvementAttempts"])values[key]=text(draft[key])||"_".repeat(66);
@@ -107,6 +133,7 @@
   }
   function fields(draft={},applicant="",type="new",context={}){
     templateFor(type);
+    if(["renewal","renewal-assessment"].includes(type))return renewalFields(type,draft,applicant,context);
     const values=["new","industry"].includes(type)?membershipFields(draft,applicant):careFields(type,draft,applicant,context);
     if(context.historicalCopy){
       // Typed names, consent and dates must come from the original saved fields.
@@ -122,8 +149,8 @@
     templateFor(type);
     const day=dateParts(meetingDate);if(!day)throw new Error("請先填寫訪談日期再產生 Word");
     const name=text(applicant).replace(/[\\/:*?"<>|\x00-\x1f]/g,"-");if(!name)throw new Error("請先填寫申請人姓名");
-    const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"363留員計畫-期中輔導",renewal:"363留員計畫-終期輔導",departure:"離會訪談表"}[type];
+    const prefix={new:"高屏區會員成功訪談表暨權利義務確認書-新會員",industry:"高屏區會員成功訪談表暨權利義務確認書-轉換行業別",midterm:"363留員計畫-期中輔導",renewal:"高屏區會員續約訪談表","renewal-assessment":"高屏區續約會員委員會內部評估表",departure:"離會訪談表"}[type];
     return `${prefix}-${name}-${day.join("")}.docx`;
   }
-  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,fields,fileName});
+  return Object.freeze({TEMPLATE,TEMPLATES,templateFor,NARRATIVES,MEMBERSHIP,RENEWAL,fields,fileName});
 });

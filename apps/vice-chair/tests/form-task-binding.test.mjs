@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 
 const read = path => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
 const forms = [
-  { html: "terminal-form.html", base: "assets/js/terminal-form.js", live: "assets/js/terminal-form-live.js", ready: "FulianTerminalFormReady", type: "renewal", form: "terminalForm" },
   { html: "midterm-form.html", base: "assets/js/midterm-form.js", live: "assets/js/midterm-form-live.js", ready: "FulianMidtermFormReady", type: "midterm", form: "midtermForm" },
   { html: "new-member-form.html", base: "assets/js/new-member-form.js", live: "assets/js/new-member-form-live.js", ready: "FulianNewMemberFormReady", type: "new", form: "newMemberForm" },
   { html: "industry-change-form.html", base: "assets/js/industry-change-form.js", live: "assets/js/industry-change-form-live.js", ready: "FulianIndustryChangeFormReady", type: "industry", form: "industryChangeForm" },

@@ -142,6 +142,13 @@
 
   async function loadWord(state) {
     const button = $("#downloadWord");
+    if(state.renewalPackVersion===1){
+      button.textContent="下載會員續約訪談表";
+      const secondary=document.createElement("button");secondary.type="button";secondary.textContent="下載委員會內部評估表";secondary.disabled=!state.renewalDocuments?.["renewal-assessment"];
+      secondary.hidden=state.form?.applicant===session.name;
+      secondary.onclick=async()=>{try{const file=await files.getCaseFile({caseId,indexedDb:indexedDB,documentKind:"renewal-assessment"});if(!file)throw new Error("未取得內部評估附件");const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);}catch(error){toast(error.message)}};
+      button.insertAdjacentElement("afterend",secondary);
+    }
     try {
       const file = await files.getCaseFile({ caseId, indexedDb: indexedDB });
       if (!file) {

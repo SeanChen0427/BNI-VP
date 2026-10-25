@@ -15,6 +15,7 @@ import { loadAttendanceHistory } from "./attendance-history.mjs";
 import { createTrainingCatalogApi } from "../_shared/training-catalog-sync.mjs";
 import { createRenewalFoundationsApi } from "./renewal-foundations.mjs";
 import { createFoundationMeasurements } from "./foundation-measurements.mjs";
+import { createRenewalDocumentSaver, renewalWorkflow, renewalStorageObjects, canReadRenewalAssessment, renewalFingerprintSource } from "../../../apps/vice-chair/services/renewal-documents.mjs";
 import { createInterviewTemplateApi } from "../../../apps/vice-chair/services/interview-template-api.mjs";
 import { createMonthlyAwardsApi } from "../../../apps/vice-chair/services/monthly-awards.mjs";
 import { createPartnerReportsApi } from "../../../apps/vice-chair/services/partner-reports.mjs";
@@ -4121,10 +4122,10 @@ async function tasksApi(request: Request, context: Context) {
       throw Object.assign(new Error("已結案歷史不可刪除；如需補充請使用追加紀錄"), { status: 409 });
     }
     const files = row
-      ? await db(`task_case_files?task_id=eq.${row.id}&select=bucket_id,object_path`)
+      ? await db(`task_case_files?task_id=eq.${row.id}&select=bucket_id,object_path,documents`)
       : [];
     const deletionJobs = row
-      ? await queueStorageDeletionJobs(id, row.id, files || [])
+      ? await queueStorageDeletionJobs(id, row.id, renewalStorageObjects(files || []))
       : [];
     try {
       await db("rpc/edge_delete_task", {
@@ -4365,7 +4366,7 @@ function visibleCaseState(row: any, task: any, assigned: boolean, leadershipRole
   return {
     taskId: task.source_reference,
     workflow,
-    draft: leadershipRole || assigned ? row?.draft || {} : null,
+    draft: leadershipRole || assigned ? (recusedApplicant?{...(row?.draft||{}),renewalAssessment:undefined}:row?.draft||{}) : null,
     revision: Number(row?.revision || 0),
     canReadFile: leadershipRole || assigned || decisionCase,
   };
@@ -5362,6 +5363,10 @@ async function caseStatesApi(request: Request, context: Context) {
   const currentDraft = existing?.draft || {};
   const decisionCase = ["renewal", "new", "industry"].includes(access.task.category);
   const recordOnlyCase = ["midterm", "departure"].includes(access.task.category);
+  const renewalFiles=access.task.category==="renewal"?(await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`))?.[0]:null;
+  const renewalGate=await renewalWorkflow({access,workflow:currentWorkflow,draft:currentDraft,files:renewalFiles,sha256Text});
+  if(access.task.category==="renewal"&&renewalGate.renewalPackVersion===1&&!["draft","workflow","reset"].includes(body.kind)&&!renewalGate.wordSaved)throw Object.assign(new Error("請先保存會員訪談與委員會內部評估兩份文件，再進入回饋"),{status:409});
+
 
   if (["feedback-call-prepare", "feedback-notice", "vote-call-prepare", "vote-notice", "vote-notice-copy", "leaders-sent", "advisor-confirmation", "result-announcement", "result-announcement-copy", "feedback", "vote", "open-vote"].includes(body.kind) && !decisionCase) {
     throw Object.assign(new Error("此案件為訪談紀錄，不適用委員回饋、投票、董顧確認或結果公告"), { status: 409 });
@@ -5528,6 +5533,14 @@ async function caseStatesApi(request: Request, context: Context) {
       throw Object.assign(new Error("只有副主席或本案受指派人員可以保存訪談草稿"), { status: 403 });
     }
     draft = body.value && typeof body.value === "object" ? body.value : {};
+    if(access.task.category==="renewal"&&(renewalGate.renewalPackVersion===1||draft.renewalPackVersion===1)){
+      draft={...draft,renewalPackVersion:1,renewalAssessment:Object.hasOwn(draft,"renewalAssessment")?draft.renewalAssessment:currentDraft.renewalAssessment};
+      const assessmentChanged=renewalFingerprintSource("renewal-assessment",draft)!==renewalFingerprintSource("renewal-assessment",currentDraft);
+      if(assessmentChanged&&!canReadRenewalAssessment(access,context))throw Object.assign(new Error("申請人本人不得填寫內部評估"),{status:403});
+      if(assessmentChanged&&!renewalGate.renewalInterviewSaved)throw Object.assign(new Error("請先保存會員訪談再填寫內部評估"),{status:409});
+      const changed=assessmentChanged||renewalFingerprintSource("renewal-interview",draft)!==renewalFingerprintSource("renewal-interview",currentDraft);
+      if(changed&&(currentWorkflow.feedbackCallId||currentWorkflow.feedbackNotified||globalThis.FulianCaseDomain.hasFeedback(currentWorkflow)||currentWorkflow.votingOpen))throw Object.assign(new Error("已進入回饋或投票的續約填答不可覆寫"),{status:409});
+    }
   } else if (body.kind === "workflow") {
     const proposed = body.value && typeof body.value === "object" ? body.value : {};
     if (access.leadership) {
@@ -5655,6 +5668,11 @@ async function caseStatesApi(request: Request, context: Context) {
     throw new Error("不支援的案件同步類型");
   }
 
+  if(access.task.category==="renewal"){
+    const authoritative=await renewalWorkflow({access,workflow:{...workflow,...(renewalGate.renewalPackVersion===1?{renewalPackVersion:1}:{})},draft,files:renewalFiles,sha256Text});
+    if(renewalGate.renewalPackVersion===1||draft.renewalPackVersion===1)workflow=authoritative;
+  }
+
   if (body.kind === "workflow" && workflow.closed) {
     if (recordOnlyCase) {
       if (!workflow.wordSaved) {
@@ -5721,7 +5739,14 @@ async function taskFileApi(request: Request, url: URL, context: Context) {
   if (!canRead) throw Object.assign(new Error("你沒有權限讀取此案件附件"), { status: 403 });
   if (request.method === "GET") {
     const rows = await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`);
-    const file = rows?.[0];
+    let file = rows?.[0];
+    const documentKind=url.searchParams.get("document")||"";
+    if(documentKind){
+      if(!["renewal-interview","renewal-assessment"].includes(documentKind)||access.task.category!=="renewal")throw Object.assign(new Error("文件類型不正確"),{status:400});
+      if(documentKind==="renewal-assessment"&&!canReadRenewalAssessment(access,context))throw Object.assign(new Error("只有副主席或本案訪談委員可以讀取內部評估"),{status:403});
+      const part=file?.documents?.[documentKind];
+      file=part?{...part,original_filename:part.name}:null;
+    }
     if (!file) throw Object.assign(new Error("此案件尚未保存 Word"), { status: 404 });
     const response = await serviceFetch(`/storage/v1/object/authenticated/case-files/${file.object_path}`);
     return {
@@ -5748,6 +5773,10 @@ async function taskFileApi(request: Request, url: URL, context: Context) {
   }
   const bytes = decodeBase64(String(body.base64 || ""));
   if (!bytes.length || bytes.length > 25 * 1024 * 1024) throw Object.assign(new Error("Word 檔案大小無效"), { status: 413 });
+  const fileRows=await db(`task_case_files?task_id=eq.${access.task.id}&select=*&limit=1`);
+  const stateRows=await db(`task_case_states?task_id=eq.${access.task.id}&select=*&limit=1`);
+  if(body.documentKind)return saveRenewalDocument({access,context,body,bytes,existing:fileRows?.[0],state:stateRows?.[0]});
+  if(access.task.category==="renewal"&&globalThis.FulianCaseDomain.renewalPackRequired(access.task,stateRows?.[0]?.workflow,stateRows?.[0]?.draft))throw Object.assign(new Error("新版續約須由訪談及內部評估兩頁分別保存文件"),{status:409});
   const objectPath = `${access.task.id}/interview.docx`;
   await serviceFetch(`/storage/v1/object/case-files/${objectPath}`, {
     method: "POST",
@@ -5798,7 +5827,7 @@ async function testResetApi(request: Request, context: Context) {
   const [meetings, tasks, files, protectedRegistrations] = await Promise.all([
     db("committee_meetings?select=id"),
     db(`tasks?source=eq.${TASK_SOURCE}&select=id,source_reference,revision`),
-    db("task_case_files?select=task_id,bucket_id,object_path"),
+    db("task_case_files?select=task_id,bucket_id,object_path,documents"),
     db("provisional_members?status=in.(pending_palms,promoted)&select=source_task_id"),
   ]);
   const protectedTaskIds = new Set((protectedRegistrations || []).map((row: any) => row.source_task_id));
@@ -5819,7 +5848,7 @@ async function testResetApi(request: Request, context: Context) {
   const deletionJobs = [];
   for (const task of resettableTasks) {
     const taskFiles = resettableFiles.filter((file: any) => file.task_id === task.id);
-    const queued = await queueStorageDeletionJobs(task.source_reference, task.id, taskFiles);
+    const queued = await queueStorageDeletionJobs(task.source_reference, task.id, renewalStorageObjects(taskFiles));
     try {
       await db("rpc/edge_delete_task", {
         method: "POST",
@@ -6245,6 +6274,7 @@ async function committeeBoardApi(request: Request, context: Context) {
 
 const interviewTemplateApi = createInterviewTemplateApi({ loadTemplate: async (name: string) => (await serviceFetch(`/storage/v1/object/authenticated/form-templates/${name}`)).text() });
 const trainingCatalogApi = createTrainingCatalogApi({ db });
+const saveRenewalDocument=createRenewalDocumentSaver({db,serviceFetch,sha256Text,queueCleanup:async(task,path)=>queueStorageDeletionJobs(task.source_reference,task.id,[{bucket_id:"case-files",object_path:path}]),sha256Bytes:async(bytes)=>Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256",bytes)),byte=>byte.toString(16).padStart(2,"0")).join("")});
 const renewalFoundationsApi = createRenewalFoundationsApi({ db, taskDirectory, taskSource: TASK_SOURCE, measure: createFoundationMeasurements({ reportImports, reportCategory, downloadReport }) });
 
 Deno.serve(async (request) => {

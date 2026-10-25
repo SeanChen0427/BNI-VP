@@ -1,5 +1,5 @@
 (function () {
-  const terminal = location.pathname.endsWith("terminal-form.html");
+  const terminal = location.pathname.endsWith("renewal-assessment.html");
   const domain = window.FulianRenewalFoundationDomain;
   const taskId = new URLSearchParams(location.search).get("task");
   const container = document.getElementById("renewalFoundationPanel");
@@ -33,7 +33,7 @@
       container.querySelector(".summary").hidden = true;
       container.querySelector(".toolbar").hidden = true;
       container.querySelector("h1").textContent = "本次續約地基設定與歷次進度";
-      container.querySelector(".hero p").textContent = "逐項設定起算日、目標及週期；保存後由工作總覽持續追蹤，也會帶入訪談 Word。";
+      container.querySelector(".hero p").textContent = "逐項設定起算日、目標及週期；保存後由工作總覽持續追蹤；地基追蹤保留在系統內，不另加到中心區公版。";
       for (const dialog of template.querySelectorAll("dialog")) {
         const copy = document.importNode(dialog, true); copy.classList.add("foundation-modal"); document.body.append(copy);
       }

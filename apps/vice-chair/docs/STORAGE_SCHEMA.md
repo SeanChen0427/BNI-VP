@@ -42,7 +42,7 @@
 - Database：`fulian-case-files`
 - Object store：`files`
 - Key：案件 ID
-- Value：訪談 Word `File`
+- Value：訪談 Word `File`；新版續約使用 `{caseId}:renewal-interview` 及 `{caseId}:renewal-assessment` 分別備援。
 - 唯一讀寫服務：`services/case-files.js`
 - 正式附件會先保存到 Private Storage `case-files`；IndexedDB 只作目前電腦的下載備援。
 
@@ -111,7 +111,7 @@
 - `renewal_foundation_events`：伺服器保存操作者、時間、提醒／確認內容及變更前後快照。只新增，不允許瀏覽器直讀直寫。
 - `edge_save_renewal_foundation`：service-role-only 交易，原子檢查版本、寫入狀態及追加事件，防止並行覆蓋與部分成功。
 - 來賓進度由分析核心依 Private Storage 正式報表即時計算，不把畫面數字或會員提供的估算寫成正式 PALMS。
-- `committee_meetings.care_summary.foundationSnapshot`：保存當次月會需要跟進的必要進度；由後端建立，已結案不跟隨新報表改寫。訪談草稿的 `renewalFoundationSnapshot` 與正式 Word 保留該次訪談文字快照。
+- `committee_meetings.care_summary.foundationSnapshot`：保存當次月會需要跟進的必要進度；由後端建立，已結案不跟隨新報表改寫。訪談草稿的 `renewalFoundationSnapshot` 保留該次內部追蹤快照，不另加入中心區公版 Word。
 
 規格見 [續約地基追蹤](renewal-foundation-tracking.md)。
 
@@ -124,3 +124,11 @@
 - 每日台北 06:00 由專用 `training-catalog-cron` 執行，不使用 LINE Bot。詳細契約與復原索引見 [培訓課程庫](training-catalog.md)。
 
 新會員／續約訪談的 `task_case_states.draft.trainingSelections` 以既有日期欄位 ID 為鍵，值為官方場次 `{id,title,start_at,end_at,category}` 快照；與原日期值一起透過既有案件權限同步。舊草稿可無此欄位，改期不自動改寫草稿，詳見 [培訓課程庫](training-catalog.md)。
+
+## 續約雙文件（2026-10-25）
+
+同案 `task_case_states.draft.renewalInterview` 與 `.renewalAssessment` 分別保存會員訪談及委員內部評估，`renewalPackVersion=1` 標記新版。`task_case_files.documents` 為服務端專用 JSONB 索引，鍵 `renewal-interview`／`renewal-assessment`，各有獨立物件路徑、名稱、大小、SHA-256、填答指紋及保存時間；評估另綁定訪談檔及訪談指紋。原主檔指標始終指向會員訪談。
+
+`services/renewal-documents.mjs` 檢查指派／本人迴避、指定模板、兩份文件關聯與並行寫入。`core/case-domain.js` 決定待內部評估／回饋階段；`services/case-files.js` 仍為前端保存與推進唯一入口。文件上傳成功但索引失敗會清理本次新物件，不標記完成。重新產檔的先前版本索引保留在私密 `documents._history`；刪除案件先將主檔、兩份索引及保留版本去重排入既有儲存清理工作。新檔索引失敗時若即時清理也失敗，則排入清理重試並回報，不靜默忽略。
+
+本次只新增 `documents` 欄位，不重放歷史 migration，不修改來源角色 guard、計分或會員業務資料。

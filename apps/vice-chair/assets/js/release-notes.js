@@ -1,6 +1,13 @@
 (() => {
   const RELEASES = Object.freeze([
     Object.freeze({
+      version: "1.9.0", publishedAt: "2026-10-25", title: "續約改用兩份中心區新版公版", level: "important",
+      audience: "副主席、會員委員",
+      changes: Object.freeze(["同一續約案件先完成會員續約訪談，再到獨立頁面填寫委員會內部評估。", "兩份 V1.1 Word 各自保存及下載，兩份都保存完成才進入委員回饋。"]),
+      howTo: "重新整理後開啟續約案件。與會員完成訪談並保存第一份 Word，結束共同訪談後按「前往內部評估」，保存第二份後進入回饋。",
+      impact: "舊版停止新填寫及新產檔；已保存舊案沿用原件與既有流程。修改新版訪談後，需重新保存對應的內部評估。"
+    }),
+    Object.freeze({
       version: "1.8.16", publishedAt: "2026-10-25", title: "全面更新中心區會員訪談公版 V1.1", level: "important",
       audience: "副主席、會員委員",
       changes: Object.freeze(["新會員與轉換行業別改用最新中心區 V1.1 公版，完整填寫 A～F 區與獨立的會員制度與權益確認書。", "新增公司團隊人數、事業願景、多選題與商務名單關係；MSP 依新版填入兩組上／下課程日期。"]),

@@ -294,25 +294,15 @@
       ]
     }),
 
-    "page:terminal-form":page({
-      key:"terminal-form",version:"1.0.2",
-      name:"終期輔導（續約）",
-      title:"將數據、經驗與續約承諾整理成完整訪談",
-      vp:"結合續約次數、燈號、PALMS、訓練與未來承諾；完成 Word 後回案件進行回饋與投票。",
-      steps:[
-        s("progress","表單導覽",'[data-guide-id="form.progress-panel"]',"進度、區段與草稿","完整側欄會顯示百分比、區段選單與輸出原則；可快速跳轉，但自動保存不代表續約已完成。"),
-        s("basic","基本資料","#basic","會員、輔導人員與續約次數","核對會員、專業、日期、主訪、陪訪及本次續約次數。"),
-        s("snapshot","數據快照","#snapshot","分數、燈號與資料期間","先核對快照期間，再將數據作為對話依據，而不是直接結論。"),
-        s("upload","數據快照","#renewalDataUpload","補上續約資料檔","只在快照不足時上傳本案正確檔案，避免帶入無關敏感資料。"),
-        s("palms","表現解讀","#palms","逐項討論 PALMS","記錄會員觀點與原因；系統不會依此自動決定續約。"),
-        s("experience","會員經驗","#experience","價值、挑戰與調整","區分會員原話與輔導者觀察，整理未來調整。"),
-        s("agreement","續約承諾","#agreement","MSP、計畫與原則","確認訓練要求、日期、摘要與政策理解；外部連結不代為報名。"),
-        s("foundations","續約地基","#renewalFoundationPanel","把本次約定設定成持續追蹤的地基","副主席在此逐項設定指標、期間、目標與追蹤人；同會員可有多項。先核對先前地基，再新增本次約定。續約訪談結案後，地基仍在首頁與追蹤頁持續列管。"),
-        s("signatures","續約承諾","#agreement","簽名、訪談者意見與權責確認","這張完整確認卡包含簽名、訪談者意見與權責理解；只由實際參與者確認，不代填姓名或政策勾選。"),
-        s("reset","表單動作","#resetDraft","清除未完成草稿","只清除目前未完成輸入，不是重算數據或倒退正式階段。"),
-        s("download","表單動作","#downloadWord","完成訪談並產生 Word","保存正式附件並推進到委員回饋；不代表續約已通過。",{fact:note("下一步","回案件工作區進行回饋與投票。")})
-      ]
-    }),
+    "page:terminal-form":page({key:"terminal-form",version:"1.1.0",name:"會員續約訪談",title:"與會員完成年度回顧及下一年度藍圖",vp:"同一案件先保存會員訪談，再到內部評估；兩份文件分開下載。",steps:[
+      s("progress","流程",'[data-guide-id="form.progress-panel"]',"會員訪談、內部評估、委員回饋","兩份 Word 都保存後才進入回饋。"),
+      s("questions","訪談","#formSections","依新版公版完成會員訪談","先確認續約週期與正式 PALMS，再完成 20 題。收到的引薦金額由會員確認。"),
+      s("signatures","簽名","#formSections","簽名與日期按實際填寫","姓名與承諾不會自動代填；可下載後親簽。"),
+      s("download","保存","#downloadWord","保存第一份 Word","完成後結束共同訪談，再由委員進入內部評估。")]}),
+    "page:renewal-assessment":page({key:"renewal-assessment",version:"1.0.0",name:"委員會內部評估",title:"在同一續約案件完成內部評估",vp:"會員共同訪談結束後，由受指派委員填寫；申請人本人須迴避。",steps:[
+      s("assessment","內部評估","#formSections","五項評等與續約建議","有條件續約需填寫改善方向、陪跑夥伴及 90 天目標。此為委員建議，仍依原回饋投票流程決議。"),
+      s("foundations","系統追蹤","#renewalFoundationPanel","續約地基","地基留在系統追蹤，不加到中心區公版。"),
+      s("download","保存","#downloadWord","保存第二份 Word","會員訪談與內部評估分開下載，再進入委員回饋。")]}),
 
     "page:departure-form":page({
       key:"departure-form",

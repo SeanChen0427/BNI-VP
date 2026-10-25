@@ -1,6 +1,6 @@
 {
   "schema": "fulian.project-manifest.v1",
-  "updated": "2026-09-11",
+  "updated": "2026-10-25",
   "product": "富聯分會會員委員會工作台",
   "runtime": {
     "type": "multi-page vanilla HTML/CSS/JavaScript application",
@@ -72,7 +72,9 @@
     "renewalFoundationTracking": "core/renewal-foundation-domain.js",
     "partnerDirectoryView": "core/partner-directory-domain.js",
     "partnerMonthlyReports": "services/partner-reports.mjs",
-    "partnerDirectoryExport": "core/partner-export-domain.js"
+    "partnerDirectoryExport": "core/partner-export-domain.js",
+    "renewalDocumentIntegrity": "services/renewal-documents.mjs",
+    "renewalTwoPageForm": "assets/js/renewal-form.js"
   },
   "pages": {
     "index.html": "工作總覽、待辦、公告、通知、AI 助手",

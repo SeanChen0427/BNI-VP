@@ -13,7 +13,7 @@ const base={task:{type:'new',member:'範例',completed:true},state:{closed:true,
 test('五類已保存舊檔即可提供按鈕；新公版不依日期或檔名判斷',async()=>{
  for(const type of ['new','industry','midterm','renewal','departure']){
   const options={...base,task:{...base.task,type}};
-  assert.equal(await copy.eligible(options),true);
+  assert.equal(await copy.eligible(options),type!=='renewal');
   const file=templates.zipParts({'word/document.xml':new Uint8Array()}, {format:'fulian.regional-template.v1',templateId:domain.templateFor(type).id});
   assert.equal(await copy.eligible({...options,file}),false);
  }
@@ -40,10 +40,9 @@ test('歷史簽名不以會員名或登入者補填，明確填答與承諾仍�
  assert.equal(explicit.interviewerSignatures,'保存姓名');assert.equal(explicit.applicantSignature,'已填姓名');
 });
 test('只採同會員歷史 PALMS 快照；期中未保存分數留白，沒有即時資料請求',()=>{
- const options={...base,task:{...base.task,type:'renewal'},draft:{member:'範例',summary:'當時的總結',meetingDate:'2026-09-14',renewalRuleVersion:2,renewalMetricsSnapshot:{member:{name:'範例',metrics:{givenIn:3,givenOut:7}},averages:{amount:10},period:{start:'2025-09',end:'2026-08'}}}};
- let p=copy.prepare(options),v=domain.fields(p.draft,p.applicant,p.type,p.context);
- assert.equal(v['metric.given'],'10');assert.equal(v.score,'');assert.match(v.palmsPeriod,/2025-09 至 2026-08/);
- options.draft.renewalMetricsSnapshot.member.name='其他人';p=copy.prepare(options);assert.equal(p.context.metrics,undefined);
+ const options={...base,task:{...base.task,type:'renewal'},draft:{...base.draft,member:'範例',summary:'當時的總結'}};
+ assert.throws(()=>copy.prepare(options),/拆成兩份文件/);
+ let p,v;
  p=copy.prepare({...options,task:{...options.task,type:'midterm'}});v=domain.fields(p.draft,p.applicant,p.type,p.context);
  assert.equal(v.scoreNote,'');assert.equal(v['metric.given'],'');assert.match(v.memberSignature,/^_+$/);assert.equal(v.signatureDate,'');
 });
@@ -90,6 +89,6 @@ test('投票中的副本保持回饋票數與原檔；共用面板在點擊時�
   const html=await readFile(new URL(`../${page}.html`,import.meta.url),'utf8');
   assert.match(html,/id="templateCopyPanel"[^>]*hidden/);
   assert.match(html,/template-copy-panel.js/);
-  assert.match(html,/archive-template-copy.js\?v=2/);
+  assert.match(html,/archive-template-copy.js\?v=3/);
  }
 });

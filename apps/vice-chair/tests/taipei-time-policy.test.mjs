@@ -31,14 +31,14 @@ test("分析與本機預覽的預設作業日都取台北日期",async()=>{
 
 test("使用台北日期工具的頁面都先載入共用日曆核心",async()=>{
   const pages={
-    "../index.html":"assets/js/work-planner.js?v=13",
+    "../index.html":"assets/js/work-planner.js?v=14",
     "../member-care.html":"assets/js/member-care.js?v=9",
-    "../case-workflow.html":"assets/js/case-workflow.js?v=33",
+    "../case-workflow.html":"assets/js/case-workflow.js?v=34",
     "../analysis-review.html":"assets/js/analysis-review.js?v=12",
-    "../terminal-form.html":"assets/js/terminal-form.js?v=14",
+    "../terminal-form.html":"assets/js/renewal-form.js?v=1",
     "../monthly-meeting.html":"assets/js/monthly-meeting.js?v=20",
     "../attendance.html":"assets/js/attendance.js?v=13",
-    "../case-board.html":"assets/js/case-board.js?v=16",
+    "../case-board.html":"assets/js/case-board.js?v=17",
     "../new-member-form.html":"assets/js/new-member-form.js?v=12",
     "../industry-change-form.html":"assets/js/industry-change-form.js?v=10",
     "../departure-form.html":"assets/js/departure-form.js?v=7",
@@ -64,7 +64,7 @@ test("主要日期輸入頁不再用裝置時區偏移技巧產生預設值",asy
     "../assets/js/industry-change-form.js",
     "../assets/js/departure-form.js",
     "../assets/js/midterm-form.js",
-    "../assets/js/terminal-form.js"
+    "../assets/js/renewal-form.js"
   ];
   for(const script of scripts){
     const source=await read(script);

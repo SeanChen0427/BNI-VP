@@ -1,0 +1,104 @@
+main{
+  max-width:1120px;
+  margin:auto;
+  padding:28px 22px}
+.renewal-steps{
+  display:flex;
+  gap:16px;
+  align-items:center;
+  flex-wrap:wrap;
+  padding:20px;
+  margin-bottom:24px;
+  background:#fff;
+  border-radius:14px}
+.renewal-steps a{
+  color:#a91419;
+  font-weight:700}
+.renewal-steps a[aria-disabled=true]{
+  color:#777;
+  pointer-events:none}
+.form-card{
+  margin-bottom:24px}
+.renewal-options{
+  display:flex;
+  gap:14px;
+  flex-wrap:wrap;
+  margin:14px 0}
+.renewal-options label{
+  display:flex;
+  gap:8px;
+  align-items:center;
+  padding:10px 12px;
+  background:#f8f8f8;
+  border-radius:8px}
+.renewal-options input{
+  width:18px;
+  height:18px;
+  accent-color:#a91419}
+.renewal-question{
+  padding:24px 0;
+  border-top:1px solid #eee}
+.renewal-question h3{
+  font-size:18px;
+  line-height:1.7}
+.renewal-question textarea{
+  width:100%;
+  box-sizing:border-box}
+.renewal-metrics{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px}
+.renewal-metric{
+  padding:16px;
+  border:1px solid #eee;
+  border-radius:10px}
+.renewal-metric strong{
+  display:block;
+  font-size:22px;
+  margin:8px 0}
+.renewal-note{
+  color:#666;
+  line-height:1.8}
+.renewal-commit{
+  display:grid;
+  grid-template-columns:1fr 2fr;
+  gap:12px;
+  border-bottom:1px solid #eee;
+  align-items:center}
+.renewal-downloads{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  margin:18px 0}
+.renewal-downloads button,.renewal-next{
+  display:inline-block;
+  padding:12px 18px;
+  border-radius:8px;
+  border:1px solid #a91419;
+  background:white;
+  color:#a91419;
+  text-decoration:none;
+  cursor:pointer}
+.renewal-next{
+  background:#a91419;
+  color:white}
+fieldset[disabled]{
+  opacity:.7}
+#loadError{
+  color:#a91419}
+#savedDocuments h2{
+  margin-top:0}
+@media(max-width:650px){
+  .renewal-metrics{
+  grid-template-columns:1fr}
+.renewal-commit{
+  grid-template-columns:1fr}
+.renewal-steps{
+  gap:8px;
+  font-size:13px}
+.actions{
+  flex-wrap:wrap}
+.topbar{
+  flex-wrap:wrap;
+  gap:12px}
+}

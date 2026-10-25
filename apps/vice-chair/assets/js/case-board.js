@@ -21,11 +21,12 @@
     departure: { label: "離會訪談", icon: "離", form: "departure-form.html", flow: false },
     special: { label: "特定關懷", icon: "關", form: "member-care.html" }
   };
-  const stages = ["active", "waiting", "interview", "feedback", "vote", "advisor", "closed"];
+  const stages = ["active", "waiting", "interview", "assessment", "feedback", "vote", "advisor", "closed"];
   const labels = {
     active: "全部工作中",
     waiting: "待安排訪談",
     interview: "訪談進行中",
+    assessment: "待內部評估",
     feedback: "待回饋",
     vote: "投票中",
     advisor: "待董顧",
@@ -87,6 +88,7 @@
     }
     if (stage === "vote") return `投票中・已投 ${domain.voteCount(state)} 票`;
     if (stage === "feedback") return `回饋中・已收 ${Object.values(state?.feedback || {}).filter(value => String(value).trim()).length} 份`;
+    if (stage === "assessment") return "會員訪談已保存・待委員會內部評估";
     if (stage === "interview") return "訪談草稿進行中";
     return "尚未開始訪談";
   }
@@ -157,7 +159,7 @@
     const type = typeMap[task.type] || typeMap.special;
     const deadline = due(task);
     const people = [task.lead, ...(task.companions || [])].filter(Boolean);
-    const form = `${type.form}?task=${encodeURIComponent(task.id)}`;
+    const form = `${stage === "assessment" ? "renewal-assessment.html" : type.form}?task=${encodeURIComponent(task.id)}`;
     const flow = `case-workflow.html?case=${encodeURIComponent(task.id)}`;
     const feedbackStarted = type.flow && Boolean(
       state?.wordSaved || state?.feedbackNotified || domain.hasFeedback(state)
@@ -178,7 +180,7 @@
         }</span>`
       : "";
     const formAction = stage !== "closed" && !task.handoverPending
-      ? `<a href="${form}">${stage === "waiting" || stage === "interview" ? (hasDraft(task) ? "繼續填寫" : "開啟訪談") : "查看訪談表"}</a>`
+      ? `<a href="${form}">${stage === "assessment" ? "填寫內部評估" : stage === "waiting" || stage === "interview" ? (hasDraft(task) ? "繼續填寫" : "開啟訪談") : "查看訪談表"}</a>`
       : "";
     const archiveAction = stage === "closed" && canViewArchive
       ? `<a class="main" href="case-archive.html?case=${encodeURIComponent(task.id)}">查看結案資料</a>`

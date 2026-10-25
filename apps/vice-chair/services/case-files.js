@@ -10,9 +10,13 @@
   const DATABASE_NAME = "fulian-case-files";
   const STORE_NAME = "files";
 
-  function workflowAfterWord(existing, fileName, sourceLabel, timeLabel, completedAt = "", {closeWithoutDecision = false} = {}) {
+  function workflowAfterWord(existing, fileName, sourceLabel, timeLabel, completedAt = "", {closeWithoutDecision = false, documentKind = "", documents = null} = {}) {
     const state = existing && typeof existing === "object" ? existing : {};
     const log = Array.isArray(state.log) ? state.log : [];
+    if(documentKind){
+      const docs=documents||{},ready=globalThis.FulianCaseDomain.renewalDocumentsReady(docs);
+      return {...state,renewalPackVersion:1,renewalDocuments:docs,renewalInterviewSaved:Boolean(docs["renewal-interview"]),renewalAssessmentSaved:ready,wordSaved:ready,wordReal:Boolean(docs["renewal-interview"]),wordName:docs["renewal-interview"]?.name||state.wordName||"",interviewCompletedAt:documentKind==="renewal-interview"?(completedAt||state.interviewCompletedAt||""):state.interviewCompletedAt||"",renewalAssessmentCompletedAt:ready?(completedAt||""):"",log:[{text:`${documentKind==="renewal-interview"?"續約會員訪談":"委員會內部評估"} Word 已保存：${fileName}`,time:timeLabel,done:true},...log].slice(0,20)};
+    }
     return {
       ...state,
       wordSaved: true,
@@ -62,13 +66,14 @@
     return new Blob([bytes], { type });
   }
 
-  async function uploadPrivateWord(caseId, file) {
+  async function uploadPrivateWord(caseId, file, documentKind="") {
     if (typeof fetch !== "function" || typeof window === "undefined") return null;
     const response = await fetch("/api/task-file", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         taskId: caseId,
+        ...(documentKind?{documentKind}:{}),
         filename: file.name,
         type: file.type,
         base64: await blobBase64(file),
@@ -86,6 +91,7 @@
     fileName,
     sourceLabel,
     caseType = "",
+    documentKind = "",
     domain,
     storage,
     indexedDb,
@@ -105,7 +111,7 @@
     try {
       await new Promise((resolve, reject) => {
         const transaction = database.transaction(STORE_NAME, "readwrite");
-        transaction.objectStore(STORE_NAME).put(file, caseId);
+        transaction.objectStore(STORE_NAME).put(file, documentKind?`${caseId}:${documentKind}`:caseId);
         transaction.oncomplete = resolve;
         transaction.onerror = () => reject(transaction.error);
       });
@@ -113,7 +119,8 @@
       database.close();
     }
 
-    await uploadPrivateWord(caseId, file);
+    const uploaded = await uploadPrivateWord(caseId, file, documentKind);
+    if(documentKind&&!uploaded?.documents)throw new Error("雙文件保存服務尚未就緒，案件未進入回饋");
     const workflowKey = domain.workflowStorageKey(caseId);
     const existing = domain.parseJson(storage.getItem(workflowKey), {});
     const closeWithoutDecision =
@@ -126,7 +133,7 @@
       sourceLabel,
       now.toLocaleString("zh-TW",{timeZone:"Asia/Taipei"}),
       now.toISOString(),
-      { closeWithoutDecision }
+      { closeWithoutDecision, documentKind, documents:uploaded?.documents }
     );
     storage.setItem(workflowKey, JSON.stringify(state));
     if (typeof window !== "undefined") {
@@ -141,11 +148,11 @@
     return state;
   }
 
-  async function getCaseFile({caseId, indexedDb}) {
+  async function getCaseFile({caseId, indexedDb, documentKind=""}) {
     if (!caseId) throw new Error("缺少案件編號");
     if (typeof fetch === "function" && typeof window !== "undefined") {
       try {
-        const response = await fetch(`/api/task-file?task=${encodeURIComponent(caseId)}`, { cache: "no-store" });
+        const response = await fetch(`/api/task-file?task=${encodeURIComponent(caseId)}${documentKind?`&document=${encodeURIComponent(documentKind)}`:""}`, { cache: "no-store" });
         const data = await response.json().catch(() => ({}));
         if (response.ok && data.base64) {
           return new File(
@@ -154,19 +161,20 @@
             { type: data.type }
           );
         }
-        if (response.status !== 404) throw new Error(data.message || `Word 下載失敗：HTTP ${response.status}`);
+        if (response.status !== 404 || documentKind==="renewal-assessment") {const error=new Error(data.message || `Word 下載失敗：HTTP ${response.status}`);error.status=response.status;throw error;}
       } catch (error) {
-        if (!indexedDb) throw error;
+        if (!indexedDb || documentKind==="renewal-assessment" || [401,403].includes(error.status)) throw error;
         console.warn("Supabase Word 載入失敗，改讀本機備援", error);
       }
     }
+    const localKey=documentKind?`${caseId}:${documentKind}`:(typeof window!=="undefined"&&globalThis.FulianCaseDomain.readWorkflow(localStorage,caseId)?.renewalPackVersion===1?`${caseId}:renewal-interview`:caseId);
     const database = await openDatabase(indexedDb);
     try {
       return await new Promise((resolve, reject) => {
         const request = database
           .transaction(STORE_NAME, "readonly")
           .objectStore(STORE_NAME)
-          .get(caseId);
+          .get(localKey);
         request.onsuccess = () => resolve(request.result || null);
         request.onerror = () => reject(request.error);
       });

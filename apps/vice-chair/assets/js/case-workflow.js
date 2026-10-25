@@ -483,6 +483,17 @@ function renderResult(){
   if(state.closed&&!$("#closeSection .closed-banner"))$("#closeSection").innerHTML=`<div class="closed-banner">案件已結案存檔・${$("#caseId").textContent}</div>`;
 }
 
+function renderRenewalDownloads(){
+  const pack=sourceTask?.type==="renewal"&&caseDomain.renewalPackRequired(sourceTask,state,caseDomain.readDraft(localStorage,sourceTask)||{});
+  $("#wordFile").closest("label").hidden=pack;
+  let panel=$("#renewalDocumentDownloads");if(!panel){panel=document.createElement("div");panel.id="renewalDocumentDownloads";$("#downloadWord").insertAdjacentElement("afterend",panel);}
+  panel.replaceChildren();if(!pack)return;
+  $("#downloadWord").textContent="下載會員續約訪談表";
+  const allowed=["vp","admin"].includes(authSession.role)||caseDomain.isAssignedTo(sourceTask,authSession.name);
+  if(allowed&&sourceTask.member!==authSession.name&&state.renewalDocuments?.["renewal-assessment"]){const b=document.createElement("button");b.type="button";b.textContent="下載委員會內部評估表";b.onclick=async()=>{try{const file=await window.FulianCaseFiles.getCaseFile({caseId:CASE_ID,documentKind:"renewal-assessment",indexedDb:indexedDB});if(!file)throw new Error("尚無已保存的內部評估表");const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=file.name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1500);}catch(error){toast(error.message)}};panel.append(b);}
+  if(!state.wordSaved){const a=document.createElement("a");a.href=`${state.renewalInterviewSaved?"renewal-assessment.html":"terminal-form.html"}?task=${encodeURIComponent(CASE_ID)}`;a.textContent=state.renewalInterviewSaved?"繼續填寫內部評估 →":"繼續會員續約訪談 →";panel.append(a);}
+}
+
 function renderSummary(){
   const type=config();
   $("#caseId").textContent=CASE_ID==="standalone"?`${type.prefix}-未編號`:CASE_ID;
@@ -491,7 +502,8 @@ function renderSummary(){
   $("#summaryQuorum").textContent=`${threshold()} 人`;
   $("#recusedMember").value=recusedApplicant()||"無須迴避";
   $("#wordName").textContent=state.wordName||"尚未保存 Word";
-  $("#wordStatus").textContent=state.wordReal?"檔案已保存於此瀏覽器，可下載確認":"尚未保存訪談 Word";
+  $("#wordStatus").textContent=state.renewalPackVersion===1?(state.wordSaved?"兩份續約文件已保存，可分別下載":"續約須分別保存會員訪談及內部評估，再進入回饋"):state.wordReal?"檔案已保存，可下載確認":"尚未保存訪談 Word";
+  renderRenewalDownloads();
   $("#downloadWord").disabled=!state.wordReal;
   $("#caseType").disabled=true;
   $("#applicant").readOnly=true;

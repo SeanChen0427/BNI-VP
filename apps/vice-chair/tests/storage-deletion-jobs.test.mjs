@@ -17,7 +17,7 @@ test("案件刪除先建立附件清理工作，刪檔失敗不再靜默忽略",
   assert.match(migration, /create table public\.storage_deletion_jobs/);
   assert.match(migration, /status in \('pending', 'deleted', 'failed'\)/);
   assert.match(migration, /unique \(bucket_id, object_path\)/);
-  assert.match(deleteSection, /queueStorageDeletionJobs\(id, row\.id, files/);
+  assert.match(deleteSection, /queueStorageDeletionJobs\(id, row\.id, renewalStorageObjects\(files/);
   assert.match(deleteSection, /rpc\/edge_delete_task/);
   assert.match(deleteSection, /performStorageDeletionJobs/);
   assert.ok(

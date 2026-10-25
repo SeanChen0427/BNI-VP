@@ -12,37 +12,44 @@
 |---|---|---|---|
 | 新會員、轉換行業別 | `kp-membership-v1.1-20261012` | 高屏區會員成功訪談表暨權利義務確認書V.1.1_20261012.doc | V1.1／20261012 |
 | 期中關懷 | `kp-midterm-v4-20241121` | 363留員計畫-期中輔導(GROW)V.4(20241121) (2).docx | V.4／20241126 |
-| 續約 | `kp-renewal-v2-20251114` | 363留員計畫-終期輔導V.2(20251114).docx | V1.3／20251114 |
+| 續約會員訪談 | `kp-renewal-interview-v1.1-20261012` | 高屏區會員續約訪談表V.1.1_20261012.doc | V1.1／20261012 |
+| 續約內部評估 | `kp-renewal-assessment-v1.1-20261012` | 高屏區續約會員委員會內部評估表V.1.1_20261012.doc | V1.1／20261012 |
 | 離會 | `kp-departure-v2.1-20230428` | 離會訪談表2.1版(20230428).docx | V.2.1 |
 
 檔名與頁首差異保留原文。收到新版時重新核對、轉換、渲染及更新來源雜湊，不能僅改版本標籤。會員已填寫的個案檔案不能充當空白模板。
 
+## 續約雙附件保存
+
+同一 `task_case_files` 列的 `documents` 保存 `renewal-interview` 與 `renewal-assessment` 兩個私密物件描述；第一份沿用主附件下載入口，第二份使用 `GET /api/task-file?task=...&document=renewal-assessment`。保存時傳入 `documentKind`，兩份各有獨立檔名、物件路徑、檔案雜湊與填答指紋。內部評估另外綁定訪談檔及其填答指紋，任一填答變更需重新保存對應文件。
+
+第一份檔名 `高屏區會員續約訪談表-{姓名}-{訪談日YYYYMMDD}.docx`；第二份檔名 `高屏區續約會員委員會內部評估表-{姓名}-{評估日YYYYMMDD}.docx`。儲存索引失敗不推進階段；兩份完整才設 `wordSaved`。已進入回饋呼喚便鎖定填答與附件，避免回饋引用不同版本。申請人本人及未受指派者不可取得內部評估。
+
 ## 匯出契約
 
-- `core/interview-template-domain.js` 是五種模板版本、來源雜湊、欄位映射及檔名的唯一來源。
+- `core/interview-template-domain.js` 是六種文件用途／五份模板版本、來源雜湊、欄位映射及檔名的唯一來源。
 - `services/interview-template.js` 只替換 Word 原文件內的指定欄位，其餘 OOXML 部件逐位元保留；不再使用 `new Document` 重建版面。
-- 字型、頁面尺寸、表格、Logo、題目、題號與政策原文沿用來源。現行 V1.1 會員表沿用來源原有沿文流表格及最小列高；期中 GROW 的跨頁浮動表格改成沿文流排版，避免填答被裁切。續約則保留同一簽名表格的連續性並縮小結尾無內容的段落，避免簽名區被拆散或產生空白尾頁。這些是渲染相容性修正，不另設版型。
+- 字型、頁面尺寸、表格、Logo、題目、題號與政策原文沿用來源。現行 V1.1 會員表沿用來源原有沿文流表格及最小列高；期中 GROW 的跨頁浮動表格改成沿文流排版，避免填答被裁切。新版續約為跨頁保留頁首標題所需空間，並保留簽名與日期段落的連續性；內部評估的原浮動表格改為沿文流，避免長答案跨頁時與頁首重疊。這些是渲染相容性修正，不另設版型。
 - 長答案可延展原欄位與頁數；不得截字、縮字或自動摘要。公版空白頁數不是填答後頁數上限。
 - 新會員檔名：`高屏區會員成功訪談表暨權利義務確認書-新會員-{姓名}-{訪談日YYYYMMDD}.docx`；其他類型沿用表單名稱並採相同姓名／訪談日規則。缺姓名或訪談日期停止輸出。
-- 申請人／會員及已知主陪訪姓名填入原簽名欄；未知主席／副主席／董顧不猜測、不偽造簽名。
-- 只填原公版有對應的資料。內部提示、續約地基追蹤快照、離會改善摘要與確認作業繼續保存於案件草稿，不新增到正式 Word。續約原公版第 18 題仍輸出使用者填寫的分會地基備註；V1.1 會員表沒有分會備註欄，該內容只留在系統內部。
+- 新版續約的簽名姓名及日期只依實際填寫，不以登入或受指派姓名代填；可留空下載後親簽。其他未提供簽署人亦不猜測或偽造。
+- 只填原公版有對應的資料。內部提示、續約地基追蹤快照、離會改善摘要與確認作業繼續保存於案件草稿，不新增到正式 Word。新版續約第 18 題為會員希望團隊如何支持，不再輸出舊版地基備註；V1.1 會員表沒有分會備註欄，該內容只留在系統內部。
 - 模板讀取、版本或欄位對應出錯時停止產檔；沒有 Word 不能呼叫 `saveGeneratedWord` 或推進案件。成功產檔後仍由既有附件服務保存並推進階段。
 
 ## 私密儲存與 API
 
-本機預設：`~/Library/Application Support/Fulian VP System/form-templates/`，可用 `FULIAN_FORM_TEMPLATE_DIR` 指向隔離測試目錄。四份原始空白文件存於其 `originals/` 子目錄。JSON 模板及原檔不得進 repository 或 GitHub Pages。
+本機預設：`~/Library/Application Support/Fulian VP System/form-templates/`，可用 `FULIAN_FORM_TEMPLATE_DIR` 指向隔離測試目錄。所有原始空白文件存於其 `originals/` 子目錄。JSON 模板及原檔不得進 repository 或 GitHub Pages。
 
-`GET /api/interview-template?type=new|industry|midterm|renewal|departure` 只允許已登入的 admin、vp、committee。路徑由白名單模板 ID 產生，不接受任意檔案路徑；前後端均核對 SHA-256。正式 Edge API 使用 Auth context；本機沿用既有 localhost 限制與 identity 檢查，不提供公開隧道。
+`GET /api/interview-template?type=new|industry|midterm|renewal|renewal-assessment|departure` 只允許已登入的 admin、vp、committee。路徑由白名單模板 ID 產生，不接受任意檔案路徑；前後端均核對 SHA-256。正式 Edge API 使用 Auth context；本機沿用既有 localhost 限制與 identity 檢查，不提供公開隧道。
 
 正式部署使用 `form-templates` 私密 bucket，物件名為 `{templateId}.json`，不提供 authenticated 的直接 Storage 讀寫 policy；只由驗證登入後的 Edge API 透過服務端連線讀取。`supabase/migrations/20260918090000_private_form_templates.sql` 已於此次發布套用並記錄版本。
 
 ## 更新與部署順序
 
 1. 取得 Sean 指定新版空白原檔，保存來源與 SHA-256，核對所有頁面。原始 DOC 先以已驗證轉換方式轉成 DOCX，不用已填案例反推。
-2. 執行根目錄 `scripts/prepare-membership-v11-template.py`（現行會員表；舊 prepare-interview-template.py 只保留歷史工具）或 `scripts/prepare-care-templates.py`（其他三份）產生專案外模板；工具拒絕未知來源雜湊與 repository 內輸出位置。
+2. 執行根目錄 `scripts/prepare-membership-v11-template.py`（現行會員表；舊 prepare-interview-template.py 只保留歷史工具）或 `scripts/prepare-care-templates.py`（期中／離會歷史工具）；新版續約兩份使用 `scripts/prepare-renewal-v11-templates.py`產生專案外模板；工具拒絕未知來源雜湊與 repository 內輸出位置。
 3. 更新 `core/interview-template-domain.js` 的對應版本與模板雜湊；以合成案例驗證全部欄位、完整聲明、簽名、長答案、檔名以及 Word 渲染。模板本體不列入 Git 測試 fixture。
 4. 執行相關測試、`npm run check` 及 Pages 打包檢查。`scripts/prepare-github-pages.mjs` 必須包含瀏覽器模板服務，不能包含原始模板或私密 JSON。
-5. 套用私密 bucket migration，上傳四份模板並核對物件雜湊與匿名拒絕；部署 `app-api` 後再發布前端。前後端和模板需使用同一版本，不能只部署 HTML。
+5. 套用私密 bucket migration，上傳本次更換模板並核對物件雜湊與匿名拒絕；部署 `app-api` 後再發布前端。前後端和模板需使用同一版本，不能只部署 HTML。
 6. 使用正式登入確認五種類型可以產檔與正常保存案件，檢查未知類型、匿名請求及缺檔都不能取得模板。保存正式部署證據後，才更新文件為「線上已生效」。舊案已保存的 Word 不批次覆寫。
 
 本次合成案例渲染、私密模板及對照證據保存在專案外；所有正式原檔部件與頁首頁尾均未另製。
@@ -57,7 +64,7 @@
 
 來源：Sean 現行決策。此功能已隨 v1.8.6 部署；發布驗證狀態見本文開頭。
 
-- 副主席／Admin 在案件回饋／投票頁及結案資料頁，只要五類案件已有實際保存的訪談附件，且附件未帶系統公版產檔標記，就能看見「產生中心區公版副本」。包含訪談已完成、正在回饋或投票、等待董顧／公告及已結案案件，不再要求結案。沒有保存附件、特定會員關懷及新公版產物不顯示。
+- 2026-10-25 新版續約題目及文件數已改變，續約歷史案停止重製不同題目的公版副本，保留下載原件。其餘四類案件：副主席／Admin 在案件回饋／投票頁及結案資料頁，只要案件已有實際保存的訪談附件，且附件未帶系統公版產檔標記，就能看見「產生中心區公版副本」。包含訪談已完成、正在回饋或投票、等待董顧／公告及已結案案件，不再要求結案。沒有保存附件、特定會員關懷及新公版產物不顯示。
 - 五種新產物於 ZIP comment 記錄 `fulian.regional-template.v1` 與模板 ID，不改動可見內容與其他 OOXML 部件。判斷不靠檔名或上線日期；版本升級後也不為已有公版檔顯示按鈕。標記是格式提示，不是數位簽章；外部 Word 重新儲存可能移除標記，手動上傳無標記公版仍可能顯示按鈕。
 - 原「下載保存檔」功能繼續取回原附件。副本只在記憶體產生並另行下載，檔名增加 `-公版副本-待核對`。不呼叫附件上傳、案件保存或狀態推進；不新增副本到原歷史附件，不異動投票、歷程與結案時間。
 - 資料來源為本案保存的結構化填答與可核對的歷史續約 PALMS 快照。不是自動解析最後上傳 Word；畫面明確提醒兩者可能不同，提交前必須對照原保存檔。缺少填答、有效訪談日期或姓名不符即停止；不以結案日期或今天取代。
